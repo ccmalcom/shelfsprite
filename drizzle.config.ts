@@ -7,7 +7,7 @@ import path from 'node:path';
 // boot. Railway is paused, so nothing auto-applies anything: `npm run
 // db:migrate` is run by hand. The Vercel build must NEVER run migrations
 // (builds run per-deploy and would race).
-loadEnv({ path: path.resolve(__dirname, '..', '.env') });
+loadEnv({ path: path.resolve(__dirname, '.env') });
 
 export default defineConfig({
   dialect: 'postgresql',

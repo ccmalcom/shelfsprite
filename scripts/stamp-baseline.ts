@@ -13,7 +13,7 @@ import { config as loadEnv } from 'dotenv';
 import path from 'node:path';
 import postgres from 'postgres';
 
-loadEnv({ path: path.resolve(__dirname, '..', '..', '.env') });
+loadEnv({ path: path.resolve(__dirname, '..', '.env') });
 
 async function main() {
   const url = process.env.DATABASE_URL;

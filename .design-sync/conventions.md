@@ -1,7 +1,7 @@
-# MyLibrary UI — how to build with these components
+# ShelfSprite UI — how to build with these components
 
-MyLibrary is a dark, literary, book-taste app. These are its real React primitives
-(`window.MyLibraryUI.*`). Build on-brand by using the token utility classes below — do
+ShelfSprite is a dark, literary, book-taste app. These are its real React primitives
+(`window.ShelfSpriteUI.*`). Build on-brand by using the token utility classes below — do
 not invent your own colors, and never hardcode hex values.
 
 ## Setup & wrapping
@@ -17,7 +17,7 @@ not invent your own colors, and never hardcode hex values.
   `style={{ '--user-accent': '<hsl>' }}` on a wrapper to theme a subtree; it defaults to
   the brand persimmon.
 
-## Styling idiom — Tailwind utilities with MyLibrary tokens
+## Styling idiom — Tailwind utilities with ShelfSprite tokens
 
 Style your own layout/glue with these token classes (real utilities, in the shipped CSS).
 Never use raw Tailwind palette classes (`bg-gray-800`, `text-red-500`) — use the tokens:
@@ -44,7 +44,7 @@ their props first (`variant`, `size`, `elevated`, `readOnly`, …).
 ## Idiomatic snippet
 
 ```tsx
-import { Card, Badge, StarRating, Button } from 'mylibrary-frontend';
+import { Card, Badge, StarRating, Button } from 'shelfsprite-frontend';
 
 function BookRow() {
   return (

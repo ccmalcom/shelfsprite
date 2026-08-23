@@ -1,4 +1,4 @@
-import { Modal, Button } from 'mylibrary-frontend';
+import { Modal, Button } from 'shelfsprite-frontend';
 
 const panel: React.CSSProperties = {
   width: 420,

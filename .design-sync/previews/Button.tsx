@@ -1,4 +1,4 @@
-import { Button } from 'mylibrary-frontend';
+import { Button } from 'shelfsprite-frontend';
 
 const row: React.CSSProperties = {
   display: 'flex',

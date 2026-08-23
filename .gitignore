@@ -19,16 +19,25 @@ venv/
 .DS_Store
 .vscode/
 
-# TypeScript build cache
-frontend/tsconfig.tsbuildinfo
+# Next.js build output
+.next/
+out/
+dist/
+.vercel
 
-# Node deps / tool caches. frontend/.gitignore already covers frontend/node_modules;
-# this catches the repo-root node_modules/.vite cache vitest creates when run from here.
+# Local env. `.env` is already ignored above; `.env.example` stays tracked.
+.env.*
+!.env.example
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
+# Node deps / tool caches.
 node_modules/
 
 #UI Test
 
-frontend/app/ui-test/
+app/ui-test/
 
 #claude docs
 # docs/superpowers/ is tracked on purpose: the Node-migration specs, wave plans and
@@ -46,6 +55,6 @@ ds-bundle/
 .design-sync/.cache/
 .design-sync/learnings/
 .design-sync/node_modules
-frontend/.design-sync-build/ds.css
-frontend/node_modules/mylibrary-frontend
-frontend/types/
+.design-sync-build/ds.css
+node_modules/shelfsprite-frontend
+types/

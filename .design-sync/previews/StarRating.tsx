@@ -1,4 +1,4 @@
-import { StarRating } from 'mylibrary-frontend';
+import { StarRating } from 'shelfsprite-frontend';
 
 const wrap: React.CSSProperties = { display: 'grid', gap: 16, padding: 28 };
 

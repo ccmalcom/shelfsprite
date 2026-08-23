@@ -1,4 +1,4 @@
-# design-sync notes — MyLibrary
+# design-sync notes — ShelfSprite
 
 ## Scope
 - Syncing the **`components/ui/` primitives only** (Button, Input, Textarea, Field, Card,
@@ -15,17 +15,17 @@
   build would give. Acceptable for primitives.
 - **Package resolution needs a junction.** `PKG_DIR = join(node_modules, pkg)`, but npm never
   self-installs the app into its own `node_modules`. Fix: a directory junction
-  `frontend/node_modules/mylibrary-frontend -> frontend` (created with PowerShell
+  `node_modules/shelfsprite-frontend -> .` (repo root) (created with PowerShell
   `New-Item -ItemType Junction`; gitignored, **recreate per clone**). `--node-modules` points
-  at `frontend/node_modules`; `pkg` = `mylibrary-frontend`; `srcDir` = `components/ui` scopes
+  at `node_modules`; `pkg` = `shelfsprite-frontend`; `srcDir` = `components/ui` scopes
   discovery to just the primitives.
-- **Reused existing `frontend/node_modules`** instead of `npm ci` (lockfile-consistent, active
-  dev tree) to save time. Re-run `npm ci` in `frontend/` if anything looks stale.
+- **Reused existing `node_modules`** instead of `npm ci` (lockfile-consistent, active
+  dev tree) to save time. Re-run `npm ci` at the repo root if anything looks stale.
 
 ## Styling (Tailwind + CSS-variable tokens)
 - Styling is Tailwind utility classes + `:root` CSS vars from `app/globals.css`. There is no
   compiled component stylesheet, so `cssEntry` points at a **generated** file:
-  `frontend/.design-sync-build/ds.css`, compiled by `buildCmd` (Tailwind CLI over
+  `.design-sync-build/ds.css`, compiled by `buildCmd` (Tailwind CLI over
   `ds-input.css` + `tailwind.ds.cjs`).
 - `ds-input.css` bakes in the full `:root` token block AND the `--font-*` family definitions
   (which normally come from `next/font` at runtime and would be undefined in a standalone
@@ -52,7 +52,7 @@
   `buildCmd`.
 
 ## Re-sync risks
-- The junction and `frontend/.design-sync-build/` are gitignored — a fresh clone must recreate
+- The junction and `.design-sync-build/` are gitignored — a fresh clone must recreate
   the junction and re-run `buildCmd` before the converter.
 - `ds.css` is only as complete as its content scan — a preview using a utility not present in
   `components/ui` needs a `buildCmd` re-run before that class renders.

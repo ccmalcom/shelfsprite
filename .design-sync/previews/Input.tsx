@@ -1,4 +1,4 @@
-import { Input } from 'mylibrary-frontend';
+import { Input } from 'shelfsprite-frontend';
 
 const wrap: React.CSSProperties = { display: 'grid', gap: 12, padding: 24, maxWidth: 360 };
 

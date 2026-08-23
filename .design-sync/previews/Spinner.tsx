@@ -1,4 +1,4 @@
-import { Spinner } from 'mylibrary-frontend';
+import { Spinner } from 'shelfsprite-frontend';
 
 const row: React.CSSProperties = {
   display: 'flex',

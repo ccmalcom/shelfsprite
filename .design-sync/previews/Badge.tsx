@@ -1,4 +1,4 @@
-import { Badge } from 'mylibrary-frontend';
+import { Badge } from 'shelfsprite-frontend';
 
 const row: React.CSSProperties = {
   display: 'flex',

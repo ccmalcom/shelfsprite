@@ -1,8 +1,8 @@
 {
   "projectId": "9451aec6-226a-4150-9d1b-2647bef8a993",
   "shape": "package",
-  "pkg": "mylibrary-frontend",
-  "globalName": "MyLibraryUI",
+  "pkg": "shelfsprite-frontend",
+  "globalName": "ShelfSpriteUI",
   "srcDir": "components/ui",
   "tsconfig": "tsconfig.json",
   "cssEntry": ".design-sync-build/ds.css",
@@ -11,5 +11,5 @@
     "Modal": { "cardMode": "single", "viewport": "600x560" },
     "ToastProvider": { "cardMode": "single", "viewport": "480x400" }
   },
-  "buildCmd": "cd frontend && node_modules/.bin/tsc -p .design-sync-build/tsconfig.dts.json && node_modules/.bin/tailwindcss -c .design-sync-build/tailwind.ds.cjs -i .design-sync-build/ds-input.css -o .design-sync-build/ds.css --minify"
+  "buildCmd": "node_modules/.bin/tsc -p .design-sync-build/tsconfig.dts.json && node_modules/.bin/tailwindcss -c .design-sync-build/tailwind.ds.cjs -i .design-sync-build/ds-input.css -o .design-sync-build/ds.css --minify"
 }

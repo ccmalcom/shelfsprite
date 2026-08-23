@@ -735,11 +735,7 @@ function DoneStep({ profiled, onComplete }: { profiled: boolean; onComplete?: ()
     <>
       <div className="space-y-6 text-center">
         <div>
-          <ShelfSprite
-            variant="success"
-            sizes="128px"
-            className="mx-auto mb-3 h-32 w-32"
-          />
+          <ShelfSprite variant="success" sizes="128px" className="mx-auto mb-3 h-32 w-32" />
           <h2 className="mb-2 text-2xl font-bold text-text">Your library is in.</h2>
           <p className="text-sm text-muted">
             {profiled
@@ -783,12 +779,7 @@ export default function SetupWizard({ onComplete }: { onComplete?: () => void })
     <div className="fade-in flex min-h-[60vh] flex-col items-center justify-center py-6 sm:py-12">
       <div className="w-full max-w-lg">
         <div className="mb-8 text-center">
-          <BrandLogo
-            alt=""
-            priority
-            sizes="208px"
-            className="mx-auto h-auto w-52"
-          />
+          <BrandLogo alt="" priority sizes="208px" className="mx-auto h-auto w-52" />
           <h1 className="sr-only">Welcome to ShelfSprite</h1>
           <p className="mt-3 text-sm text-muted">
             {step === 'name' || step === 'api-key'

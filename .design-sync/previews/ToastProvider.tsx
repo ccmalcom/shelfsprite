@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { ToastProvider, useToast } from 'mylibrary-frontend';
+import { ToastProvider, useToast } from 'shelfsprite-frontend';
 
 function Demo() {
   const toast = useToast();

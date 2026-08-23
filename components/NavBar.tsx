@@ -25,11 +25,7 @@ export default function NavBar() {
   return (
     <nav className="sticky top-0 z-50 border-b border-border bg-base/90 backdrop-blur-sm">
       <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-3">
-        <Link
-          href="/"
-          aria-label="ShelfSprite home"
-          className={`shrink-0 rounded-sm ${focusRing}`}
-        >
+        <Link href="/" aria-label="ShelfSprite home" className={`shrink-0 rounded-sm ${focusRing}`}>
           <BrandLogo
             alt=""
             priority

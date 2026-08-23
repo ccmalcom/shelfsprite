@@ -1,4 +1,4 @@
-import { Card, Badge } from 'mylibrary-frontend';
+import { Card, Badge } from 'shelfsprite-frontend';
 
 const wrap: React.CSSProperties = { display: 'grid', gap: 16, padding: 24, maxWidth: 420 };
 
