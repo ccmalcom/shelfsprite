@@ -36,7 +36,7 @@
     threshold), preserving `progress` at 65/159.
 
 - ~~**Add-book search ranking scores correct matches 0.**~~ **FIXED 2026-08-13, Node only.**
-  Root cause was `matchScore` (`frontend/lib/server/catalog.ts`, mirror of `_match_score`,
+  Root cause was `matchScore` (`lib/server/catalog.ts`, mirror of `_match_score`,
   `mylibrary/catalog.py:449`) — NOT retrieval. Both defects are fixed:
   1. `normFull` mapped non-alphanumerics to a _space_, so `"The Android's Dream"` became
      `the android s dream` with a stray `s` token and the query `the androids dream` failed all
@@ -119,7 +119,7 @@ Repository retirement work:
 - [x] Drizzle baseline generated from a production `pg_dump`, **never** a fresh `alembic upgrade
 head`; `docs/hosting.md` records the two legitimate `enrich_jobs.progress`/`total` shapes.
 - [x] Delete `mylibrary/`, `tests/`, `alembic/`, and the fixture recorders.
-- [x] Strip `NEXT_PUBLIC_API_URL` and the retired backend switcher; `frontend/lib/api.ts` now uses
+- [x] Strip `NEXT_PUBLIC_API_URL` and the retired backend switcher; `lib/api.ts` now uses
       the same-origin `/api` base directly.
 - [x] Fix add-book search ranking — done early, 2026-08-13, without waiting for the delete. Node
       only; the parity fixture turned out not to be a blocker (see BUGS above).

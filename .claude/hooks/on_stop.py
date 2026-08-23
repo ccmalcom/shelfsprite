@@ -1,18 +1,18 @@
 #!/usr/bin/env python3
-"""Claude Code Stop hook for MyLibrary.
+"""Claude Code Stop hook for ShelfSprite.
 
 Runs when Claude finishes a turn. Inspects uncommitted changes and runs targeted
 verification on the files that changed, so regressions surface before you hit
 them manually:
 
-  - frontend `tsc --noEmit`            (any frontend .ts/.tsx changed)
-  - eslint on changed frontend files   (if eslint is installed)
+  - `tsc --noEmit`                     (any .ts/.tsx changed)
+  - eslint on changed files            (if eslint is installed)
   - prettier --check on changed files  (if prettier is installed)
   - nudge when code changed but no .md  (docs convention)
 
 Checks run on changed files only, so a clean turn stays quiet and you are not
 blocked by pre-existing debt in files Claude did not touch. Node tools are
-skipped silently until their package appears in frontend/node_modules. On any
+skipped silently until their package appears in node_modules. On any
 finding it writes to stderr and exits 2, feeding the message back to Claude so it
 keeps working. `stop_hook_active` is honored as a loop guard (fires at most once
 per stop cycle).
@@ -78,34 +78,36 @@ def main():
     if not changed:
         return 0
 
-    ts = [c for c in changed if c.startswith("frontend/") and c.endswith((".ts", ".tsx"))]
+    # The Next app used to live under frontend/; it is now the repo root, so
+    # paths need no prefix filter or stripping. Tooling state and the planning
+    # archive are excluded via .prettierignore / eslint's dot-dir defaults.
+    ts = [c for c in changed if c.endswith((".ts", ".tsx"))]
     docs = [c for c in changed if c.endswith(".md")]
     code = [c for c in changed if c.endswith((".py", ".ts", ".tsx"))]
-    fe = [c for c in changed if c.startswith("frontend/")]
-    fe_lint = [c[len("frontend/"):] for c in fe if c.endswith(ESLINT_EXT)]
-    fe_fmt = [c[len("frontend/"):] for c in fe if c.endswith(PRETTIER_EXT)]
+    fe_lint = [c for c in changed if c.endswith(ESLINT_EXT)]
+    fe_fmt = [c for c in changed if c.endswith(PRETTIER_EXT)]
 
-    fe_dir = root / "frontend"
+    fe_dir = root
     msgs = []
 
-    # --- frontend type-check ---
+    # --- type-check ---
     if ts:
         r = run("npm run -s type-check", fe_dir)
         if r.returncode != 0:
-            msgs.append("[type-check FAILED] frontend tsc --noEmit\n" + tail(r.stdout + r.stderr))
+            msgs.append("[type-check FAILED] tsc --noEmit\n" + tail(r.stdout + r.stderr))
 
-    # --- eslint on changed frontend files ---
+    # --- eslint on changed files ---
     if fe_lint and (fe_dir / "node_modules" / "eslint").exists():
         r = run("npm exec --no -- eslint " + sh_args(fe_lint), fe_dir)
         if r.returncode != 0:
             msgs.append("[eslint FAILED]\n" + tail(r.stdout + r.stderr))
 
-    # --- prettier --check on changed frontend files ---
+    # --- prettier --check on changed files ---
     if fe_fmt and (fe_dir / "node_modules" / "prettier").exists():
         r = run("npm exec --no -- prettier --check " + sh_args(fe_fmt), fe_dir)
         if r.returncode != 0:
             msgs.append(
-                "[prettier FAILED] (run `npm run format` in frontend/ to fix)\n"
+                "[prettier FAILED] (run `npm run format` to fix)\n"
                 + tail(r.stdout + r.stderr)
             )
 

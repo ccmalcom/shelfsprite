@@ -1,5 +1,5 @@
 /**
- * Typed fetch client for MyLibrary's same-origin API.
+ * Typed fetch client for ShelfSprite's same-origin API.
  * In hosted mode each request carries the Supabase session token (see authHeaders).
  */
 

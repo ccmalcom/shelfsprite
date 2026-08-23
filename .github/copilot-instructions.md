@@ -18,7 +18,7 @@ source or focused document.
 
 ## Current system
 
-ShelfSprite is one TypeScript/Next.js application under `frontend/`. Vercel hosts both the pages
+ShelfSprite is one TypeScript/Next.js application rooted at the repository root. Vercel hosts both the pages
 and same-origin `/api` route handlers. Supabase provides authentication and Postgres; server code
 uses drizzle-orm. There is no separate backend service or resident worker.
 
@@ -33,7 +33,7 @@ uses drizzle-orm. There is no separate backend service or resident worker.
 
 ## Build and validate
 
-Run from `frontend/`:
+Run from the repository root:
 
 ```bash
 npm install
@@ -52,13 +52,12 @@ failures. For local development, run `npm run dev`.
 ## Project layout
 
 ```text
-frontend/
-  app/              Next.js pages and same-origin API route handlers
-  components/       application and design-system components
-  lib/api.ts        typed browser client; every request uses /api
-  lib/server/       auth, database, catalog, enrichment, profile, recommender, admin
-  drizzle/          migration SQL and drizzle metadata
-  proxy.ts          page-session middleware; deliberately excludes /api
+app/                Next.js pages and same-origin API route handlers
+components/         application and design-system components
+lib/api.ts          typed browser client; every request uses /api
+lib/server/         auth, database, catalog, enrichment, profile, recommender, admin
+drizzle/            migration SQL and drizzle metadata
+proxy.ts            page-session middleware; deliberately excludes /api
 docs/               architecture, frontend, hosting, and conventions
 ```
 
@@ -74,7 +73,7 @@ docs/               architecture, frontend, hosting, and conventions
 - Unknown-language catalog candidates pass the language filter. Keep recommender tuning constants
   in their owning modules (`recSignal.ts`, `recAssemble.ts`, and `recFilters.ts`), not in callers or
   tests.
-- `frontend/proxy.ts` must exclude `api`; route handlers authenticate themselves, and cookieless
+- `proxy.ts` must exclude `api`; route handlers authenticate themselves, and cookieless
   enrichment continuation depends on bypassing page middleware.
 - `enrich/start` and `enrich/tick` must each export the literal `maxDuration = 300`; an imported
   value breaks Next's static segment-config analysis.

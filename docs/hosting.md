@@ -3,7 +3,7 @@
 ## Current runtime
 
 ShelfSprite is one Next.js application deployed on Vercel. Pages and same-origin `/api` route
-handlers run from `frontend/`; server modules access Supabase Postgres through drizzle-orm and
+handlers run from the repository root; server modules access Supabase Postgres through drizzle-orm and
 verify Supabase sessions through JWKS. There is no separate web service or resident worker.
 
 The product is invite-only. Users may store an encrypted Anthropic key, with a server-level key as
@@ -16,7 +16,7 @@ users, and other Supabase-managed settings live in the **Supabase dashboard**. T
 of the deployed system: a missing variable or dashboard allowlist entry is not repairable with a
 code-only change.
 
-Current source readers under `frontend/lib`, `frontend/app`, and `frontend/utils` use:
+Current source readers under `lib`, `app`, and `utils` use:
 
 | Variable                               | Purpose                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------ |
@@ -118,7 +118,7 @@ explicitly.
 
 ## Vercel cron and enrichment continuation
 
-`frontend/vercel.json` registers one cron:
+`vercel.json` registers one cron:
 
 ```text
 /api/enrich/janitor  17 3 * * *
@@ -131,7 +131,7 @@ $CRON_SECRET`; `isValidCronSecret` fails closed when the value or header is abse
 The enrichment flow is serverless:
 
 - `POST /api/enrich/start` creates/claims a durable job and runs one bounded chunk.
-- `frontend/app/api/enrich/start/route.ts` and `tick/route.ts` each export the literal
+- `app/api/enrich/start/route.ts` and `tick/route.ts` each export the literal
   `maxDuration = 300`.
 - `CHUNK_BUDGET_MS = 240_000` stops work below that function ceiling.
 - `rearmAfterResponse` uses Next's `after()` to send only the job ID to
@@ -145,7 +145,7 @@ when synchronous scheduling fails; `repairActiveJobs` catches failures per job a
 the janitor from authenticating, the job remains intact but cannot resume until configuration is
 fixed and a healthy repair path runs.
 
-`frontend/proxy.ts` must continue to exclude `api`. Internal tick and cron calls carry a bearer
+`proxy.ts` must continue to exclude `api`. Internal tick and cron calls carry a bearer
 secret but no Supabase session cookie; when page middleware matched `/api/*`, it redirected those
 requests to `/login`. A 307 did not throw, so the failure looked like successful scheduling.
 `rearmAfterResponse` now checks `response.ok` and logs non-2xx outcomes.
@@ -173,10 +173,9 @@ evidence that the cron failed.
 
 ## Database migrations: drizzle-kit
 
-All new migrations use drizzle-kit from `frontend/`:
+All new migrations use drizzle-kit from the repository root:
 
 ```bash
-cd frontend
 npm run db:generate
 # inspect drizzle/NNNN_*.sql before continuing
 npm run db:migrate

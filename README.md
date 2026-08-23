@@ -10,9 +10,9 @@ deterministic retrieval followed by Claude reranking and explanation.
 
 ## Architecture
 
-ShelfSprite is a single Next.js application in `frontend/`, deployed on Vercel. Browser calls go
-through the typed client in `frontend/lib/api.ts` to same-origin `/api` route handlers. Server code
-under `frontend/lib/server/` verifies Supabase sessions, accesses Supabase Postgres through
+ShelfSprite is a single Next.js application at the repository root, deployed on Vercel. Browser calls go
+through the typed client in `lib/api.ts` to same-origin `/api` route handlers. Server code
+under `lib/server/` verifies Supabase sessions, accesses Supabase Postgres through
 drizzle-orm, calls catalog providers, and runs the profile and recommendation flows.
 
 ```text
@@ -27,7 +27,6 @@ candidates; Stage 2 lets Claude rerank and explain only that bounded set.
 ## Local development
 
 ```bash
-cd frontend
 npm install
 npm run dev
 ```
@@ -39,7 +38,7 @@ project URL nor an explicit JWKS URL is configured, requests use the single loca
 
 ## Validation
 
-Run the complete gate from `frontend/`:
+Run the complete gate from the repository root:
 
 ```bash
 npm run test:server

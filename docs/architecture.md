@@ -2,21 +2,21 @@
 
 ## Runtime shape
 
-ShelfSprite is one TypeScript/Next.js application in `frontend/`, deployed on Vercel. Browser code
-uses the typed client in `frontend/lib/api.ts`, which sends same-origin requests to `/api` route
-handlers under `frontend/app/api/`. Those handlers call the application modules in
-`frontend/lib/server/`; there is no separate backend service or worker process.
+ShelfSprite is one TypeScript/Next.js application rooted at the repository root, deployed on Vercel. Browser code
+uses the typed client in `lib/api.ts`, which sends same-origin requests to `/api` route
+handlers under `app/api/`. Those handlers call the application modules in
+`lib/server/`; there is no separate backend service or worker process.
 
 Supabase supplies authentication and the Postgres database. `lib/server/auth.ts` verifies
 Supabase bearer tokens and derives the tenant key from the JWT subject. `lib/server/http.ts` wraps
 API handlers with authentication, admin checks, error mapping, request logging, and optional
-timing headers. Page session middleware lives in `frontend/proxy.ts` and excludes `/api`, because
+timing headers. Page session middleware lives in `proxy.ts` and excludes `/api`, because
 API routes enforce their own authentication.
 
 `lib/server/db.ts#getDb` creates the drizzle/postgres-js client, and
 `lib/server/schema.ts` declares the checked-in database shape. Connections use
 `prepare: false` for the Supabase transaction-mode pooler. Schema changes are generated and
-applied with drizzle-kit from `frontend/drizzle/`.
+applied with drizzle-kit from `drizzle/`.
 
 ## Server module map
 

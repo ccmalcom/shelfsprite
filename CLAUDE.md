@@ -9,11 +9,11 @@ ShelfSprite is a personal, AI-assisted book-analysis and recommendation app at
 `shelfsprite.app`. It starts from a Goodreads CSV export, enriches each book with catalog
 metadata, derives a taste profile, and recommends real books from the catalog.
 
-The application is a TypeScript/Next.js app in `frontend/`, deployed only on Vercel. Next route
-handlers under `frontend/app/api/` are the backend, and `frontend/lib/api.ts` calls them at the
+The application is a TypeScript/Next.js app rooted at the repository root, deployed only on
+Vercel. Next route handlers under `app/api/` are the backend, and `lib/api.ts` calls them at the
 same-origin `/api` prefix. Supabase provides authentication and user identity. User-owned
 application data is tenant-scoped in Supabase Postgres, accessed through drizzle-orm using the
-schema in `frontend/lib/server/schema.ts`; drizzle-kit owns schema migrations. There is no
+schema in `lib/server/schema.ts`; drizzle-kit owns schema migrations. There is no
 separate web service or worker deployment.
 
 The product is invite-only. Supabase JWT `sub` values are the tenant keys, and every data access
@@ -22,13 +22,13 @@ not configured.
 
 ## Code map
 
-- `frontend/app/` — pages and same-origin API route handlers.
-- `frontend/components/` — application and design-system components.
-- `frontend/lib/api.ts` — typed browser client for `/api`.
-- `frontend/lib/server/` — database, auth, catalog, enrichment, profile, recommender, import,
+- `app/` — pages and same-origin API route handlers.
+- `components/` — application and design-system components.
+- `lib/api.ts` — typed browser client for `/api`.
+- `lib/server/` — database, auth, catalog, enrichment, profile, recommender, import,
   export, administration, and wire-format domain code.
-- `frontend/drizzle/` — generated migration SQL and drizzle metadata snapshots.
-- `frontend/proxy.ts` — page-session middleware; API authentication stays in route handlers.
+- `drizzle/` — generated migration SQL and drizzle metadata snapshots.
+- `proxy.ts` — page-session middleware; API authentication stays in route handlers.
 
 See `docs/architecture.md` for the server module map, `docs/frontend.md` for UI and client
 patterns, `docs/hosting.md` for deployment and operational history, and `docs/conventions.md` for
@@ -42,7 +42,7 @@ to match the current implementation.
 Ratings use a 0.5 grid from 0.5 through 5.0. `books.app_rating` and
 `books.goodreads_rating` are `numeric(2,1)` columns and must keep drizzle
 `mode: 'number'`; otherwise Postgres values arrive as strings and numeric comparisons silently
-misbehave. Keep `frontend/lib/server/rating.ts` dependency-free: client code imports it, so adding
+misbehave. Keep `lib/server/rating.ts` dependency-free: client code imports it, so adding
 Zod or another server dependency there increases every affected browser bundle.
 
 `0` is a sentinel, never a rating. `app_rating IS NULL` means there is no in-app override,
@@ -55,7 +55,7 @@ as decimals (`4.5`).
 
 ### API wire-format primitives
 
-`frontend/lib/server/serialize.ts` defines the API and prompt wire format. Client behavior and
+`lib/server/serialize.ts` defines the API and prompt wire format. Client behavior and
 stored prompt inputs depend on these exact representations even though the helpers retain their
 `py*` names:
 
@@ -79,7 +79,7 @@ stored prompt inputs depend on these exact representations even though the helpe
 
 ### Enrichment jobs and Vercel duration
 
-`frontend/app/api/enrich/start/route.ts` and `frontend/app/api/enrich/tick/route.ts` must each
+`app/api/enrich/start/route.ts` and `app/api/enrich/tick/route.ts` must each
 export the literal `maxDuration = 300`. Do not replace the literal with an imported binding,
 including `FUNCTION_CEILING_SECONDS`: Next's static segment-config analyzer requires a literal,
 and the imported form makes `next build` fail during “Collecting page data” without naming the
@@ -94,18 +94,18 @@ Progress is derived by recounting persisted enrichment rows, including the run-r
 `resolved_at >= started_at` rule; never accumulate an in-memory counter as job truth. Job creation
 must explicitly pass `progress: 0` and `total: 0`, because those NOT NULL columns do not have a
 reliable server default across database vintages. The hand-written `NewJobValues` interface in
-`frontend/lib/server/enrichmentJobs.ts` is the TypeScript guard that keeps both fields required;
+`lib/server/enrichmentJobs.ts` is the TypeScript guard that keeps both fields required;
 do not replace that insert type with drizzle's looser `$inferInsert`.
 
 ### Administration and transaction boundaries
 
 Transaction boundaries are chosen per operation and deliberately differ. In
-`frontend/lib/server/invites.ts`, `backfillFromSupabase` is transactional after its remote read;
+`lib/server/invites.ts`, `backfillFromSupabase` is transactional after its remote read;
 `createInvite` is not wrapped in one transaction because its GoTrue write cannot roll back; and
 `revokeUser` records revocation before its separately transactional purge so a purge failure does
 not cause a retry of the irreversible GoTrue deletion. Do not “harmonize” these functions.
 
-`frontend/lib/server/supabaseAdmin.ts` sends the Supabase secret on the `apikey` header only,
+`lib/server/supabaseAdmin.ts` sends the Supabase secret on the `apikey` header only,
 never `Authorization`; Supabase interprets an Authorization value as a JWT, while current
 `sb_secret_*` keys are opaque. Its error-message fallback must remain `data.msg || data.message`,
 not `??`: `||` falls through on every falsy value, including an empty string, while `??` falls
@@ -115,7 +115,7 @@ unauthenticated and non-admin callers instead of being pre-empted by the wrapper
 
 ### Page middleware versus API authentication
 
-`frontend/proxy.ts` must keep `api` in the matcher's negative lookahead. The proxy gates page
+`proxy.ts` must keep `api` in the matcher's negative lookahead. The proxy gates page
 routes only; API handlers perform their own bearer authentication through `withApi`, and internal
 enrichment routes validate `CRON_SECRET`. When the proxy once matched `/api/*`, cookieless
 internal tick requests were redirected to `/login`. The bug stayed invisible for a long stretch
@@ -132,7 +132,7 @@ prerender failures.
 ### Database migrations and production shape
 
 `drizzle-kit generate` never reads a live database. It only diffs
-`frontend/lib/server/schema.ts` against `frontend/drizzle/meta/*.json`, so “generate emitted
+`lib/server/schema.ts` against `drizzle/meta/*.json`, so “generate emitted
 nothing” does not prove production has no drift. Verify production columns, nullability, and defaults with
 `information_schema.columns`, never with `schema.ts` comments. Generate migrations from the
 checked-in schema and snapshot, inspect the SQL, then apply through the documented drizzle
@@ -154,10 +154,9 @@ workflow.
 
 ## Commands
 
-Run every gate from `frontend/`:
+Run every gate from the repository root:
 
 ```bash
-cd frontend
 npm run test:server  # Vitest: lib/server/** and app/api/**
 npm test             # Jest: everything else
 npm run type-check   # tsc --noEmit

@@ -91,5 +91,5 @@
 
 ## Linting and formatting
 
-- ESLint and Prettier are configured in `frontend/`. Run `npm run lint`,
+- ESLint and Prettier are configured at the repository root. Run `npm run lint`,
   `npm run format:check`, and the rest of the gates documented in `CLAUDE.md` from that directory.

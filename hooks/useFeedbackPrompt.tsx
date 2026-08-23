@@ -185,7 +185,7 @@ export function useFeedbackPrompt(trigger: string, runId?: string): UseFeedbackP
       });
   }, [trigger, runId]);
 
-  const heading = HEADINGS[trigger] ?? 'How is MyLibrary working for you?';
+  const heading = HEADINGS[trigger] ?? 'How is ShelfSprite working for you?';
 
   const modal: ReactNode | null = open ? (
     <TargetedModal

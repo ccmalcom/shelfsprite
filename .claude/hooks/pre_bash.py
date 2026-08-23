@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Claude Code PreToolUse hook (Bash) for MyLibrary.
+"""Claude Code PreToolUse hook (Bash) for ShelfSprite.
 
 Blocks shell commands that would read the project's `.env` secrets file, while
 allowing `.env.example`, `.env.local`, etc. Exit code 2 denies the tool call and

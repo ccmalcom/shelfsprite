@@ -10,7 +10,7 @@
 import { cacheGet, cachePut } from './catalogCache';
 import type { Db } from './db';
 
-const USER_AGENT = 'MyLibrary/0.1 (personal book-analysis project)';
+const USER_AGENT = 'ShelfSprite/0.1 (personal book-analysis project)';
 const MAX_RETRIES = 2;
 const RETRYABLE = new Set([429, 500, 502, 503, 504]);
 const DEFAULT_REQ_PER_SEC = 8.0;
