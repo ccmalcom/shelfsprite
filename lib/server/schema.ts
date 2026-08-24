@@ -333,6 +333,43 @@ export const invites = pgTable(
   ]
 );
 
+/**
+ * Waitlist requests from the public marketing page.
+ *
+ * Hand-added, NOT introspected. The file header forbids hand-editing the shape of tables
+ * that `drizzle-kit pull` produced from the Alembic-owned database, so the checked-in file
+ * cannot drift from real column types. This table is new and owned by ShelfSprite alone, so
+ * there is nothing to drift from. Do not run `drizzle-kit pull` to add it.
+ *
+ * DELIBERATELY NOT tenant-scoped. Every other user-owned table carries a user_id that forms
+ * the tenancy boundary. These rows are submitted by people who have no Supabase `sub` yet, so
+ * there is nothing to scope them to; they are readable only by admins. Do not "fix" this.
+ *
+ * The unique index is on the raw column, so lowercasing and trimming happen in
+ * lib/server/inviteRequests.ts before every insert and lookup. `status` is a plain varchar
+ * ('pending' | 'approved' | 'declined'), matching invites.status and feedback.status.
+ */
+export const inviteRequests = pgTable(
+  'invite_requests',
+  {
+    id: serial().primaryKey().notNull(),
+    email: varchar().notNull(),
+    status: varchar().notNull(),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    reviewedAt: timestamp('reviewed_at', { mode: 'string' }),
+    /** The reviewing admin's Supabase `sub`. */
+    reviewedBy: varchar('reviewed_by'),
+  },
+  (table) => [
+    uniqueIndex('ux_invite_requests_email').using(
+      'btree',
+      table.email.asc().nullsLast().op('text_ops')
+    ),
+  ]
+);
+
 export const usageEvents = pgTable(
   'usage_events',
   {

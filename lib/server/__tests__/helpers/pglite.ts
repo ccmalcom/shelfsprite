@@ -238,6 +238,15 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       accepted_at timestamp,
       revoked_at timestamp
     );
+    create table invite_requests (
+      id serial primary key,
+      email text not null,
+      status text not null,
+      created_at timestamp not null default current_timestamp,
+      reviewed_at timestamp,
+      reviewed_by text
+    );
+    create unique index ux_invite_requests_email on invite_requests (email);
   `);
   const db = drizzle(pg, { schema }) as unknown as Db;
   return { db, close: () => pg.close() };
@@ -249,6 +258,7 @@ export interface Seed {
   catalog_cache?: Record<string, unknown>[];
   books?: Record<string, unknown>[];
   invites?: Record<string, unknown>[];
+  invite_requests?: Record<string, unknown>[];
   enrichment?: Record<string, unknown>[];
   taste_traits?: Record<string, unknown>[];
   recommendations?: Record<string, unknown>[];
@@ -288,6 +298,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
     'snooze_until',
     'revoked_at',
     'accepted_at',
+    'reviewed_at',
   ]);
   const JSON_COLS = new Set([
     'subjects',
@@ -304,6 +315,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
     'catalog_cache',
     'books',
     'invites',
+    'invite_requests',
     'enrichment',
     'taste_traits',
     'recommendations',
@@ -342,6 +354,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
     // advance the serial. Without this setval, createInvite's first INSERT gets id=1
     // and fails on the primary key.
     'invites',
+    'invite_requests',
     'enrichment',
     'taste_traits',
     'recommendations',
