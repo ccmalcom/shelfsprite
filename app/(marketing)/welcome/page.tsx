@@ -109,14 +109,15 @@ export default function WelcomePage() {
             ))}
           </ol>
 
-          {/* Capped at the asset's own 850px: displaying a screenshot wider than it was
-              captured upscales it and the UI goes soft. */}
+          {/* Both screenshots are captured at 2x (1700px wide for an 850px layout) and displayed
+              at 850, so they stay sharp on retina. Keep the display cap at 850: at the asset's
+              full width the UI inside would render at half scale and read as tiny. */}
           <figure className="mx-auto mt-14 max-w-[850px]">
             <Image
               src="/marketing/library.png"
               alt="The ShelfSprite library, listing imported books with their covers, half-star ratings and shelf counts"
-              width={850}
-              height={870}
+              width={1700}
+              height={1740}
               sizes="(max-width: 850px) 100vw, 850px"
               className="h-auto w-full rounded-xl border border-border"
             />
@@ -186,8 +187,8 @@ export default function WelcomePage() {
             <Image
               src="/marketing/taste-profile.png"
               alt="A ShelfSprite taste profile: each trait states a claim about the reader, with the books offered as evidence and as contrast"
-              width={850}
-              height={575}
+              width={1700}
+              height={1270}
               sizes="(max-width: 850px) 100vw, 850px"
               className="h-auto w-full rounded-xl border border-border"
             />
