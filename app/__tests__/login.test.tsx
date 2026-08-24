@@ -8,7 +8,9 @@ jest.mock('@/utils/supabase/client', () => ({
   authEnabled: true,
   getSupabaseClient: () => null,
 }));
-jest.mock('@/lib/authRedirect', () => ({ inviteCallbackRedirect: () => null }));
+// The page no longer reads the hash itself; it renders <InviteHashRedirect />, which forwards
+// window.location to this helper on mount. Stub it so the test never touches navigation.
+jest.mock('@/lib/authRedirect', () => ({ forwardInviteHash: () => {} }));
 
 describe('/login', () => {
   it('exposes both credentials fields by accessible name', () => {
