@@ -188,7 +188,7 @@ Vitest's `include` covers both locations, so this is style only.
   `status: string`, `createdAt: string`, `reviewedAt: string | null`,
   `reviewedBy: string | null`; PGlite table `invite_requests`; `Seed.invite_requests`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `lib/server/__tests__/invite-requests.test.ts`:
 
@@ -236,12 +236,12 @@ describe('invite_requests table', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and confirm it fails**
+- [x] **Step 2: Run it and confirm it fails**
 
 Run: `npx vitest run lib/server/__tests__/invite-requests.test.ts`
 Expected: FAIL — `schema.inviteRequests` is undefined.
 
-- [ ] **Step 3: Add the table to `lib/server/schema.ts`**
+- [x] **Step 3: Add the table to `lib/server/schema.ts`**
 
 Insert immediately after the `invites` table block (which ends `);` before
 `export const usageEvents`). Every identifier used here — `pgTable`, `serial`, `varchar`,
@@ -286,7 +286,7 @@ export const inviteRequests = pgTable(
 );
 ```
 
-- [ ] **Step 4: Mirror the table in the PGlite helper**
+- [x] **Step 4: Mirror the table in the PGlite helper**
 
 In `lib/server/__tests__/helpers/pglite.ts`, append to the `pg.exec(...)` template literal, after
 the `create table invites (...)` statement:
@@ -310,7 +310,7 @@ Then wire it into `loadSeed` so admin route tests can seed rows:
 3. Add `'invite_requests',` to the `order` array (put it right after `'invites'`).
 4. Add `'invite_requests',` to the `SEQ_TABLES` array.
 
-- [ ] **Step 5: Run the test and the full server suite**
+- [x] **Step 5: Run the test and the full server suite**
 
 ```bash
 npx vitest run lib/server/__tests__/invite-requests.test.ts
@@ -320,7 +320,7 @@ npm run test:server
 Expected: the new file PASSES; the full server suite stays green (a missing PGlite table breaks
 unrelated seeded tests, so this is the check that matters).
 
-- [ ] **Step 6: Generate and inspect the migration — CONTROLLER ONLY, do not delegate**
+- [x] **Step 6: Generate and inspect the migration — CONTROLLER ONLY, do not delegate**
 
 ```bash
 npm run db:generate
@@ -330,7 +330,7 @@ Then read `drizzle/000N_*.sql` by hand. Expect exactly one `CREATE TABLE "invite
 one `CREATE UNIQUE INDEX "ux_invite_requests_email"`, and **no** statement touching any other
 table. If anything else appears, stop: the snapshot has drifted and that is a separate problem.
 
-- [ ] **Step 7: Apply the migration and verify production shape — CONTROLLER ONLY**
+- [x] **Step 7: Apply the migration and verify production shape — CONTROLLER ONLY**
 
 Apply through the drizzle workflow in `docs/hosting.md` (`npm run db:migrate`). `drizzle-kit
 generate` never reads a live database, so a clean generate proves nothing about production. After
@@ -347,7 +347,7 @@ Record what you actually observe, not what this plan predicts. Expected: six col
 `status` / `created_at` NOT NULL, `created_at` defaulting to `CURRENT_TIMESTAMP`, `reviewed_at`
 and `reviewed_by` nullable.
 
-- [ ] **Step 8: Gates and commit**
+- [x] **Step 8: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -397,7 +397,7 @@ git commit -m "feat(db): add invite_requests table"
   ): Promise<AdminInviteRequest | null>;
   ```
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Append to `lib/server/__tests__/invite-requests.test.ts` (add the new import next to the existing
 ones at the top of the file):
@@ -550,12 +550,12 @@ describe('inviteRequestRateKey', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx vitest run lib/server/__tests__/invite-requests.test.ts`
 Expected: FAIL — cannot resolve `../inviteRequests`.
 
-- [ ] **Step 3: Write the module**
+- [x] **Step 3: Write the module**
 
 Create `lib/server/inviteRequests.ts`:
 
@@ -679,7 +679,7 @@ export async function markReviewed(
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx vitest run lib/server/__tests__/invite-requests.test.ts
@@ -692,7 +692,7 @@ Note on the "newest first" test: two rows inserted milliseconds apart can share 
 `desc(createdAt), desc(id)` — the id breaks the tie. If that test is flaky, the ordering is
 wrong, not the test.
 
-- [ ] **Step 5: Gates and commit**
+- [x] **Step 5: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -716,7 +716,7 @@ git commit -m "feat(server): add invite-request domain module"
 - Produces: `POST /api/invite-requests` returning `200 {"ok": true}` on every accepted outcome;
   `RATE_LIMITS.inviteRequest = { limit: 5, windowSeconds: 3600 }`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `app/api/invite-requests/route.test.ts`:
 
@@ -872,12 +872,12 @@ describe('POST /api/invite-requests', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx vitest run app/api/invite-requests/route.test.ts`
 Expected: FAIL — cannot resolve `./route`.
 
-- [ ] **Step 3: Add the rate-limit entry**
+- [x] **Step 3: Add the rate-limit entry**
 
 In `lib/server/ratelimit.ts`, extend the exported `RATE_LIMITS` object. Keep the existing parity
 comment above it intact and add the new entry with its own note:
@@ -900,7 +900,7 @@ export const RATE_LIMITS = {
 } as const;
 ```
 
-- [ ] **Step 4: Write the route**
+- [x] **Step 4: Write the route**
 
 Create `app/api/invite-requests/route.ts`:
 
@@ -963,7 +963,7 @@ export const POST = withApi(
 );
 ```
 
-- [ ] **Step 5: Run the tests**
+- [x] **Step 5: Run the tests**
 
 ```bash
 npx vitest run app/api/invite-requests/route.test.ts
@@ -973,7 +973,7 @@ npx vitest run lib/server/__tests__/ratelimit-routes.test.ts
 Expected: both PASS. (The second confirms the `RATE_LIMITS` edit did not disturb the five
 existing byte-parity routes.)
 
-- [ ] **Step 6: Mutation check — three minutes, do it**
+- [x] **Step 6: Mutation check — three minutes, do it**
 
 Temporarily change the honeypot guard to `if (false)` and re-run the suite. The "silently
 swallows a filled honeypot" and "does not consume the rate limit" tests must both go red. Then
@@ -981,7 +981,7 @@ change the 429 branch to return `rateLimitExceededResponse(limit, windowSeconds)
 confirm the `{detail}`-shape test goes red. Revert both. If either stays green, the test is not
 testing what it claims.
 
-- [ ] **Step 7: Gates and commit**
+- [x] **Step 7: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -1013,7 +1013,7 @@ git commit -m "feat(api): public invite-request endpoint with honeypot and IP ra
 exposes `ctx.params.id`. In tests, call the exported handler as
 `POST(request, { params: { id: '1' } })` — `withApi` accepts a plain object or a promise.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Create `lib/server/__tests__/admin-invite-request-routes.test.ts`:
 
@@ -1202,12 +1202,12 @@ describe('admin gating', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx vitest run lib/server/__tests__/admin-invite-request-routes.test.ts`
 Expected: FAIL — the three route modules do not exist.
 
-- [ ] **Step 3: Write the list route**
+- [x] **Step 3: Write the list route**
 
 Create `app/api/admin/invite-requests/route.ts`:
 
@@ -1232,7 +1232,7 @@ export const GET = withApi(
 );
 ```
 
-- [ ] **Step 4: Write the approve route**
+- [x] **Step 4: Write the approve route**
 
 Create `app/api/admin/invite-requests/[id]/approve/route.ts`:
 
@@ -1283,7 +1283,7 @@ export const POST = withApi(
 );
 ```
 
-- [ ] **Step 5: Write the decline route**
+- [x] **Step 5: Write the decline route**
 
 Create `app/api/admin/invite-requests/[id]/decline/route.ts`:
 
@@ -1307,7 +1307,7 @@ export const POST = withApi(
 );
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 npx vitest run lib/server/__tests__/admin-invite-request-routes.test.ts
@@ -1316,13 +1316,13 @@ npm run test:server
 
 Expected: both PASS.
 
-- [ ] **Step 7: Mutation check**
+- [x] **Step 7: Mutation check**
 
 Swap the approve route's order so `markReviewed` runs before `createInvite`. The "leaves the row
 pending" test must go red. Revert. If it stays green, that test is not proving the ordering the
 comment claims.
 
-- [ ] **Step 8: Gates and commit**
+- [x] **Step 8: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -1358,7 +1358,7 @@ git commit -m "feat(api): admin invite-request list, approve and decline routes"
   export function InviteRequestsTab(): JSX.Element; // named export, like FeedbackTab
   ```
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `components/admin/__tests__/InviteRequestsTab.test.tsx`, following the mocking pattern
 already used in `components/admin/__tests__/FeedbackTab.test.tsx`:
@@ -1479,12 +1479,12 @@ describe('InviteRequestsTab', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx jest InviteRequestsTab.test.tsx`
 Expected: FAIL — cannot resolve `@/components/admin/InviteRequestsTab`.
 
-- [ ] **Step 3: Add the client functions to `lib/api.ts`**
+- [x] **Step 3: Add the client functions to `lib/api.ts`**
 
 Append after `createFeedbackGithubIssue`, before the `// ── Spend guardrails ──` divider:
 
@@ -1516,7 +1516,7 @@ export const declineInviteRequest = (id: number): Promise<AdminInviteRequest> =>
   post<AdminInviteRequest>(`/admin/invite-requests/${id}/decline`, {});
 ```
 
-- [ ] **Step 4: Write the tab**
+- [x] **Step 4: Write the tab**
 
 Create `components/admin/InviteRequestsTab.tsx`:
 
@@ -1678,7 +1678,7 @@ function RequestRow({
 }
 ```
 
-- [ ] **Step 5: Wire the tab into the admin page**
+- [x] **Step 5: Wire the tab into the admin page**
 
 Three edits in `app/(main)/admin/page.tsx`:
 
@@ -1701,7 +1701,7 @@ Three edits in `app/(main)/admin/page.tsx`:
    ```
    The `capitalize` class already on the tab button renders `requests` as "Requests".
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 npx jest InviteRequestsTab.test.tsx
@@ -1710,7 +1710,7 @@ npm test
 
 Expected: both PASS.
 
-- [ ] **Step 7: Gates and commit**
+- [x] **Step 7: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -1737,7 +1737,7 @@ rewrite (Task 7), so the rescue exists the moment the rewrite starts skipping `/
   (zero imports of its own — that is why it is safe on a page that must not pull in Supabase).
 - Produces: `export default function InviteHashRedirect(): null` — a render-nothing client island.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `components/__tests__/InviteHashRedirect.test.tsx`:
 
@@ -1801,12 +1801,12 @@ describe('InviteHashRedirect', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx jest InviteHashRedirect.test.tsx`
 Expected: FAIL — cannot resolve `@/components/InviteHashRedirect`.
 
-- [ ] **Step 3: Write the component**
+- [x] **Step 3: Write the component**
 
 Create `components/InviteHashRedirect.tsx`:
 
@@ -1837,7 +1837,7 @@ export default function InviteHashRedirect(): null {
 }
 ```
 
-- [ ] **Step 4: Use it in `app/login/page.tsx`**
+- [x] **Step 4: Use it in `app/login/page.tsx`**
 
 Delete the `useEffect` block and its comment, delete the now-unused
 `import { inviteCallbackRedirect } from '@/lib/authRedirect';`, add
@@ -1854,7 +1854,7 @@ child of the returned wrapper `<div>`:
 Trim `useEffect` from the React import if nothing else in the file uses it — check before editing
 that line; `useState` is still used.
 
-- [ ] **Step 5: Update the `lib/authRedirect.ts` header comment**
+- [x] **Step 5: Update the `lib/authRedirect.ts` header comment**
 
 Replace the sentence describing the `/login` bounce as *the* mechanism. The new header:
 
@@ -1873,7 +1873,7 @@ Replace the sentence describing the `/login` bounce as *the* mechanism. The new 
 // /auth/callback, so onboarding completes regardless of the Supabase redirect config.
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 npx jest InviteHashRedirect.test.tsx
@@ -1882,7 +1882,7 @@ npm test
 
 Expected: both PASS. `npm test` matters here because the login page changed.
 
-- [ ] **Step 7: Gates and commit**
+- [x] **Step 7: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -1910,7 +1910,7 @@ git commit -m "refactor: extract InviteHashRedirect for reuse on the marketing p
 `jest.resetModules()`, then `await import('../middleware')`. A static top-of-file import would
 freeze one env configuration for the whole file.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `utils/supabase/__tests__/middleware.test.ts`:
 
@@ -2046,13 +2046,13 @@ describe('updateSession — local mode (no Supabase env)', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx jest middleware.test.ts`
 Expected: FAIL — the `/` case currently redirects (307 to `/login`), so the rewrite assertions
 fail.
 
-- [ ] **Step 3: Modify `utils/supabase/middleware.ts`**
+- [x] **Step 3: Modify `utils/supabase/middleware.ts`**
 
 Two edits.
 
@@ -2105,7 +2105,7 @@ to `/login` full stop:
  */
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx jest middleware.test.ts
@@ -2114,7 +2114,7 @@ npm test
 
 Expected: both PASS.
 
-- [ ] **Step 5: Mutation check on the load-bearing cookie copy**
+- [x] **Step 5: Mutation check on the load-bearing cookie copy**
 
 Delete the `supabaseResponse.cookies.getAll().forEach(...)` line and re-run. **Nothing will go
 red** — no test covers it, because asserting on a refreshed-token cookie means driving the
@@ -2122,7 +2122,7 @@ red** — no test covers it, because asserting on a refreshed-token cookie means
 the cookie copy is currently documentation plus manual step 6 in Task 9, not engineering. Do not
 weaken the comment to match, and do not invent a test that only asserts the line exists.
 
-- [ ] **Step 6: Gates and commit**
+- [x] **Step 6: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -2165,7 +2165,7 @@ git commit -m "feat(middleware): rewrite signed-out / to the marketing page"
   do not add anything whose legibility depends on JS timing.
 - The copy below is final. Transcribe it exactly. No em dashes.
 
-- [ ] **Step 0: Create the placeholder images — CONTROLLER STEP (no network in the sandbox)**
+- [x] **Step 0: Create the placeholder images — CONTROLLER STEP (no network in the sandbox)**
 
 ```bash
 mkdir -p public/marketing
@@ -2178,7 +2178,7 @@ magick -size 1600x1000 xc:'#1f1b18' -fill '#948b81' -gravity center -pointsize 5
 Both are 1600x1000. Those are the intrinsic dimensions the page hardcodes, so the real screenshots
 must be captured at the same size or the `width` / `height` props updated with them.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `app/(marketing)/__tests__/welcome.test.tsx`:
 
@@ -2297,12 +2297,12 @@ describe('waitlist form', () => {
 });
 ```
 
-- [ ] **Step 2: Run and confirm failure**
+- [x] **Step 2: Run and confirm failure**
 
 Run: `npx jest welcome.test.tsx`
 Expected: FAIL — the page and form modules do not exist.
 
-- [ ] **Step 3: Write the route-group layout**
+- [x] **Step 3: Write the route-group layout**
 
 Create `app/(marketing)/layout.tsx`:
 
@@ -2318,7 +2318,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
 }
 ```
 
-- [ ] **Step 4: Write the waitlist form**
+- [x] **Step 4: Write the waitlist form**
 
 Create `app/(marketing)/welcome/WaitlistForm.tsx`:
 
@@ -2420,7 +2420,7 @@ export default function WaitlistForm() {
 `Field` renders its `error` string inside a `<p role="alert">`, which is what the 422 / 429 /
 network tests assert on. Do not add a second error element.
 
-- [ ] **Step 5: Write the page**
+- [x] **Step 5: Write the page**
 
 Create `app/(marketing)/welcome/page.tsx`. Copy is final; transcribe exactly.
 
@@ -2604,7 +2604,7 @@ export default function WelcomePage() {
 }
 ```
 
-- [ ] **Step 6: Run the tests**
+- [x] **Step 6: Run the tests**
 
 ```bash
 npx jest welcome.test.tsx
@@ -2613,7 +2613,7 @@ npm test
 
 Expected: both PASS.
 
-- [ ] **Step 7: Prove the Supabase client did not leak into the bundle**
+- [x] **Step 7: Prove the Supabase client did not leak into the bundle**
 
 ```bash
 grep -rn "lib/api\|utils/supabase/client\|@supabase" "app/(marketing)/"
@@ -2622,7 +2622,7 @@ grep -rn "lib/api\|utils/supabase/client\|@supabase" "app/(marketing)/"
 Expected: **no output**. Any hit is a bug — the marketing bundle must not carry the Supabase
 browser client.
 
-- [ ] **Step 8: Gates and commit**
+- [x] **Step 8: Gates and commit**
 
 ```bash
 npm run type-check && npm run lint && npm run format:check
@@ -2637,7 +2637,7 @@ git commit -m "feat(marketing): public splash page with invite waitlist"
 Not delegable. `npm run build` fails in a sandbox with no network because the root layout pulls
 three Google Fonts, and steps 2 through 8 need a real browser and a real Supabase project.
 
-- [ ] **Step 1: Run every gate from the repository root**
+- [x] **Step 1: Run every gate from the repository root**
 
 ```bash
 npm run test:server
@@ -2651,24 +2651,38 @@ npm run build
 All six must pass. `npm run build` is the only gate that catches Next segment-config and prerender
 failures, and this change adds a route group and a rewrite.
 
-- [ ] **Step 2: Signed out, load `/`**
+- [x] **Step 2: Signed out, load `/`**
 
 The splash renders and the address bar still reads `/`, not `/welcome`.
 
-- [ ] **Step 3: Submit the waitlist form**
+- [x] **Step 3: Submit the waitlist form**
 
 Success state appears and replaces the form. Submit the same email again from a fresh load: still
 succeeds, and the admin tab shows exactly one row.
+
+> **Execution record (2026-08-24).** Task 1 step 7 had never been run: the migration was
+> committed but `invite_requests` did not exist in the live Supabase project, so the endpoint
+> 500d and the form showed its generic error. `npm run db:migrate` applied it, and the observed
+> shape matches this plan's prediction: six columns, `email` / `status` / `created_at` NOT NULL,
+> `created_at` defaulting to CURRENT_TIMESTAMP, `reviewed_at` and `reviewed_by` nullable.
+>
+> Steps 2, 3, 5, 6 and 8 were verified against a real Chrome over CDP driving the dev server.
+> Step 6 only fires on a cold load: navigating to `/#access_token=...` from a page already at `/`
+> is a same-document fragment change, so the effect never remounts. Steps 4 and 7 below need a
+> signed-in session and are left for a human.
+>
+> One verification row (`verify-1787597769198@example.com`) is in `invite_requests` and can be
+> declined from the Requests tab.
 
 - [ ] **Step 4: Signed in, load `/`**
 
 The dashboard renders, unchanged. Nav, bottom nav, and banners all present.
 
-- [ ] **Step 5: Signed out, load `/library`**
+- [x] **Step 5: Signed out, load `/library`**
 
 Still redirects to `/login`.
 
-- [ ] **Step 6: Load `/` with a fake Supabase auth hash**
+- [x] **Step 6: Load `/` with a fake Supabase auth hash**
 
 Visit `/#access_token=fake&type=invite&refresh_token=fake`. It must forward to `/auth/callback`
 with the fragment intact. This is the invite-hash trap from spec §3.2 and the single most
@@ -2680,7 +2694,7 @@ and the real client together.
 Find the request in the Requests tab, approve it, confirm the invite email actually arrives and
 the row flips to approved with a reviewer stamped.
 
-- [ ] **Step 8: Responsive check**
+- [x] **Step 8: Responsive check**
 
 At 360px wide, the page must not scroll horizontally at any point down its full length.
 
