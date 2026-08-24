@@ -61,11 +61,12 @@ export default function WelcomePage() {
           <div className="grid items-start gap-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
             <div className="flex flex-col gap-6">
               <h1 className="max-w-[15ch] text-balance font-display text-[2.5rem] font-extrabold leading-[1.05] tracking-tight text-text sm:text-6xl">
-                Your reading history is a CSV file sitting in your downloads folder.
+                Finding your next book shouldn&apos;t be this hard.
               </h1>
               <p className="max-w-[58ch] text-pretty text-lg leading-relaxed text-muted">
-                ShelfSprite reads it, works out what you actually like, and hands back real books
-                you have not read yet.
+                Goodreads surfaces what&apos;s popular. A chatbot will invent a title that
+                doesn&apos;t exist. ShelfSprite builds a taste profile from what you actually rated
+                and recommends real books that match it — no popularity contest, nothing made up.
               </p>
 
               <div className="mt-2 max-w-md">

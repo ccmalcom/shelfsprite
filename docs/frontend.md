@@ -19,9 +19,9 @@ Supabase URL/JWKS configuration absent too, local development runs unauthenticat
 mode): an unauthenticated request for exactly `/` is **rewritten** to the public marketing page at
 `/welcome`, and every other unauthenticated page is redirected to `/login`. The rewrite is
 deliberately not a redirect — `shelfsprite.app` is the URL people share, and a redirect means that
-is never the URL they land on. It is built from `supabaseResponse`'s cookies so a session the
-`getUser()` call just refreshed is not thrown away. `app/login` is the invite-only
-email-and-password sign-in. The
+is never the URL they land on. It, and both `/login`-gate redirects, are built from
+`supabaseResponse`'s cookies so a session the `getUser()` call just refreshed is not thrown away.
+`app/login` is the invite-only email-and-password sign-in. The
 public variables are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 **Auth boundaries do a FULL document load, not client-side nav** (`window.location.assign`): sign-in, sign-out, and destructive clear-library / delete-account actions all hard-reload. The SWR cache + component state (notably `LibraryGate`'s latch) are in-memory and global, so a client-side `router.push` after these leaks previous user's state until a manual refresh. Don't revert these to `router.push`/`replace`. `app/auth/callback` (invite-link landing page — see `docs/hosting.md` Admin console notes) follows the same rule for its post-password-set and error-state navigations.

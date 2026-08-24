@@ -24,7 +24,7 @@ describe('welcome page', () => {
     render(<WelcomePage />);
     expect(
       screen.getByRole('heading', {
-        name: /Your reading history is a CSV file sitting in your downloads folder\./i,
+        name: /Finding your next book shouldn't be this hard\./i,
       })
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /^Import$/ })).toBeInTheDocument();

@@ -127,8 +127,10 @@ because a 307 redirect is a successful fetch and therefore throws no network err
 
 An unauthenticated `/` is **rewritten** to `/welcome`, not redirected, so the shared URL stays
 `shelfsprite.app`. Two consequences are load-bearing. The rewrite response must carry
-`supabaseResponse`'s cookies, or a token `getUser()` just refreshed is silently discarded. And
-because the URL never changes, `/login` never loads for that visitor, so
+`supabaseResponse`'s cookies, or a token `getUser()` just refreshed is silently discarded — and the
+same rule applies to the `/login` gate's own redirect responses (`!user` → `/login`,
+authenticated-on-`/login` → `/`), which must copy `supabaseResponse`'s cookies for the same
+reason. And because the URL never changes, `/login` never loads for that visitor, so
 `components/InviteHashRedirect.tsx` must stay mounted on the marketing page as well as on `/login`
 — otherwise a misdirected Supabase invite link strands its one-time token in the address bar with
 no error and no failed request.

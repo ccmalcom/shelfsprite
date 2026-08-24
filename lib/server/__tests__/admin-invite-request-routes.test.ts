@@ -33,8 +33,8 @@ async function withDb(fn: (db: Db) => Promise<void>): Promise<void> {
 }
 
 const listReq = (qs = '') => new Request(`http://test/api/admin/invite-requests${qs}`);
-const actionReq = () =>
-  new Request('http://test/api/admin/invite-requests/1/approve', { method: 'POST' });
+const actionReq = (action: 'approve' | 'decline') =>
+  new Request(`http://test/api/admin/invite-requests/1/${action}`, { method: 'POST' });
 
 describe('GET /api/admin/invite-requests', () => {
   it('lists every request newest first', async () => {
@@ -53,7 +53,7 @@ describe('GET /api/admin/invite-requests', () => {
       await submitInviteRequest(db, 'one@example.com');
       await submitInviteRequest(db, 'two@example.com');
       const [newest] = await listInviteRequests(db);
-      await declineRoute(actionReq(), { params: { id: String(newest.id) } });
+      await declineRoute(actionReq('decline'), { params: { id: String(newest.id) } });
 
       const pending = (await (await listRoute(listReq('?status=pending'))).json()) as {
         email: string;
@@ -87,7 +87,7 @@ describe('POST /api/admin/invite-requests/[id]/approve', () => {
       await submitInviteRequest(db, 'reader@example.com');
       const [row] = await listInviteRequests(db);
 
-      const res = await approveRoute(actionReq(), { params: { id: String(row.id) } });
+      const res = await approveRoute(actionReq('approve'), { params: { id: String(row.id) } });
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toMatchObject({ status: 'approved', reviewed_by: 'local' });
@@ -108,7 +108,7 @@ describe('POST /api/admin/invite-requests/[id]/approve', () => {
       await submitInviteRequest(db, 'reader@example.com');
       const [row] = await listInviteRequests(db);
 
-      const res = await approveRoute(actionReq(), { params: { id: String(row.id) } });
+      const res = await approveRoute(actionReq('approve'), { params: { id: String(row.id) } });
       expect(res.status).toBe(502);
       expect(typeof (await res.json()).detail).toBe('string');
 
@@ -125,7 +125,7 @@ describe('POST /api/admin/invite-requests/[id]/approve', () => {
         called = true;
         return { id: 'sb', email };
       });
-      const res = await approveRoute(actionReq(), { params: { id: '9999' } });
+      const res = await approveRoute(actionReq('approve'), { params: { id: '9999' } });
       expect(res.status).toBe(404);
       expect(called).toBe(false);
     });
@@ -143,7 +143,7 @@ describe('POST /api/admin/invite-requests/[id]/decline', () => {
       await submitInviteRequest(db, 'reader@example.com');
       const [row] = await listInviteRequests(db);
 
-      const res = await declineRoute(actionReq(), { params: { id: String(row.id) } });
+      const res = await declineRoute(actionReq('decline'), { params: { id: String(row.id) } });
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({ status: 'declined', reviewed_by: 'local' });
       expect(called).toBe(false);
@@ -152,7 +152,7 @@ describe('POST /api/admin/invite-requests/[id]/decline', () => {
 
   it('404s an unknown id', async () => {
     await withDb(async () => {
-      const res = await declineRoute(actionReq(), { params: { id: '9999' } });
+      const res = await declineRoute(actionReq('decline'), { params: { id: '9999' } });
       expect(res.status).toBe(404);
     });
   });

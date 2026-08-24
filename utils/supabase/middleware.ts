@@ -64,12 +64,16 @@ export async function updateSession(request: NextRequest) {
   if (!user && !isPublic) {
     const loginUrl = request.nextUrl.clone();
     loginUrl.pathname = '/login';
-    return NextResponse.redirect(loginUrl);
+    const redirect = NextResponse.redirect(loginUrl);
+    supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
   if (user && path.startsWith('/login')) {
     const homeUrl = request.nextUrl.clone();
     homeUrl.pathname = '/';
-    return NextResponse.redirect(homeUrl);
+    const redirect = NextResponse.redirect(homeUrl);
+    supabaseResponse.cookies.getAll().forEach((cookie) => redirect.cookies.set(cookie));
+    return redirect;
   }
 
   return supabaseResponse;
