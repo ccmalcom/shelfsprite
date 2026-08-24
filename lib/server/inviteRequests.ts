@@ -64,6 +64,14 @@ export function serializeInviteRequest(row: InviteRequestRow): AdminInviteReques
  * ANY status it is left exactly as it is, including an already-reviewed one. The caller must
  * respond identically either way — a distinguishable response would turn the public endpoint
  * into an oracle for "is this email already known to ShelfSprite".
+ *
+ * The select above is only an optimization for the common, non-racing path — it lets a normal
+ * duplicate return without burning a sequence value. It does NOT by itself close the race: two
+ * concurrent submissions of the same email can both pass the select before either insert
+ * commits. `.onConflictDoNothing()` on the insert is what actually makes the guarantee hold
+ * under concurrency, by turning the second writer's unique-violation into a silent no-op instead
+ * of an unhandled 23505 that would otherwise surface as a distinguishable 500 to the caller.
+ * Do not remove it as "redundant" with the select.
  */
 export async function submitInviteRequest(db: Db, rawEmail: string): Promise<void> {
   const email = normalizeEmail(rawEmail);
@@ -76,7 +84,7 @@ export async function submitInviteRequest(db: Db, rawEmail: string): Promise<voi
     .limit(1);
   if (existing.length) return;
 
-  await db.insert(schema.inviteRequests).values({ email, status: 'pending' });
+  await db.insert(schema.inviteRequests).values({ email, status: 'pending' }).onConflictDoNothing();
 }
 
 /** Every request, newest first, optionally narrowed to one status. */
