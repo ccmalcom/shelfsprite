@@ -66,6 +66,13 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
   `lib/api.ts`, because that client attaches a Supabase token and would pull the Supabase browser
   client into a bundle whose entire audience is signed out. `ResolveArtifact` is the hero: a
   drawn CSV-row-to-catalog-record composition, not a screenshot.
+  The two real screenshots (`public/marketing/library.png`, `taste-profile.png`) are captured at
+  **2x** — a 1700px-wide asset of an 850px layout — and the `next/image` `width`/`height` props
+  carry that intrinsic size while the `<figure>` stays capped at `max-w-[850px]`. Keep both halves
+  of that: dropping the cap renders the app UI inside at half scale, and capturing at 1x is what
+  made the first pair look soft. Neither shot is a real account; they come from a throwaway
+  Postgres seeded under `user_id = 'local'` with hand-authored traits, so recapturing spends
+  nothing on Claude.
   **Never write `text-base` on this page** — `base` is a registered color token, so Tailwind
   resolves `text-base` to `color: var(--bg)` and paints the copy in the background (see
   `docs/conventions.md`).
