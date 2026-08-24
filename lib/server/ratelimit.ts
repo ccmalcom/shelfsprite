@@ -16,6 +16,14 @@ export const RATE_LIMITS = {
   directiveDraft: { limit: 30, windowSeconds: 60 },
   booksSimilar: { limit: 15, windowSeconds: 60 },
   discover: { limit: 30, windowSeconds: 60 },
+  /**
+   * No Python ancestor: the public waitlist endpoint. Unlike every entry above it, its bucket
+   * key is IP-derived rather than per-user, because the route has no authenticated caller
+   * (see inviteRequestRateKey in inviteRequests.ts). It also does NOT use
+   * rateLimitExceededResponse — that helper's {"error": ...} shape exists only for SlowAPI
+   * byte-parity, and this route should carry the normal {"detail": ...} shape.
+   */
+  inviteRequest: { limit: 5, windowSeconds: 3600 },
 } as const;
 
 export interface RateLimitResult {
