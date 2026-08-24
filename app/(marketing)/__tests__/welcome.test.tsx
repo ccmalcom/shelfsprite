@@ -52,6 +52,25 @@ describe('welcome page', () => {
     expect(screen.getByAltText(/library/i)).toBeInTheDocument();
     expect(screen.getByAltText(/taste profile/i)).toBeInTheDocument();
   });
+
+  // Legal-ish copy: it must not quietly disappear in a future redesign of this page.
+  it('disclaims any affiliation with Goodreads and Amazon', () => {
+    render(<WelcomePage />);
+    expect(
+      screen.getByText(/not affiliated with, endorsed by, or sponsored by Goodreads or Amazon/i)
+    ).toBeInTheDocument();
+  });
+
+  it('says a Goodreads account is not required', () => {
+    render(<WelcomePage />);
+    expect(screen.getByText(/You do not need a Goodreads account/i)).toBeInTheDocument();
+  });
+
+  it('puts the footer outside <main> so it keeps the contentinfo landmark', () => {
+    const { container } = render(<WelcomePage />);
+    expect(container.querySelector('main footer')).toBeNull();
+    expect(screen.getByRole('contentinfo')).toBeInTheDocument();
+  });
 });
 
 describe('waitlist form', () => {

@@ -24,6 +24,16 @@ Goodreads CSV -> import -> books -> enrichment -> taste profile -> recommendatio
 The recommender never asks Claude to invent titles. Stage 1 retrieves and filters real catalog
 candidates; Stage 2 lets Claude rerank and explain only that bounded set.
 
+## Access
+
+ShelfSprite is invite-only. Signed-out visitors to the root URL are served the public marketing
+page at `/welcome`, where they can ask for an invite; requests land in `invite_requests` and are
+approved or declined from the `requests` tab of `/admin`, which sends the real Supabase invite.
+Signed-in users get the dashboard at the same URL.
+
+It is an independent project, not affiliated with, endorsed by, or sponsored by Goodreads or
+Amazon. Catalog metadata comes from Open Library and Google Books.
+
 ## Local development
 
 ```bash

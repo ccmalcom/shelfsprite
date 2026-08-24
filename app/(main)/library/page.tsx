@@ -60,11 +60,14 @@ function CoverThumb({
   );
 }
 
+// The placeholder uses an expression container, not a bare attribute: an escape written in a
+// bare JSX attribute is not processed and ships as the literal text "\u2026". See
+// docs/conventions.md.
 function SearchInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   return (
     <input
       type="search"
-      placeholder="Search title or author\u2026"
+      placeholder={'Search title or author\u2026'}
       aria-label="Search your library by title or author"
       value={value}
       onChange={(e) => onChange(e.target.value)}
@@ -1129,8 +1132,9 @@ function LibraryInner() {
 
       {lowConfidenceBooks.length > 0 && (
         <Button variant="secondary" size="sm" onClick={startLowConfidenceQueue}>
-          {lowConfidenceBooks.length} book{lowConfidenceBooks.length !== 1 ? 's' : ''} need a match
-          check
+          {lowConfidenceBooks.length === 1
+            ? '1 book needs a match check'
+            : `${lowConfidenceBooks.length} books need a match check`}
         </Button>
       )}
 

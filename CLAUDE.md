@@ -20,6 +20,10 @@ The product is invite-only. Supabase JWT `sub` values are the tenant keys, and e
 path must preserve its `user_id` boundary. Local mode uses the `local` user only when Supabase is
 not configured.
 
+`invite_requests` is the one deliberate exception to that tenancy rule. Waitlist rows are submitted
+from the public marketing page by people who have no Supabase `sub` yet, so there is nothing to
+scope them to; they are readable only by admins. Do not "fix" it by adding a `user_id`.
+
 ## Code map
 
 - `app/` — pages and same-origin API route handlers.
@@ -120,6 +124,14 @@ routes only; API handlers perform their own bearer authentication through `withA
 enrichment routes validate `CRON_SECRET`. When the proxy once matched `/api/*`, cookieless
 internal tick requests were redirected to `/login`. The bug stayed invisible for a long stretch
 because a 307 redirect is a successful fetch and therefore throws no network error.
+
+An unauthenticated `/` is **rewritten** to `/welcome`, not redirected, so the shared URL stays
+`shelfsprite.app`. Two consequences are load-bearing. The rewrite response must carry
+`supabaseResponse`'s cookies, or a token `getUser()` just refreshed is silently discarded. And
+because the URL never changes, `/login` never loads for that visitor, so
+`components/InviteHashRedirect.tsx` must stay mounted on the marketing page as well as on `/login`
+— otherwise a misdirected Supabase invite link strands its one-time token in the address bar with
+no error and no failed request.
 
 ### Tests and build gate
 

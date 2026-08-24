@@ -7,6 +7,19 @@
 - **No non-ASCII characters inside JavaScript string literals in `.tsx` files.** Turbopack can
   reject them. Unicode is fine in JSX text nodes. In a JavaScript expression use an escape when
   needed; in a bare JSX attribute, an escape is not processed and appears as literal text.
+  This half of the rule has shipped a visible defect at least once: the `/library` search box read
+  `Search title or author\u2026` in production, because the escape sat in a bare
+  `placeholder="\u2026"`. Put such a value in an expression container instead, so the escape is
+  processed and the source stays ASCII: `placeholder={'\u2026'}`.
+- **`text-base` is a COLOR, not a font size.** `tailwind.config.ts` registers a color named `base`
+  (`var(--bg)`), and Tailwind's `text-*` namespace serves both `fontSize` and `textColor` with
+  `textColor` registered later, so `text-base` compiles to `color: var(--bg)` and emits no font
+  size at all. Written for emphasis on a colored surface (`bg-accent text-base`) that is correct
+  and intentional. Written meaning "1rem body text" it paints the copy in the page background and
+  the text vanishes. The responsive form is the dangerous one: `text-muted sm:text-base` looks
+  right on mobile and goes invisible at `sm`, because the variant lands later in the cascade than
+  the unprefixed color. For a body size use an explicit value such as `text-[1rem]`. The same
+  shadowing applies to any other color token that collides with a font-size name.
 - **No IIFEs inside JSX.** Compute derived values as ordinary variables at the top of the
   component.
 - **Never render ratings with `'★'.repeat(rating)`.** `repeat` truncates 4.5 to four stars. Use

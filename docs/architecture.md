@@ -11,7 +11,9 @@ Supabase supplies authentication and the Postgres database. `lib/server/auth.ts`
 Supabase bearer tokens and derives the tenant key from the JWT subject. `lib/server/http.ts` wraps
 API handlers with authentication, admin checks, error mapping, request logging, and optional
 timing headers. Page session middleware lives in `proxy.ts` and excludes `/api`, because
-API routes enforce their own authentication.
+API routes enforce their own authentication. It rewrites an unauthenticated `/` to the public
+marketing page at `/welcome` and redirects every other unauthenticated page to `/login`; see
+`docs/frontend.md` for why that one is a rewrite rather than a redirect.
 
 `lib/server/db.ts#getDb` creates the drizzle/postgres-js client, and
 `lib/server/schema.ts` declares the checked-in database shape. Connections use
@@ -142,8 +144,31 @@ are returned or stored.
 - `invites.ts` — invite creation, Supabase-user backfill, revocation/purge sequencing, and roster
   reads (`createInvite`, `backfillFromSupabase`, `revokeUser`, `listRoster`). Its transaction
   boundaries intentionally differ by operation.
+- `inviteRequests.ts` — the public waitlist: normalization, submission, listing, and review
+  stamping (`submitInviteRequest`, `listInviteRequests`, `markReviewed`). Emails are lowercased and
+  trimmed here on every insert _and_ every lookup, because the unique index is on the raw column
+  rather than a functional index. `submitInviteRequest` is idempotent on the normalized email and
+  keeps `.onConflictDoNothing()` on the insert: the preceding select is only an optimization for
+  the non-racing path, and the conflict clause is what actually holds under concurrency by turning
+  a second writer's unique violation into a no-op instead of a distinguishable 500.
 - `supabaseAdmin.ts` — server-only GoTrue admin transport for inviting, listing, and deleting
   users. It uses the Supabase `apikey` header and exposes an injectable fetch seam for tests.
+
+`POST /api/invite-requests` is public (`requireAuth: false`) because its entire audience is signed
+out. Every accepted outcome — new email, duplicate email, honeypot — returns the same
+`200 {"ok": true}`; only 422 (Zod rejected the address) and 429 differ. A distinguishable response
+would make the endpoint an oracle for "is this email already known to ShelfSprite", which on an
+invite-only product leaks the user list. Its rate limit is the one entry in `RATE_LIMITS` keyed by
+client IP rather than by authenticated user, and it deliberately does not use
+`rateLimitExceededResponse` — that helper's `{"error": ...}` shape exists only for byte-parity with
+the retired Python SlowAPI handler, and this route has no Python ancestor.
+
+The three admin routes are `GET /api/admin/invite-requests` and
+`POST /api/admin/invite-requests/{id}/approve|decline`. Approve is deliberately **not**
+transactional, for the same reason `createInvite` is not: the GoTrue write cannot be rolled back,
+so the irreversible remote call goes first and the local stamp follows. A failure after the invite
+leaves a sent invite beside a still-pending row, which is visible, harmless, and cleared by
+approving again.
 
 ## Locked product decisions
 

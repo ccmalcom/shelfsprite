@@ -84,6 +84,45 @@ body {
   }
 }
 
+/* Marketing hero: the one orchestrated moment on the public page — a Goodreads CSV row
+   resolving into an enriched catalog record.
+
+   Deliberately animation-only, never a class-triggered transition, and every rule lives
+   inside `no-preference`. The finished state is what the element renders with NO animation
+   at all, and `backwards` fill supplies the start frame only while the animation is armed.
+   So a reduced-motion visitor, a background tab, or a headless render all get the fully
+   composed artifact rather than a blank box waiting for a reveal that never fires. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes ssRise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  @keyframes ssDrawDown {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
+
+  .ss-rise {
+    animation: ssRise 560ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+
+  .ss-draw {
+    transform-origin: top center;
+    animation: ssDrawDown 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

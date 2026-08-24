@@ -15,8 +15,13 @@ browser `authEnabled` is false when the public Supabase variables are absent. Wi
 Supabase URL/JWKS configuration absent too, local development runs unauthenticated.
 `lib/api.ts#authHeaders` attaches the session's `access_token` as
 `Authorization: Bearer` on every request, and the route handler verifies it through JWKS.
-`utils/supabase/middleware.ts` refreshes the session and redirects unauthenticated page requests to
-`/login` (a no-op in local mode); `app/login` is the invite-only email-and-password sign-in. The
+`utils/supabase/middleware.ts` refreshes the session and gates page requests (a no-op in local
+mode): an unauthenticated request for exactly `/` is **rewritten** to the public marketing page at
+`/welcome`, and every other unauthenticated page is redirected to `/login`. The rewrite is
+deliberately not a redirect — `shelfsprite.app` is the URL people share, and a redirect means that
+is never the URL they land on. It is built from `supabaseResponse`'s cookies so a session the
+`getUser()` call just refreshed is not thrown away. `app/login` is the invite-only
+email-and-password sign-in. The
 public variables are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 
 **Auth boundaries do a FULL document load, not client-side nav** (`window.location.assign`): sign-in, sign-out, and destructive clear-library / delete-account actions all hard-reload. The SWR cache + component state (notably `LibraryGate`'s latch) are in-memory and global, so a client-side `router.push` after these leaks previous user's state until a manual refresh. Don't revert these to `router.push`/`replace`. `app/auth/callback` (invite-link landing page — see `docs/hosting.md` Admin console notes) follows the same rule for its post-password-set and error-state navigations.
@@ -25,11 +30,17 @@ public variables are `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLIS
 tokens and prompts for a password). This requires **both** `FRONTEND_URL` in the Vercel project,
 so `supabaseAdmin.ts#inviteUser` sends `redirect_to=<FRONTEND_URL>/auth/callback`, **and** that exact
 URL in the Supabase dashboard's Auth → URL Configuration → **Redirect URLs** allowlist. If either
-is missing, GoTrue falls back to the project Site URL. The bare app root can send the user to
-`/login` while the tokens remain stranded in the URL hash. As a safety net, `app/login` forwards
-an invite/recovery hash to `/auth/callback` through
-`lib/authRedirect.ts#inviteCallbackRedirect`, so onboarding can still complete when that
-configuration is wrong.
+is missing, GoTrue falls back to the project Site URL and the tokens arrive in the hash at the bare
+app root. As a safety net, `components/InviteHashRedirect.tsx` forwards such a hash to
+`/auth/callback` (via `lib/authRedirect.ts#forwardInviteHash`), so onboarding still completes when
+that configuration is wrong.
+
+It must stay mounted on **both** public entry points, because the app root is served two different
+ways. On `/library`, `/settings` and every other page the proxy redirects to `/login` and the
+fragment survives the 302, so `/login` sees the hash. On `/` with no session the proxy _rewrites_
+to `/welcome`, so the URL never changes and `/login` never loads — without the component on the
+marketing page, an invited user lands on a stranger's landing page with their one-time token
+sitting unused in the address bar, and the failure is silent: no error, no failed request.
 
 ## Key files
 
@@ -39,12 +50,25 @@ configuration is wrong.
   its `GET`/`PUT`/`DELETE /directive` plus `POST /directive/draft` calls.
 - `app/providers.tsx` — client component wrapping `(main)` layout children with a global `SWRConfig` (`revalidateOnFocus: false`, `dedupingInterval: 30_000`). Prevents refetch thrash when switching browser tabs; per-page `useSWR` keys are unchanged.
 - `lib/bookLinks.ts` — pure function `bookLinks(book)` returning `{ label, href }[]` for Amazon, Bookshop.org, and WorldCat. Uses ISBN13 when present, falls back to title+author search query.
-- `lib/authRedirect.ts` — pure `inviteCallbackRedirect(hash)`: returns the `/auth/callback` URL (hash preserved) when a URL hash carries Supabase invite/recovery tokens or an auth error, else `null`. Used by `app/login` to rescue misdirected invite links (see Auth section).
+- `lib/authRedirect.ts` — pure `inviteCallbackRedirect(hash)`: returns the `/auth/callback` URL (hash preserved) when a URL hash carries Supabase invite/recovery tokens or an auth error, else `null`. `forwardInviteHash(loc)` applies it to a location. The redirect takes the location as an argument rather than reading `window` inline because jsdom's `window.location` is non-configurable and its `replace` is read-only, so an inline call cannot be asserted on. Used through `InviteHashRedirect` to rescue misdirected invite links (see Auth section).
 - `lib/authCallback.ts` — pure `parseAuthCallbackHash(hash)`: classifies the callback hash as `error` (reused/expired link), `tokens` (implicit-grant `access_token`+`refresh_token`), or `none`. Used by `app/auth/callback` to consume the tokens itself (see Auth section for why the SSR client can't).
 - `lib/tasteAccent.ts` — maps 4-letter archetype code to one of 16 curated HSL colors (warm for Immersive types, cool for Reflective); falls back to hash-derived color.
 
 ## Routes (`app/`)
 
+- `/welcome` — the public marketing page, in the `(marketing)` route group. Served at `/` for
+  signed-out visitors through the proxy rewrite, and directly reachable at `/welcome` (the only way
+  to see it in local mode, where the proxy no-ops and `/` renders the dashboard). Its layout is
+  chrome-free on purpose: no `NavBar`, `BottomNav`, `LibraryGate`, banners, `FeedbackLauncher` or
+  `Providers`, because every one of those assumes a session. `metadata.alternates.canonical` is
+  `'/'` so crawlers reaching `/welcome` attribute the page to the shared URL.
+  `WaitlistForm` calls `fetch('/api/invite-requests')` directly rather than going through
+  `lib/api.ts`, because that client attaches a Supabase token and would pull the Supabase browser
+  client into a bundle whose entire audience is signed out. `ResolveArtifact` is the hero: a
+  drawn CSV-row-to-catalog-record composition, not a screenshot.
+  **Never write `text-base` on this page** — `base` is a registered color token, so Tailwind
+  resolves `text-base` to `color: var(--bg)` and paints the copy in the background (see
+  `docs/conventions.md`).
 - `/` — dashboard: greeting "Hey, {displayName}." with `text-user`; compact archetype callout badge+name linking to `/profile`; stats strip with numbers in `text-user`; ratings bars in `bg-user`; run-recommend CTA. `--user-accent` is set on the outer wrapper so all `text-user`/`bg-user` tokens pick up the archetype color.
 - `/swipe` — rec swiping. `already_read` lands the book on the read shelf then prompts a review.
 - `/discover` — natural-language discovery ("find me a book like X"). A search box posts
@@ -62,7 +86,7 @@ configuration is wrong.
   soft cap as a progress bar, a per-operation cost breakdown (`by_operation`), an
   "Approaching cap" badge when `usage.warn` is true, and a footnote clarifying it's a
   soft cap for visibility only — recommendations and profiling never stop running.
-- `/admin` — admin console (invite/revoke users, view roster). Only reachable by users in the `ADMIN_EMAILS` allowlist; in local mode all users can access it.
+- `/admin` — admin console, tabs `users` / `requests` / `usage` / `feedback` / `system`. Only reachable by users in the `ADMIN_EMAILS` allowlist; in local mode all users can access it. The `requests` tab (`components/admin/InviteRequestsTab.tsx`) triages the waitlist: filter by status, then approve (sends the real invite and stamps the row) or decline. It is deliberately unpaginated and carries no count badge on the tab button — volume is expected to be small and no other admin tab has one.
 - `/auth/callback` — public (middleware's `PUBLIC_PREFIXES` includes `/auth`) landing page for Supabase invite links. Client-only: parses the session tokens Supabase puts in the URL hash (`lib/authCallback.ts`) and establishes the session via `supabase.auth.setSession(...)`, then prompts the invited user (no password yet) to set one before hard-reloading into `/`. **It must call `setSession` itself and cannot rely on the client auto-detecting the hash:** `@supabase/ssr` hardcodes `flowType: 'pkce'`, and invite/recovery links use the implicit grant (tokens in the hash), which auth-js refuses to auto-consume under PKCE (`_getSessionFromURL` throws "Not a valid PKCE flow url"). `setSession` ignores `flowType` and persists to the same cookie storage so middleware sees the session. `/login` forwards any invite/recovery hash here as a fallback (see Auth section).
 
 `layout.tsx` mounts `NavBar` + `ReprofileBanner` + `UsageWarningBanner` + `FeedbackLauncher` + `BottomNav` above/below all pages and wraps `children` in **`LibraryGate`**. The root `app/layout.tsx` `<body>` carries `suppressHydrationWarning` (browser extensions mutate `<body>` pre-hydration — silences benign attribute mismatches only).
