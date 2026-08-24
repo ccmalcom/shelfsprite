@@ -13,6 +13,7 @@ import {
   type AdminUser,
 } from '@/lib/api';
 import { Button, Card, Badge, Spinner, useToast, Field, Input } from '@/components/ui';
+import { InviteRequestsTab } from '@/components/admin/InviteRequestsTab';
 import { UsageTab } from '@/components/admin/UsageTab';
 import { FeedbackTab } from '@/components/admin/FeedbackTab';
 import { SystemTab } from '@/components/admin/SystemTab';
@@ -38,7 +39,7 @@ export default function AdminPage() {
   const [apiKey, setApiKey] = useState('');
   const [inviting, setInviting] = useState(false);
   const [backfilling, setBackfilling] = useState(false);
-  const [tab, setTab] = useState<'users' | 'usage' | 'feedback' | 'system'>('users');
+  const [tab, setTab] = useState<'users' | 'requests' | 'usage' | 'feedback' | 'system'>('users');
 
   if (meLoading) {
     return (
@@ -109,7 +110,7 @@ export default function AdminPage() {
       </div>
 
       <div className="mb-6 flex gap-1 border-b border-border">
-        {(['users', 'usage', 'feedback', 'system'] as const).map((t) => (
+        {(['users', 'requests', 'usage', 'feedback', 'system'] as const).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -208,6 +209,8 @@ export default function AdminPage() {
             </Card>
           </section>
         </>
+      ) : tab === 'requests' ? (
+        <InviteRequestsTab />
       ) : tab === 'usage' ? (
         <UsageTab />
       ) : tab === 'feedback' ? (

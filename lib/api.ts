@@ -916,6 +916,32 @@ export const createFeedbackGithubIssue = (
   req: { title: string; body: string }
 ): Promise<AdminFeedbackItem> => post<AdminFeedbackItem>(`/admin/feedback/${id}/github-issue`, req);
 
+export interface AdminInviteRequest {
+  id: number;
+  email: string;
+  status: string;
+  created_at: string;
+  reviewed_at: string | null;
+  reviewed_by: string | null;
+}
+
+/** Waitlist requests, newest first (admin-only). GET /admin/invite-requests */
+export function listAdminInviteRequests(status?: string): Promise<AdminInviteRequest[]> {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return get<AdminInviteRequest[]>(`/admin/invite-requests${qs}`);
+}
+
+/**
+ * Send the real invite for one request and mark it approved (admin-only).
+ * POST /admin/invite-requests/{id}/approve
+ */
+export const approveInviteRequest = (id: number): Promise<AdminInviteRequest> =>
+  post<AdminInviteRequest>(`/admin/invite-requests/${id}/approve`, {});
+
+/** Mark one request declined (admin-only). POST /admin/invite-requests/{id}/decline */
+export const declineInviteRequest = (id: number): Promise<AdminInviteRequest> =>
+  post<AdminInviteRequest>(`/admin/invite-requests/${id}/decline`, {});
+
 // ── Spend guardrails ────────────────────────────────────────────────────────
 
 /** Shared SWR key for the month-to-date Anthropic spend (settings panel + warning banner). */
