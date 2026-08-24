@@ -52,7 +52,7 @@ export default function WelcomePage() {
           <h1 className="font-display text-3xl font-extrabold leading-tight tracking-tight text-text sm:text-5xl">
             Your reading history is a CSV file sitting in your downloads folder.
           </h1>
-          <p className="max-w-2xl text-base text-muted sm:text-lg">
+          <p className="max-w-2xl text-[1rem] text-muted sm:text-lg">
             ShelfSprite reads it, works out what you actually like, and hands back real books you
             have not read yet.
           </p>
@@ -75,7 +75,7 @@ export default function WelcomePage() {
                 <h3 className="font-display text-xl font-bold tracking-tight text-text">
                   {step.title}
                 </h3>
-                <p className="text-sm leading-relaxed text-muted sm:text-base">{step.body}</p>
+                <p className="text-sm leading-relaxed text-muted sm:text-[1rem]">{step.body}</p>
               </div>
             </div>
           ))}
@@ -94,19 +94,19 @@ export default function WelcomePage() {
           <h2 className="font-display text-2xl font-bold tracking-tight text-text sm:text-3xl">
             The books it recommends exist
           </h2>
-          <p className="text-sm leading-relaxed text-muted sm:text-base">
+          <p className="text-sm leading-relaxed text-muted sm:text-[1rem]">
             Ask a chatbot for book recommendations and some of what comes back will not exist. The
             title is plausible, the author is plausible, and there is no such book. You do not find
             out until you go looking for it.
           </p>
-          <p className="text-sm leading-relaxed text-muted sm:text-base">
+          <p className="text-sm leading-relaxed text-muted sm:text-[1rem]">
             ShelfSprite is built so that cannot happen. Recommendations come out of two stages. The
             first is ordinary deterministic retrieval against a real catalog, and everything it
             returns provably exists. Only then does Claude see anything, and its job is narrow: put
             that set in order and say why. It cannot invent a title, because it is never asked for
             one.
           </p>
-          <p className="text-sm leading-relaxed text-text sm:text-base">
+          <p className="text-sm leading-relaxed text-text sm:text-[1rem]">
             The model is a critic here, not an author.
           </p>
         </section>
@@ -116,18 +116,18 @@ export default function WelcomePage() {
           <h2 className="font-display text-2xl font-bold tracking-tight text-text sm:text-3xl">
             A profile built from evidence
           </h2>
-          <p className="text-sm leading-relaxed text-muted sm:text-base">
+          <p className="text-sm leading-relaxed text-muted sm:text-[1rem]">
             A five star rating tells you almost nothing on its own, because the person who reads
             only airport thrillers and the person who reads only Woolf both hand out fives, and
             never for the same reason.
           </p>
-          <p className="text-sm leading-relaxed text-muted sm:text-base">
+          <p className="text-sm leading-relaxed text-muted sm:text-[1rem]">
             ShelfSprite sorts your ratings into tiers and looks for what the books in each tier
             share once they have been enriched: subject, era, length, how far they sit from the
             middle of the catalog. The result is a profile that can say something more specific than
             &ldquo;likes literary fiction.&rdquo;
           </p>
-          <p className="text-sm leading-relaxed text-muted sm:text-base">
+          <p className="text-sm leading-relaxed text-muted sm:text-[1rem]">
             Reviews outrank all of it. Once you write down why a book landed, that sentence is
             better evidence than any amount of pattern matching over metadata, and the profile
             weights it accordingly.
@@ -147,7 +147,7 @@ export default function WelcomePage() {
           <h2 className="font-display text-2xl font-bold tracking-tight text-text sm:text-3xl">
             Ask for an invite
           </h2>
-          <p className="max-w-2xl text-sm leading-relaxed text-muted sm:text-base">
+          <p className="max-w-2xl text-sm leading-relaxed text-muted sm:text-[1rem]">
             ShelfSprite is invite only. It started as a personal project, and it is still small
             enough that I hand out every account myself, so the waitlist is an actual list rather
             than a marketing device. Leave your email and I will get to it.
