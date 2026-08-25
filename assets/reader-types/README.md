@@ -7,11 +7,10 @@ motif.
 
 ## Using the assets
 
-1. Copy the 16 `.webp` files into `frontend/public/reader-types/`.
-2. Copy `reader-sprites.ts` into `frontend/lib/readerSprites.ts`.
-3. Resolve a profile code with `readerSprite(profile.archetype_code)`.
-4. Render the image with meaningful alt text such as `The Plot Mechanic reader type`.
-
+1. WebP files ship from `public/reader-types/` (do not serve the PNG masters).
+2. Sprite lookup lives in `lib/readerSprites.ts`; use `readerSprite(code)` for `{ src, name }`.
+3. Prefer the `components/ReaderSprite.tsx` component for rendering.
+4. Treat the sprite as decorative (`alt=""` + `aria-hidden="true"`), since the archetype name/code is rendered adjacent.
 Use WebP in the app and retain PNG as the lossless source/fallback. Every image is
 512×512 with genuine alpha transparency and a consistent transparent safety margin.
 
