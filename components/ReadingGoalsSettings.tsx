@@ -104,6 +104,7 @@ export default function ReadingGoalsSettings() {
               <span className="flex-1 truncate text-sm text-text">{goalLabel(g)}</span>
               <span className="font-mono text-xs text-faint">{g.progress} /</span>
               <Input
+                key={`${g.id}-${g.target}`}
                 type="number"
                 min={1}
                 defaultValue={g.target}
