@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui';
 import { type ArchetypeOut } from '@/lib/api';
 import { tasteAccent } from '@/lib/tasteAccent';
+import ReaderSprite from '@/components/ReaderSprite';
+import { readerSprite } from '@/lib/readerSprites';
 
 const AXIS_LABELS = [
   { left: 'Immersive', right: 'Reflective' },
@@ -46,6 +48,21 @@ export function ArchetypeShareModal({ archetype, onClose }: Props) {
       return;
     }
 
+    // A sprite that won't decode must not cost the user their share image, so a
+    // failure here falls through to the original text-only layout below.
+    let spriteImg: HTMLImageElement | null = null;
+    const sprite = readerSprite(archetype.code);
+    if (sprite) {
+      try {
+        const img = new window.Image();
+        img.src = sprite.src;
+        await img.decode();
+        spriteImg = img;
+      } catch {
+        spriteImg = null;
+      }
+    }
+
     // Background
     ctx.fillStyle = '#1e1b18';
     ctx.fillRect(0, 0, 800, 560);
@@ -63,30 +80,42 @@ export function ArchetypeShareModal({ archetype, onClose }: Props) {
     ctx.textAlign = 'left';
     ctx.fillText('ShelfSprite', 56, 68);
 
+    // 800x560 canvas. The sprite sits centered under the accent wash; every text
+    // baseline below shifts down to make room, and reverts to today's geometry
+    // when there is no sprite to draw.
+    if (spriteImg) ctx.drawImage(spriteImg, 320, 80, 160, 160);
+
+    const codeSize = spriteImg ? 80 : 96;
+    const codeY = spriteImg ? 320 : 230;
+    const nameY = spriteImg ? 372 : 300;
+    const taglineY = spriteImg ? 414 : 350;
+    const axisY = spriteImg ? 474 : 430;
+    const borderY = spriteImg ? 505 : 480;
+
     // Code
     ctx.fillStyle = accentColor;
-    ctx.font = 'bold 96px monospace';
+    ctx.font = `bold ${codeSize}px monospace`;
     ctx.textAlign = 'center';
-    ctx.fillText(archetype.code, 400, 230);
+    ctx.fillText(archetype.code, 400, codeY);
 
     // Name
     ctx.fillStyle = '#f5f0eb';
     ctx.font = 'bold 36px system-ui, sans-serif';
-    ctx.fillText(archetype.name, 400, 300);
+    ctx.fillText(archetype.name, 400, nameY);
 
     // Tagline
     ctx.fillStyle = '#a3a09d';
     ctx.font = 'italic 20px system-ui, sans-serif';
-    ctx.fillText(archetype.tagline, 400, 350);
+    ctx.fillText(archetype.tagline, 400, taglineY);
 
     // Axis labels row
     ctx.fillStyle = '#6b6866';
     ctx.font = '16px monospace';
-    ctx.fillText(axisPairs, 400, 430);
+    ctx.fillText(axisPairs, 400, axisY);
 
     // Bottom border — archetype color
     ctx.fillStyle = accentColor;
-    ctx.fillRect(56, 480, 688, 2);
+    ctx.fillRect(56, borderY, 688, 2);
 
     try {
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
@@ -128,6 +157,7 @@ export function ArchetypeShareModal({ archetype, onClose }: Props) {
             aria-hidden="true"
           />
           <p className="relative font-mono text-xs text-muted mb-3">ShelfSprite</p>
+          <ReaderSprite code={archetype.code} size={96} className="relative mx-auto mb-3 block" />
           <p
             className="relative font-mono text-5xl font-bold tracking-widest mb-2"
             style={{ color: accentColor }}
