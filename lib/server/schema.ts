@@ -490,3 +490,31 @@ export const rateLimits = pgTable(
     primaryKey({ columns: [table.bucketKey, table.windowStart], name: 'rate_limits_pkey' }),
   ]
 );
+
+export const readingGoals = pgTable(
+  'reading_goals',
+  {
+    id: serial().primaryKey().notNull(),
+    userId: varchar('user_id').default('local').notNull(),
+    year: integer().notNull(),
+    kind: varchar().notNull(), // 'books' | 'genre' | 'new_authors' | 'pages'
+    subject: varchar(), // NOT NULL exactly when kind = 'genre'
+    target: integer().notNull(),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+  },
+  (table) => [
+    index('ix_reading_goals_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
+    unique('uq_reading_goal').on(table.userId, table.year, table.kind, table.subject),
+    check('ck_reading_goals_target_positive', sql`${table.target} > 0`),
+    check(
+      'ck_reading_goals_kind',
+      sql`${table.kind} in ('books', 'genre', 'new_authors', 'pages')`
+    ),
+    check(
+      'ck_reading_goals_subject',
+      sql`(${table.kind} = 'genre') = (${table.subject} is not null)`
+    ),
+  ]
+);
