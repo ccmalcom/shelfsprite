@@ -43,7 +43,9 @@ function finaleBeat(code: string): Beat {
 describe('reveal finale', () => {
   it('lands the reader-type sprite on the payoff beat', () => {
     const { container } = render(<>{renderBeat(finaleBeat('ICDH'), handlers)}</>);
-    expect(container.querySelector('img[src="/reader-types/icdh-devoted-fan.webp"]')).not.toBeNull();
+    expect(
+      container.querySelector('img[src="/reader-types/icdh-devoted-fan.webp"]')
+    ).not.toBeNull();
   });
 
   it('still renders the finale text when the code has no sprite', () => {
