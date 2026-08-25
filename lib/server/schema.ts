@@ -506,7 +506,17 @@ export const readingGoals = pgTable(
   },
   (table) => [
     index('ix_reading_goals_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
-    unique('uq_reading_goal').on(table.userId, table.year, table.kind, table.subject),
+    // subject is NULL for every non-genre kind, and Postgres treats NULLs as
+    // distinct in a regular unique constraint, so a single (user, year, kind,
+    // subject) constraint would never stop duplicate non-genre goals. Split
+    // it into two partial unique indexes instead: one keyed on subject for
+    // genre goals, one without subject for everything else.
+    uniqueIndex('uq_reading_goal_genre')
+      .on(table.userId, table.year, table.kind, table.subject)
+      .where(sql`${table.subject} is not null`),
+    uniqueIndex('uq_reading_goal_no_subject')
+      .on(table.userId, table.year, table.kind)
+      .where(sql`${table.subject} is null`),
     check('ck_reading_goals_target_positive', sql`${table.target} > 0`),
     check(
       'ck_reading_goals_kind',

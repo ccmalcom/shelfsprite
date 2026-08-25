@@ -255,11 +255,14 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       subject text,
       target integer not null,
       created_at timestamp not null default current_timestamp,
-      constraint uq_reading_goal unique (user_id, year, kind, subject),
       constraint ck_reading_goals_target_positive check (target > 0),
       constraint ck_reading_goals_kind check (kind in ('books', 'genre', 'new_authors', 'pages')),
       constraint ck_reading_goals_subject check ((kind = 'genre') = (subject is not null))
     );
+    create unique index uq_reading_goal_genre on reading_goals (user_id, year, kind, subject)
+      where subject is not null;
+    create unique index uq_reading_goal_no_subject on reading_goals (user_id, year, kind)
+      where subject is null;
   `);
   const db = drizzle(pg, { schema }) as unknown as Db;
   return { db, close: () => pg.close() };
