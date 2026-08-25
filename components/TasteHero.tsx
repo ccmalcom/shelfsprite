@@ -19,7 +19,7 @@ import { tasteAccent } from '@/lib/tasteAccent';
 import { ArchetypeShareModal } from '@/components/ArchetypeShareModal';
 import Link from 'next/link';
 import ReaderSprite from '@/components/ReaderSprite';
-import { readerSprite } from '@/lib/readerSprites';
+import { readerSprite, READER_SPRITE_CODES } from '@/lib/readerSprites';
 
 // ── Archetype explainer modal ─────────────────────────────────────────────────
 
@@ -79,11 +79,21 @@ function ArchetypeExplainerModal({ onClose }: { onClose: () => void }) {
             ))}
           </div>
 
-          <p className="text-muted">
-            The four letters combine into one of 16 named archetypes, from The Wandering Escapist to
-            The Cerebral Architect. Your code is derived from your actual rated books and taste
-            traits, so it should feel like you.
-          </p>
+          <div>
+            <p className="text-muted">
+              The four letters combine into one of 16 named archetypes, from The Wandering Escapist
+              to The Cerebral Architect. Your code is derived from your actual rated books and taste
+              traits, so it should feel like you.
+            </p>
+            <ul className="mt-4 grid grid-cols-4 gap-3">
+              {READER_SPRITE_CODES.map((code) => (
+                <li key={code} className="flex flex-col items-center gap-1">
+                  <ReaderSprite code={code} size={72} className="h-auto w-full max-w-[4.5rem]" />
+                  <span className="font-mono text-[0.625rem] text-faint">{code}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
 
           <p className="text-faint text-xs">
             Doesn&apos;t feel like you? Correct your traits and re-derive. The code follows the

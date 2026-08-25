@@ -84,4 +84,13 @@ describe('TasteHero', () => {
     expect(container.querySelector('img[src^="/reader-types/"]')).toBeNull();
     expect(screen.getByText('The Cerebral Architect')).toBeInTheDocument();
   });
+
+  it('shows all sixteen reader types in the explainer', () => {
+    const { container } = renderHero();
+    fireEvent.click(screen.getByText('What is this?'));
+    const grid = container.querySelectorAll('img[src^="/reader-types/"]');
+    // 16 in the explainer grid, plus the one on the panel behind it.
+    expect(grid).toHaveLength(17);
+    expect(screen.getByText('IPBM')).toBeInTheDocument();
+  });
 });
