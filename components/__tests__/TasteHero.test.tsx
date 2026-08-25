@@ -63,4 +63,25 @@ describe('TasteHero', () => {
     renderHero();
     expect(screen.getByText('The Cerebral Architect').className).toContain('text-user-ink');
   });
+
+  it('shows the reader-type sprite on the panel', () => {
+    const { container } = renderHero();
+    const img = container.querySelector('img[src="/reader-types/rcdm-cerebral-architect.webp"]');
+    expect(img).not.toBeNull();
+  });
+
+  // The sprite's body color is the panel's own background color, so it needs the
+  // ink disc behind it or it disappears into the drenched field.
+  it('seats the sprite on an ink disc so it separates from the drenched panel', () => {
+    const { container } = renderHero();
+    const disc = container.querySelector('img[src^="/reader-types/"]')!.parentElement!;
+    expect(disc.className).toContain('bg-user-ink/10');
+  });
+
+  it('falls back to the text-only panel when the code has no sprite', () => {
+    mockArchetype = { ...DEFAULT_ARCHETYPE, code: 'XXXX' };
+    const { container } = renderHero();
+    expect(container.querySelector('img[src^="/reader-types/"]')).toBeNull();
+    expect(screen.getByText('The Cerebral Architect')).toBeInTheDocument();
+  });
 });

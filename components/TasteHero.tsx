@@ -18,6 +18,8 @@ import { Modal } from '@/components/ui/Modal';
 import { tasteAccent } from '@/lib/tasteAccent';
 import { ArchetypeShareModal } from '@/components/ArchetypeShareModal';
 import Link from 'next/link';
+import ReaderSprite from '@/components/ReaderSprite';
+import { readerSprite } from '@/lib/readerSprites';
 
 // ── Archetype explainer modal ─────────────────────────────────────────────────
 
@@ -156,6 +158,7 @@ export function TasteHero({ compact = false }: TasteHeroProps) {
     (profileStatus?.last_profiled_at === null || (traits !== undefined && traits.length === 0));
 
   const padClass = compact ? 'p-5' : 'p-8 sm:p-12';
+  const spriteSize = compact ? 96 : 180;
 
   // Pre-compute axis bar geometry (plain vars, not IIFEs).
   const axisItems = archetype
@@ -329,25 +332,38 @@ export function TasteHero({ compact = false }: TasteHeroProps) {
           What is this?
         </button>
       </div>
-      <div className="flex items-center gap-3 mb-1">
-        <span className="inline-flex items-center rounded-full bg-user-ink/10 px-3 py-1 font-mono text-[1rem] font-medium text-user-ink">
-          {archetype.code}
-        </span>
-      </div>
-      <p className="font-mono text-xs text-user-ink/85 mb-3">
-        {AXIS_META.map((a, i) => {
-          const axisData = archetype[a.key];
-          const label = axisData.score < 0 ? a.left : a.right;
-          return (
-            <span key={a.key}>
-              <span className="text-user-ink">{axisData.letter}</span> {label}
-              {i < 3 ? ' · ' : ''}
+      <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:items-center sm:gap-8 sm:text-left">
+        {readerSprite(archetype.code) && (
+          // The sprite is drawn at this panel's own hue, so without a contrasting
+          // disc it sinks into the field. bg-user-ink/10 is the same token the
+          // code chip below uses.
+          <div className="shrink-0 rounded-full bg-user-ink/10 p-3">
+            <ReaderSprite code={archetype.code} size={spriteSize} priority />
+          </div>
+        )}
+
+        <div className="min-w-0">
+          <div className="flex items-center justify-center gap-3 mb-1 sm:justify-start">
+            <span className="inline-flex items-center rounded-full bg-user-ink/10 px-3 py-1 font-mono text-[1rem] font-medium text-user-ink">
+              {archetype.code}
             </span>
-          );
-        })}
-      </p>
-      <h1 className={[headingClass, 'text-user-ink'].join(' ')}>{archetype.name}</h1>
-      <p className="text-sm text-user-ink/85 italic mt-2">{archetype.tagline}</p>
+          </div>
+          <p className="font-mono text-xs text-user-ink/85 mb-3">
+            {AXIS_META.map((a, i) => {
+              const axisData = archetype[a.key];
+              const label = axisData.score < 0 ? a.left : a.right;
+              return (
+                <span key={a.key}>
+                  <span className="text-user-ink">{axisData.letter}</span> {label}
+                  {i < 3 ? ' · ' : ''}
+                </span>
+              );
+            })}
+          </p>
+          <h1 className={[headingClass, 'text-user-ink'].join(' ')}>{archetype.name}</h1>
+          <p className="text-sm text-user-ink/85 italic mt-2">{archetype.tagline}</p>
+        </div>
+      </div>
 
       {/* Trait chips as supporting detail -- click to expand truncated claims */}
       {chipTraits.length > 0 && (
