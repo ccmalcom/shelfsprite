@@ -17,6 +17,7 @@ import {
 import { Button, Card, Badge, useToast, Field, Input } from '@/components/ui';
 import { getSupabaseClient, authEnabled } from '@/utils/supabase/client';
 import ImportModal from '@/components/ImportModal';
+import ReadingGoalsSettings from '@/components/ReadingGoalsSettings';
 
 function DangerAction({
   title,
@@ -282,6 +283,11 @@ export default function SettingsPage() {
             </Button>
           </form>
         </Card>
+      </section>
+
+      {/* Reading goals */}
+      <section className="mb-6">
+        <ReadingGoalsSettings />
       </section>
 
       {/* Change email */}

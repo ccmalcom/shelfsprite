@@ -1,0 +1,3 @@
+ALTER TABLE "reading_goals" DROP CONSTRAINT "uq_reading_goal";--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_reading_goal_genre" ON "reading_goals" USING btree ("user_id","year","kind","subject") WHERE "reading_goals"."subject" is not null;--> statement-breakpoint
+CREATE UNIQUE INDEX "uq_reading_goal_no_subject" ON "reading_goals" USING btree ("user_id","year","kind") WHERE "reading_goals"."subject" is null;

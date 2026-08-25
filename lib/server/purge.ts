@@ -9,6 +9,7 @@ export type ProfilePurgeResult = {
 export type AccountPurgeResult = ProfilePurgeResult & {
   books_removed: number;
   settings_removed: number;
+  goals_removed: number;
   signals_removed: number;
   jobs_removed: number;
   usage_events_removed: number;
@@ -60,6 +61,10 @@ export async function deleteAccountRows(tx: DbTx, userId: string): Promise<Accou
     .delete(schema.userSettings)
     .where(eq(schema.userSettings.userId, userId))
     .returning({ id: schema.userSettings.id });
+  const goals = await tx
+    .delete(schema.readingGoals)
+    .where(eq(schema.readingGoals.userId, userId))
+    .returning({ id: schema.readingGoals.id });
   const signals = await tx
     .delete(schema.tasteSignal)
     .where(eq(schema.tasteSignal.userId, userId))
@@ -81,6 +86,7 @@ export async function deleteAccountRows(tx: DbTx, userId: string): Promise<Accou
     books_removed,
     ...profile,
     settings_removed: settings.length,
+    goals_removed: goals.length,
     signals_removed: signals.length,
     jobs_removed: jobs.length,
     usage_events_removed: usage.length,

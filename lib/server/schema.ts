@@ -490,3 +490,41 @@ export const rateLimits = pgTable(
     primaryKey({ columns: [table.bucketKey, table.windowStart], name: 'rate_limits_pkey' }),
   ]
 );
+
+export const readingGoals = pgTable(
+  'reading_goals',
+  {
+    id: serial().primaryKey().notNull(),
+    userId: varchar('user_id').default('local').notNull(),
+    year: integer().notNull(),
+    kind: varchar().notNull(), // 'books' | 'genre' | 'new_authors' | 'pages'
+    subject: varchar(), // NOT NULL exactly when kind = 'genre'
+    target: integer().notNull(),
+    createdAt: timestamp('created_at', { mode: 'string' })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+  },
+  (table) => [
+    index('ix_reading_goals_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
+    // subject is NULL for every non-genre kind, and Postgres treats NULLs as
+    // distinct in a regular unique constraint, so a single (user, year, kind,
+    // subject) constraint would never stop duplicate non-genre goals. Split
+    // it into two partial unique indexes instead: one keyed on subject for
+    // genre goals, one without subject for everything else.
+    uniqueIndex('uq_reading_goal_genre')
+      .on(table.userId, table.year, table.kind, table.subject)
+      .where(sql`${table.subject} is not null`),
+    uniqueIndex('uq_reading_goal_no_subject')
+      .on(table.userId, table.year, table.kind)
+      .where(sql`${table.subject} is null`),
+    check('ck_reading_goals_target_positive', sql`${table.target} > 0`),
+    check(
+      'ck_reading_goals_kind',
+      sql`${table.kind} in ('books', 'genre', 'new_authors', 'pages')`
+    ),
+    check(
+      'ck_reading_goals_subject',
+      sql`(${table.kind} = 'genre') = (${table.subject} is not null)`
+    ),
+  ]
+);

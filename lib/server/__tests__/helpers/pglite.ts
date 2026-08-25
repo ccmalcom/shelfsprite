@@ -247,6 +247,22 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       reviewed_by text
     );
     create unique index ux_invite_requests_email on invite_requests (email);
+    create table reading_goals (
+      id serial primary key,
+      user_id text not null default 'local',
+      year integer not null,
+      kind text not null,
+      subject text,
+      target integer not null,
+      created_at timestamp not null default current_timestamp,
+      constraint ck_reading_goals_target_positive check (target > 0),
+      constraint ck_reading_goals_kind check (kind in ('books', 'genre', 'new_authors', 'pages')),
+      constraint ck_reading_goals_subject check ((kind = 'genre') = (subject is not null))
+    );
+    create unique index uq_reading_goal_genre on reading_goals (user_id, year, kind, subject)
+      where subject is not null;
+    create unique index uq_reading_goal_no_subject on reading_goals (user_id, year, kind)
+      where subject is null;
   `);
   const db = drizzle(pg, { schema }) as unknown as Db;
   return { db, close: () => pg.close() };
@@ -259,6 +275,7 @@ export interface Seed {
   books?: Record<string, unknown>[];
   invites?: Record<string, unknown>[];
   invite_requests?: Record<string, unknown>[];
+  reading_goals?: Record<string, unknown>[];
   enrichment?: Record<string, unknown>[];
   taste_traits?: Record<string, unknown>[];
   recommendations?: Record<string, unknown>[];
@@ -314,6 +331,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
   const order = [
     'catalog_cache',
     'books',
+    'reading_goals',
     'invites',
     'invite_requests',
     'enrichment',
@@ -350,6 +368,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
   }
   const SEQ_TABLES = [
     'books',
+    'reading_goals',
     // Load-bearing: the seed inserts invites with explicit ids 1-3, which does not
     // advance the serial. Without this setval, createInvite's first INSERT gets id=1
     // and fails on the primary key.

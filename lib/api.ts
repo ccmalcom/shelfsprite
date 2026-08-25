@@ -20,6 +20,40 @@ export interface Stats {
   by_star: Record<string, number>;
 }
 
+export type GoalKind = 'books' | 'genre' | 'new_authors' | 'pages';
+
+export interface Goal {
+  id: number;
+  year: number;
+  kind: GoalKind;
+  subject: string | null;
+  target: number;
+  progress: number;
+  /** Books that could not contribute -- currently only pages goals with no page_count. */
+  unknown: number;
+  done: boolean;
+}
+
+export interface YearStats {
+  books: number;
+  pages: number;
+  unknown_pages: number;
+  authors: number;
+  new_authors: number;
+  /** Read-shelf books with no date_read, any year -- the backlog the card cannot see. */
+  undated: number;
+  top_genres: { subject: string; count: number }[];
+  top_authors: { author: string; count: number }[];
+}
+
+export interface GoalsResponse {
+  year: number;
+  stats: YearStats;
+  goals: Goal[];
+  /** The user's own subject vocabulary, for goal-creation suggestions. */
+  subjects: string[];
+}
+
 export interface Book {
   id: number;
   title: string;
@@ -344,6 +378,9 @@ export const ARCHETYPE_KEY = 'archetype';
 /** Shared SWR key for the computed shelf highlights (GET /profile/highlights). */
 export const PROFILE_HIGHLIGHTS_KEY = 'profile-highlights';
 
+/** Shared SWR key for the reading-goals query (GET /goals). */
+export const GOALS_KEY = 'reading-goals';
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────────────────
 
 /**
@@ -625,6 +662,17 @@ export const api = {
     if (!res.ok) throw new Error(`Export failed (${res.status}): ${await res.text()}`);
     return res.blob();
   },
+
+  // ── Reading goals ─────────────────────────────────────────────────────────
+  listGoals: (year?: number) =>
+    get<GoalsResponse>(year === undefined ? '/goals' : `/goals?year=${year}`),
+
+  createGoal: (req: { year?: number; kind: GoalKind; subject?: string; target: number }) =>
+    post<Goal>('/goals', req),
+
+  updateGoal: (goalId: number, target: number) => patch<Goal>(`/goals/${goalId}`, { target }),
+
+  deleteGoal: (goalId: number) => del<{ ok: true }>(`/goals/${goalId}`),
 };
 
 /** Shared SWR key for the API-key status (settings page + any gating UI). */

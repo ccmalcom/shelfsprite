@@ -5,7 +5,7 @@ import { DELETE as deleteLibrary } from '../../../app/api/library/route';
 import { DELETE as deleteProfile } from '../../../app/api/profile/route';
 import { _setDbForTests, schema, type Db } from '../db';
 import { deleteAccountRows, deleteLibraryRows, deleteProfileRows } from '../purge';
-import { makeTestDb } from './helpers/pglite';
+import { loadSeed, makeTestDb } from './helpers/pglite';
 
 async function seedUser(db: Db, userId: string) {
   const inserted = await db
@@ -279,18 +279,28 @@ describe('purge primitives', () => {
     const { db, close } = await makeTestDb();
     try {
       await seedUser(db, 'local');
+      await loadSeed(db, {
+        reading_goals: [{ id: 1, user_id: 'local', year: 2026, kind: 'books', target: 10 }],
+      });
       const result = await db.transaction((tx) => deleteAccountRows(tx, 'local'));
       expect(result).toEqual({
         books_removed: 2,
         traits_removed: 1,
         recommendations_removed: 1,
         settings_removed: 1,
+        goals_removed: 1,
         signals_removed: 1,
         jobs_removed: 1,
         usage_events_removed: 1,
         directive_removed: 1,
         account_deleted: true,
       });
+      expect(
+        await db
+          .select({ id: schema.readingGoals.id })
+          .from(schema.readingGoals)
+          .where(eq(schema.readingGoals.userId, 'local'))
+      ).toEqual([]);
       expect(await countFor(db, 'local')).toEqual({
         ...completeCounts,
         books: 0,
@@ -317,6 +327,12 @@ describe('purge primitives', () => {
       try {
         await seedUser(db, 'local');
         await seedUser(db, 'other-user');
+        await loadSeed(db, {
+          reading_goals: [
+            { id: 1, user_id: 'local', year: 2026, kind: 'books', target: 10 },
+            { id: 2, user_id: 'other-user', year: 2026, kind: 'books', target: 10 },
+          ],
+        });
         const before = await snapshotFor(db, 'other-user');
         await db.transaction(async (tx) => {
           if (kind === 'profile') await deleteProfileRows(tx, 'local');
@@ -327,6 +343,12 @@ describe('purge primitives', () => {
           if (kind === 'account') await deleteAccountRows(tx, 'local');
         });
         expect(await snapshotFor(db, 'other-user')).toEqual(before);
+        expect(
+          await db
+            .select({ id: schema.readingGoals.id })
+            .from(schema.readingGoals)
+            .where(eq(schema.readingGoals.userId, 'other-user'))
+        ).toHaveLength(1);
       } finally {
         await close();
       }
@@ -342,6 +364,7 @@ describe('purge primitives', () => {
         traits_removed: 0,
         recommendations_removed: 0,
         settings_removed: 0,
+        goals_removed: 0,
         signals_removed: 0,
         jobs_removed: 0,
         usage_events_removed: 0,
@@ -385,6 +408,7 @@ describe('purge routes', () => {
         traits_removed: 1,
         recommendations_removed: 1,
         settings_removed: 1,
+        goals_removed: 0,
         signals_removed: 1,
         jobs_removed: 1,
         usage_events_removed: 1,
@@ -397,6 +421,7 @@ describe('purge routes', () => {
           'traits_removed',
           'recommendations_removed',
           'settings_removed',
+          'goals_removed',
           'signals_removed',
           'jobs_removed',
           'usage_events_removed',
@@ -464,6 +489,7 @@ describe('purge routes', () => {
         traits_removed: 0,
         recommendations_removed: 0,
         settings_removed: 0,
+        goals_removed: 0,
         signals_removed: 0,
         jobs_removed: 0,
         usage_events_removed: 0,

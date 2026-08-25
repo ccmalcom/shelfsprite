@@ -15,6 +15,7 @@ import {
 } from '@/lib/api';
 import { Card, Button, useToast } from '@/components/ui';
 import { TasteHero } from '@/components/TasteHero';
+import YearCard from '@/components/YearCard';
 import { tasteAccent } from '@/lib/tasteAccent';
 
 // ── Stats strip ───────────────────────────────────────────────────────────────
@@ -188,6 +189,8 @@ export default function HomePage() {
         ) : stats ? (
           <StatsStrip stats={stats} />
         ) : null}
+
+        <YearCard />
 
         {stats && <RatingsBreakdown stats={stats} />}
       </div>
