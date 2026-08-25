@@ -19,6 +19,7 @@ import { buildBeats, type Beat } from '@/lib/revealBeats';
 import { tasteAccent } from '@/lib/tasteAccent';
 import { RevealFrame, RevealButton } from './revealFrame';
 import { RewardTraitBeat, AversionsBeat } from './TraitBeats';
+import ReaderSprite from '@/components/ReaderSprite';
 
 // Fade-in wrapper honoring reduced motion.
 function Stagger({ children, reduced }: { children: React.ReactNode; reduced: boolean }) {
@@ -121,7 +122,8 @@ export default function RevealSequence({
   );
 }
 
-function renderBeat(
+/** Exported for the beat-level tests; not part of the public component API. */
+export function renderBeat(
   beat: Beat,
   h: {
     next: () => void;
@@ -237,6 +239,7 @@ function renderBeat(
               ? 'Early read: you might be...'
               : `Four axes. ${beat.nBooks} books of evidence. One reader:`}
           </p>
+          <ReaderSprite code={beat.archetype.code} size={200} className="mx-auto block" priority />
           <p className="font-mono text-lg text-user">{beat.archetype.code}</p>
           <h1 className="font-display text-4xl font-extrabold text-user sm:text-5xl">
             {beat.archetype.name}

@@ -1,0 +1,130 @@
+{
+  "IPBH": {
+    "name": "The Wandering Escapist",
+    "hue": 24,
+    "surface": "#972529",
+    "vivid": "#d95a58",
+    "png": "ipbh-wandering-escapist.png",
+    "webp": "ipbh-wandering-escapist.webp"
+  },
+  "IPBM": {
+    "name": "The Plot Mechanic",
+    "hue": 180,
+    "surface": "#066357",
+    "vivid": "#059583",
+    "png": "ipbm-plot-mechanic.png",
+    "webp": "ipbm-plot-mechanic.webp"
+  },
+  "IPDH": {
+    "name": "The Serial Thrill-Seeker",
+    "hue": 0,
+    "surface": "#922452",
+    "vivid": "#d35985",
+    "png": "ipdh-serial-thrill-seeker.png",
+    "webp": "ipdh-serial-thrill-seeker.webp"
+  },
+  "IPDM": {
+    "name": "The Genre Architect",
+    "hue": 270,
+    "surface": "#364ba7",
+    "vivid": "#617de6",
+    "png": "ipdm-genre-architect.png",
+    "webp": "ipdm-genre-architect.webp"
+  },
+  "ICBH": {
+    "name": "The Empathic Rover",
+    "hue": 345,
+    "surface": "#8b2868",
+    "vivid": "#cc5da1",
+    "png": "icbh-empathic-rover.png",
+    "webp": "icbh-empathic-rover.webp"
+  },
+  "ICBM": {
+    "name": "The Character Analyst",
+    "hue": 210,
+    "surface": "#07606c",
+    "vivid": "#0492a4",
+    "png": "icbm-character-analyst.png",
+    "webp": "icbm-character-analyst.webp"
+  },
+  "ICDH": {
+    "name": "The Devoted Fan",
+    "hue": 142,
+    "surface": "#0a6802",
+    "vivid": "#3b9533",
+    "png": "icdh-devoted-fan.png",
+    "webp": "icdh-devoted-fan.webp"
+  },
+  "ICDM": {
+    "name": "The Deep Empath",
+    "hue": 290,
+    "surface": "#5740a1",
+    "vivid": "#8873e0",
+    "png": "icdm-deep-empath.png",
+    "webp": "icdm-deep-empath.webp"
+  },
+  "RPBH": {
+    "name": "The Conscious Adventurer",
+    "hue": 38,
+    "surface": "#942d02",
+    "vivid": "#d75f39",
+    "png": "rpbh-conscious-adventurer.png",
+    "webp": "rpbh-conscious-adventurer.webp"
+  },
+  "RPBM": {
+    "name": "The Eclectic Critic",
+    "hue": 170,
+    "surface": "#03654e",
+    "vivid": "#049675",
+    "png": "rpbm-eclectic-critic.png",
+    "webp": "rpbm-eclectic-critic.webp"
+  },
+  "RPDH": {
+    "name": "The Committed Purist",
+    "hue": 18,
+    "surface": "#972334",
+    "vivid": "#d85964",
+    "png": "rpdh-committed-purist.png",
+    "webp": "rpdh-committed-purist.webp"
+  },
+  "RPDM": {
+    "name": "The Structural Connoisseur",
+    "hue": 225,
+    "surface": "#045e78",
+    "vivid": "#048fb5",
+    "png": "rpdm-structural-connoisseur.png",
+    "webp": "rpdm-structural-connoisseur.webp"
+  },
+  "RCBH": {
+    "name": "The Literary Wanderer",
+    "hue": 318,
+    "surface": "#76338a",
+    "vivid": "#b066c7",
+    "png": "rcbh-literary-wanderer.png",
+    "webp": "rcbh-literary-wanderer.webp"
+  },
+  "RCBM": {
+    "name": "The Cerebral Explorer",
+    "hue": 195,
+    "surface": "#036262",
+    "vivid": "#029393",
+    "png": "rcbm-cerebral-explorer.png",
+    "webp": "rcbm-cerebral-explorer.webp"
+  },
+  "RCDH": {
+    "name": "The Canon Keeper",
+    "hue": 47,
+    "surface": "#8a3a01",
+    "vivid": "#d2631e",
+    "png": "rcdh-canon-keeper.png",
+    "webp": "rcdh-canon-keeper.webp"
+  },
+  "RCDM": {
+    "name": "The Cerebral Architect",
+    "hue": 248,
+    "surface": "#025894",
+    "vivid": "#0f88dd",
+    "png": "rcdm-cerebral-architect.png",
+    "webp": "rcdm-cerebral-architect.webp"
+  }
+}
