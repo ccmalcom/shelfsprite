@@ -2,7 +2,7 @@ import { and, eq } from 'drizzle-orm';
 import { withApi, ApiError } from '@/lib/server/http';
 import { getDb, schema } from '@/lib/server/db';
 import { bookSummary, VALID_SHELVES } from '@/lib/server/books';
-import { effectiveRating, parseIdParam, pyList } from '@/lib/server/serialize';
+import { effectiveRating, parseIdParam, pyList, todayIsoDate } from '@/lib/server/serialize';
 
 export const PATCH = withApi('/api/books/[id]/shelf', async (req, ctx) => {
   const raw = await req.json().catch(() => null);
@@ -29,7 +29,16 @@ export const PATCH = withApi('/api/books/[id]/shelf', async (req, ctx) => {
       'A review requires a rating. Rate the book 0.5 to 5 before moving it off did-not-finish.'
     );
   }
-  await db.update(schema.books).set({ exclusiveShelf: shelf }).where(eq(schema.books.id, bookId));
+  // Marking a book read is the only signal ShelfSprite has for WHEN it was read;
+  // without this, every yearly goal and the year card stay empty. Never overwrite
+  // an existing date -- Goodreads import dates must survive.
+  const dateRead = shelf === 'read' && book.dateRead === null ? todayIsoDate() : book.dateRead;
+
+  await db
+    .update(schema.books)
+    .set({ exclusiveShelf: shelf, dateRead })
+    .where(eq(schema.books.id, bookId));
   ctx.timer.mark('db');
-  return Response.json(bookSummary({ ...book, exclusiveShelf: shelf }));
+
+  return Response.json(bookSummary({ ...book, exclusiveShelf: shelf, dateRead }));
 });
