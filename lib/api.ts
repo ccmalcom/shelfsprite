@@ -304,17 +304,16 @@ export interface BookFeedbackResult {
   feedback_updated_at: string | null;
 }
 
-/** Outcome of POST /recommend. `run_id` is null and `served` 0 when a run reached the
- *  end without persisting anything -- an empty retrieval pool, or a rerank whose every
- *  citation was dropped. Callers must check `served` before sending the reader to the
- *  swipe deck, which would otherwise show the previous batch. */
+/** Outcome of POST /recommend -- the fields the client reads, not the whole response.
+ *  `run_id` is null and `served` 0 when a run reached the end without persisting
+ *  anything -- an empty retrieval pool, or a rerank whose every citation was dropped.
+ *  Callers must check `served` before sending the reader to the swipe deck, which would
+ *  otherwise show the previous batch. `note` is present only on those zero-served runs. */
 export interface RecommendRunResult {
   run_id: string | null;
   served: number;
   candidates: number;
-  cold_start?: boolean;
   note?: string;
-  recommendations?: Record<string, unknown>[];
 }
 
 /** Whether the taste profile is stale relative to in-app edits (GET /profile/status). */

@@ -155,8 +155,12 @@ export default function HomePage() {
         setRunning(false);
         return;
       }
-      // The deck's cached 'recommendations' key still holds the old batch.
-      await mutate('recommendations');
+      // The deck's cached 'recommendations' key still holds the old batch, and
+      // nothing on THIS page subscribes to it -- so a bare mutate(key) would find no
+      // revalidator, return the stale value, and leave it in cache for /swipe to paint
+      // before the refetch lands. Passing `undefined` as data clears the entry outright;
+      // startRevalidate still runs afterwards and drops the dedupe markers.
+      await mutate('recommendations', undefined, { revalidate: true });
       router.push('/swipe');
     } catch (e) {
       toast.error(

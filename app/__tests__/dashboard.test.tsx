@@ -57,9 +57,10 @@ describe('dashboard', () => {
     renderDashboard();
     fireEvent.click(screen.getByRole('button', { name: /find my next books/i }));
     await waitFor(() => expect(push).toHaveBeenCalledWith('/swipe'));
-    // The deck reads SWR key 'recommendations'; without this it can paint the
-    // previous, fully-swiped batch from cache.
-    expect(mutate).toHaveBeenCalledWith('recommendations');
+    // The deck reads SWR key 'recommendations'; the explicit `undefined` clears the
+    // cached entry, without which /swipe paints the previous, fully-swiped batch until
+    // its refetch resolves.
+    expect(mutate).toHaveBeenCalledWith('recommendations', undefined, { revalidate: true });
   });
 
   it('keeps the reader on the home page when a run serves nothing', async () => {
