@@ -212,4 +212,28 @@ describe('runRecommend happy path', () => {
       await close();
     }
   });
+
+  // Observed in production 2026-08-30: both Claude stages ran and the reranker
+  // answered with a full 1378-token tool call, yet not one row was written --
+  // recommendations.id_seq never advanced. Every candidate_index it cited had been
+  // dropped, so `ranked` was empty and the run "succeeded" with nothing served.
+  test('returns a note instead of an empty run when the rerank yields no usable picks', async () => {
+    const { db, close } = await seeded();
+    const restore = installHttpReplay(httpFixtures as any);
+    // A complete response whose every cited index is out of range.
+    const client = fakeClaude([seedResponse, rerankResponse([9001, 9002, 9003])] as any);
+    try {
+      const before = await db.select().from(schema.recommendations);
+      const out = (await runRecommend(db, client, 'local', opts())) as any;
+      expect(client.calls).toHaveLength(2);
+      expect(out.candidates).toBeGreaterThan(0);
+      expect(out).toMatchObject({ run_id: null, served: 0, recommendations: [] });
+      expect(out.note).toContain('no usable picks');
+      const after = await db.select().from(schema.recommendations);
+      expect(after).toHaveLength(before.length);
+    } finally {
+      restore();
+      await close();
+    }
+  });
 });

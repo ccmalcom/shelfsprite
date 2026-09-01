@@ -22,6 +22,7 @@ import {
 } from './claudeErrors';
 import { schema, type Db } from './db';
 import { ApiError } from './errors';
+import { logDebug } from './log';
 import { asIdList } from './profileBuild';
 import { ensureProfileMeta } from './profileMeta';
 import { booksChangedSince } from './profileUpdate';
@@ -132,6 +133,20 @@ export async function runRecommend(
   }
 
   const ranked = await claudeRerank(db, requireClient(), candidates, signal, userId, n);
+
+  // A rerank that survives none of its own citations must not mint a run. An empty
+  // run writes no rows, so /recommendations falls back to the PREVIOUS run and the
+  // swipe deck tells the reader they have already seen everything (issue #64).
+  if (ranked.length === 0) {
+    return {
+      run_id: null,
+      served: 0,
+      candidates: candidates.length,
+      cold_start: coldStart,
+      note: `The reranker returned no usable picks from ${candidates.length} candidates.`,
+      recommendations: [],
+    };
+  }
 
   const runId = randomUUID().replace(/-/g, '').slice(0, 12); // uuid4().hex[:12]
   const createdAt = utcnowTs();
@@ -278,6 +293,19 @@ async function claudeRerank(
       // `[i for i in ... if i in valid_ids]` — reused rather than duplicated.
       grounded_trait_ids: asIdList(r.grounded_trait_ids, validTraitIds),
       grounded_book_ids: asIdList(r.grounded_book_ids, validBookIds),
+    });
+  }
+
+  if (rankedRaw.length > 0 && out.length === 0) {
+    // Every citation was dropped, so a response we paid for yields nothing. Production
+    // hit this on 2026-08-30 and left no evidence behind; log the shape of what came
+    // back so the next occurrence is diagnosable.
+    logDebug('recommend', 'rerank returned no usable candidate indices', {
+      userId,
+      returned: rankedRaw.length,
+      candidates: candidates.length,
+      sampleKeys: Object.keys(rankedRaw[0] ?? {}),
+      sampleIndex: JSON.stringify(rankedRaw[0]?.candidate_index ?? null),
     });
   }
 
