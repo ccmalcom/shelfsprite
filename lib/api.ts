@@ -304,6 +304,19 @@ export interface BookFeedbackResult {
   feedback_updated_at: string | null;
 }
 
+/** Outcome of POST /recommend. `run_id` is null and `served` 0 when a run reached the
+ *  end without persisting anything -- an empty retrieval pool, or a rerank whose every
+ *  citation was dropped. Callers must check `served` before sending the reader to the
+ *  swipe deck, which would otherwise show the previous batch. */
+export interface RecommendRunResult {
+  run_id: string | null;
+  served: number;
+  candidates: number;
+  cold_start?: boolean;
+  note?: string;
+  recommendations?: Record<string, unknown>[];
+}
+
 /** Whether the taste profile is stale relative to in-app edits (GET /profile/status). */
 export interface ProfileStatus {
   dirty: boolean;
@@ -495,7 +508,7 @@ export const api = {
 
   profileHighlights: () => get<ProfileHighlights>('/profile/highlights'),
 
-  runRecommend: (n = 10) => post<Record<string, unknown>>('/recommend', { n }),
+  runRecommend: (n = 10) => post<RecommendRunResult>('/recommend', { n }),
 
   /** Build the initial taste profile (required before first recommendations). */
   runProfile: () => post<Record<string, unknown>>('/profile'),

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import {
   api,
   type Stats,
@@ -145,7 +145,18 @@ export default function HomePage() {
   async function handleRun() {
     setRunning(true);
     try {
-      await api.runRecommend(10);
+      const run = await api.runRecommend(10);
+      // A run can finish without persisting anything (empty retrieval pool, or a
+      // rerank whose every citation was dropped). The swipe deck reads the LATEST
+      // run that has rows, so redirecting here would show the previous, fully
+      // swiped batch and claim the reader had seen it all already (issue #64).
+      if (!run.run_id || run.served === 0) {
+        toast.error(run.note ?? 'That run turned up no new picks. Try again in a moment.');
+        setRunning(false);
+        return;
+      }
+      // The deck's cached 'recommendations' key still holds the old batch.
+      await mutate('recommendations');
       router.push('/swipe');
     } catch (e) {
       toast.error(
