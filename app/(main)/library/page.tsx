@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, Suspense } from 'react';
+import { useStickySort } from '@/lib/useStickySort';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR, { mutate } from 'swr';
@@ -80,6 +81,12 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
   );
 }
 
+// The stored-sort guard in useStickySort needs the allowed values, not the
+// labels; deriving them here keeps each tab's list in one place.
+function sortValues<T extends string>(options: { value: T; label: string }[]): T[] {
+  return options.map((o) => o.value);
+}
+
 function SortSelect<T extends string>({
   value,
   onChange,
@@ -118,11 +125,16 @@ const READ_SORT_OPTIONS: { value: ReadSort; label: string }[] = [
   { value: 'title-asc', label: 'Title A\u2013Z' },
   { value: 'date-desc', label: 'Date read \u2193' },
 ];
+const READ_SORT_VALUES = sortValues(READ_SORT_OPTIONS);
 
 function ReadTab({ books }: { books: Book[] }) {
   const [filterStar, setFilterStar] = useState<number | null>(null);
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<ReadSort>('rating-desc');
+  const [sort, setSort] = useStickySort<ReadSort>(
+    'shelfsprite:library-sort:read',
+    'rating-desc',
+    READ_SORT_VALUES
+  );
   const [editing, setEditing] = useState<Book | null>(null);
   const [queue, setQueue] = useState<Book[] | null>(null);
   const [qIndex, setQIndex] = useState(0);
@@ -311,10 +323,15 @@ const TO_READ_SORT_OPTIONS: { value: ToReadSort; label: string }[] = [
   { value: 'date-asc', label: 'Date added \u2191' },
   { value: 'title-asc', label: 'Title A\u2013Z' },
 ];
+const TO_READ_SORT_VALUES = sortValues(TO_READ_SORT_OPTIONS);
 
 function ToReadTab({ books }: { books: Book[] }) {
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<ToReadSort>('date-desc');
+  const [sort, setSort] = useStickySort<ToReadSort>(
+    'shelfsprite:library-sort:to-read',
+    'date-desc',
+    TO_READ_SORT_VALUES
+  );
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<Book | null>(null);
@@ -468,10 +485,15 @@ const CURRENTLY_READING_SORT_OPTIONS: { value: CurrentlyReadingSort; label: stri
   { value: 'date-asc', label: 'Date added \u2191' },
   { value: 'title-asc', label: 'Title A\u2013Z' },
 ];
+const CURRENTLY_READING_SORT_VALUES = sortValues(CURRENTLY_READING_SORT_OPTIONS);
 
 function CurrentlyReadingTab({ books }: { books: Book[] }) {
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<CurrentlyReadingSort>('date-desc');
+  const [sort, setSort] = useStickySort<CurrentlyReadingSort>(
+    'shelfsprite:library-sort:currently-reading',
+    'date-desc',
+    CURRENTLY_READING_SORT_VALUES
+  );
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState<Book | null>(null);
@@ -626,10 +648,15 @@ const DNF_SORT_OPTIONS: { value: DnfSort; label: string }[] = [
   { value: 'date-desc', label: 'Date added \u2193' },
   { value: 'title-asc', label: 'Title A\u2013Z' },
 ];
+const DNF_SORT_VALUES = sortValues(DNF_SORT_OPTIONS);
 
 function DnfTab({ books }: { books: Book[] }) {
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<DnfSort>('date-desc');
+  const [sort, setSort] = useStickySort<DnfSort>(
+    'shelfsprite:library-sort:did-not-finish',
+    'date-desc',
+    DNF_SORT_VALUES
+  );
   const [busyId, setBusyId] = useState<number | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [addingNote, setAddingNote] = useState<Book | null>(null);
@@ -839,10 +866,15 @@ const REJECTED_SORT_OPTIONS: { value: RejectedSort; label: string }[] = [
   { value: 'date-desc', label: 'Date skipped \u2193' },
   { value: 'title-asc', label: 'Title A\u2013Z' },
 ];
+const REJECTED_SORT_VALUES = sortValues(REJECTED_SORT_OPTIONS);
 
 function RejectedTab({ recs }: { recs: Recommendation[] }) {
   const [search, setSearch] = useState('');
-  const [sort, setSort] = useState<RejectedSort>('date-desc');
+  const [sort, setSort] = useStickySort<RejectedSort>(
+    'shelfsprite:library-sort:rejected',
+    'date-desc',
+    REJECTED_SORT_VALUES
+  );
   const [editingNote, setEditingNote] = useState<Recommendation | null>(null);
   const [noteText, setNoteText] = useState('');
   const [savingNote, setSavingNote] = useState(false);
