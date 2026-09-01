@@ -66,11 +66,12 @@ export function useStickySort<T extends string>(
 
   const setSort = useCallback(
     (value: T) => {
-      sessionValues.set(storageKey, value);
       try {
         window.localStorage.setItem(storageKey, value);
+        sessionValues.delete(storageKey);
       } catch {
         // Preference just will not outlive the session; the sort still changes.
+        sessionValues.set(storageKey, value);
       }
       listeners.forEach((notify) => notify());
     },
