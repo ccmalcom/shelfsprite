@@ -31,10 +31,16 @@ describe('costUsd', () => {
     expect(costUsd('claude-sonnet-4-6', usage)).toBeCloseTo(22.05, 6);
   });
 
-  it('uses the sonnet-5 promo rate before 2026-09-01 and list after', () => {
-    const usage = { input_tokens: 1_000_000 };
-    expect(costUsd('claude-sonnet-5', usage, new Date('2026-08-15'))).toBeCloseTo(2.0, 6);
-    expect(costUsd('claude-sonnet-5', usage, new Date('2026-09-01'))).toBeCloseTo(3.0, 6);
+  it('prices sonnet-5 at its permanent rate regardless of date', () => {
+    // 1M of each = 2 + 10 + 2.50 + 0.20. The $2/$10 introductory rate was made
+    // permanent, so there is no date on which this total changes.
+    const usage = {
+      input_tokens: 1_000_000,
+      output_tokens: 1_000_000,
+      cache_creation_input_tokens: 1_000_000,
+      cache_read_input_tokens: 1_000_000,
+    };
+    expect(costUsd('claude-sonnet-5', usage)).toBeCloseTo(14.7, 6);
   });
 
   it('falls back to the most expensive tier for unknown models', () => {

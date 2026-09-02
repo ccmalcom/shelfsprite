@@ -2,8 +2,7 @@
  * Per-user Anthropic spend tracking — the Node twin of mylibrary/usage.py.
  * trackedCreate wraps messages.create and records token usage + computed cost
  * into usage_events. Recording is best-effort: failures are logged and
- * swallowed so they can never break a Claude-powered flow. Pricing table is
- * copied from mylibrary/usage.py — keep the two in sync until cutover.
+ * swallowed so they can never break a Claude-powered flow.
  */
 import { sql } from 'drizzle-orm';
 import type { Db } from './db';
@@ -18,21 +17,21 @@ export interface UsageLike {
 
 type Pricing = [number, number, number, number]; // USD/1M: input, output, cache_write, cache_read
 
+// Official list prices, USD per 1M tokens. Sonnet 5 launched at an
+// introductory $2/$10 that Anthropic later made permanent, so it carries no
+// expiry: an earlier version of this table stepped it up to $3/$15 on
+// 2026-09-01 and overstated every Sonnet 5 run by 50% until that was removed.
+// Source: https://www.anthropic.com/pricing — last_verified 2026-09-01.
 const MODEL_PRICING: Record<string, Pricing> = {
+  'claude-sonnet-5': [2.0, 10.0, 2.5, 0.2],
   'claude-sonnet-4-6': [3.0, 15.0, 3.75, 0.3],
   'claude-haiku-4-5-20251001': [1.0, 5.0, 1.25, 0.1],
 };
+// Unknown models bill at the priciest tier we know, so a missed table entry
+// over-reports rather than hiding spend.
 const DEFAULT_PRICING: Pricing = [3.0, 15.0, 3.75, 0.3];
 
-// Sonnet 5 promo ends 2026-08-31 (inclusive) — mirrors mylibrary/usage.py.
-const SONNET_5_PROMO_END = new Date('2026-08-31T23:59:59Z');
-const SONNET_5_PROMO: Pricing = [2.0, 10.0, 2.5, 0.2];
-const SONNET_5_LIST: Pricing = [3.0, 15.0, 3.75, 0.3];
-
-function pricing(model: string, today: Date): Pricing {
-  if (model === 'claude-sonnet-5') {
-    return today <= SONNET_5_PROMO_END ? SONNET_5_PROMO : SONNET_5_LIST;
-  }
+function pricing(model: string): Pricing {
   return MODEL_PRICING[model] ?? DEFAULT_PRICING;
 }
 
@@ -41,8 +40,8 @@ function tok(usage: UsageLike | null, name: keyof UsageLike): number {
   return typeof v === 'number' && Number.isFinite(v) ? v : 0;
 }
 
-export function costUsd(model: string, usage: UsageLike | null, today: Date = new Date()): number {
-  const [inRate, outRate, cwRate, crRate] = pricing(model, today);
+export function costUsd(model: string, usage: UsageLike | null): number {
+  const [inRate, outRate, cwRate, crRate] = pricing(model);
   return (
     (tok(usage, 'input_tokens') * inRate +
       tok(usage, 'output_tokens') * outRate +

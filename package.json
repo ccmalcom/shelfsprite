@@ -28,7 +28,7 @@
     "framer-motion": "^11",
     "jose": "^6.2.8",
     "lucide-react": "^1.21.0",
-    "next": "^16.2.9",
+    "next": "^16.3.4",
     "postgres": "^3.4.9",
     "react": "^18",
     "react-dom": "^18",
@@ -48,11 +48,11 @@
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9",
-    "eslint-config-next": "^16",
+    "eslint-config-next": "^16.3.4",
     "jest": "^30.4.2",
     "jest-environment-jsdom": "^30.4.1",
     "jest-environment-node": "^30.4.1",
-    "postcss": "^8.5.10",
+    "postcss": "^8.5.26",
     "prettier": "^3",
     "tailwindcss": "^3",
     "ts-jest": "^29.4.11",
@@ -60,10 +60,13 @@
     "vitest": "^4.1.10"
   },
   "overrides": {
-    "postcss": "$postcss"
+    "postcss": "$postcss",
+    "@eslint/eslintrc": {
+      "js-yaml": "^4.3.2"
+    }
   },
   "allowScripts": {
-    "sharp@0.34.5": true,
+    "sharp@0.35.4": true,
     "unrs-resolver@1.12.2": true
   }
 }
