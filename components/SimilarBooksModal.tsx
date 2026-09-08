@@ -51,6 +51,7 @@ export default function SimilarBooksModal({ book, onClose }: Props) {
         shelf: 'to-read',
         cover_url: rec.cover_url,
         subjects: rec.subjects,
+        description: rec.description,
         catalog_source: rec.catalog_source,
         catalog_id: rec.catalog_id,
       });

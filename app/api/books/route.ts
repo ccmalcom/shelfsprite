@@ -69,6 +69,7 @@ const AddBook = z.object({
   review: z.string().nullish(),
   cover_url: z.string().nullish(),
   subjects: z.array(z.string()).nullish(),
+  description: z.string().nullish(),
   catalog_source: z.string().nullish(),
   catalog_id: z.string().nullish(),
 });
@@ -139,8 +140,10 @@ export const POST = withApi('/api/books', async (req, ctx) => {
       })
       .returning();
 
+    // An unrated to-read book is filtered out of every background enrichment run, so a
+    // description dropped here is never backfilled. Persist what the catalog already gave us.
     let enr = null;
-    if (b.cover_url || b.subjects || b.catalog_source || b.catalog_id) {
+    if (b.cover_url || b.subjects || b.description || b.catalog_source || b.catalog_id) {
       [enr] = await tx
         .insert(schema.enrichment)
         .values({
@@ -148,6 +151,7 @@ export const POST = withApi('/api/books', async (req, ctx) => {
           resolvedSource: b.catalog_source ?? null,
           resolvedId: b.catalog_id ?? null,
           subjects: b.subjects ?? [],
+          description: b.description ?? null,
           coverUrl: b.cover_url ?? null,
           resolutionConfidence: 1.0,
           confidenceLabel: 'MANUAL',

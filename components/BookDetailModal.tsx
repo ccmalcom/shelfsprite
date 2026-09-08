@@ -2,11 +2,11 @@
 
 import Image from 'next/image';
 import { ExternalLink, BookOpen, Sparkles, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui';
 import { bookLinks } from '@/lib/bookLinks';
 import SimilarBooksModal from '@/components/SimilarBooksModal';
-import type { Book, Shelf } from '@/lib/api';
+import { api, type Book, type Shelf } from '@/lib/api';
 
 interface Props {
   book: Book;
@@ -21,6 +21,32 @@ const LABEL_ID = 'book-detail-modal-title';
 export default function BookDetailModal({ book, onClose, onMove, onRemove, busy = false }: Props) {
   const [removeArmed, setRemoveArmed] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
+  // Books added before POST /books persisted a description have none, and no
+  // background run will ever reach them (unrated books are filtered out of every
+  // enrichment run), so ask for one the first time the book is actually looked at.
+  // A miss is not an error: it just leaves the empty-state copy in place. The
+  // result carries the id it was fetched for, so switching books derives a fresh
+  // pending state instead of resetting it from inside the effect.
+  const [fetched, setFetched] = useState<{ id: number; description: string | null } | null>(null);
+
+  useEffect(() => {
+    if (book.description) return;
+    let cancelled = false;
+    const settle = (description: string | null) => {
+      if (!cancelled) setFetched({ id: book.id, description });
+    };
+    api
+      .bookDescription(book.id)
+      .then((result) => settle(result.description))
+      .catch(() => settle(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [book.id, book.description]);
+
+  const resolved = fetched?.id === book.id ? fetched.description : null;
+  const description = book.description ?? resolved;
+  const descriptionPending = !description && fetched?.id !== book.id;
 
   const links = bookLinks({ title: book.title, author: book.author, isbn13: book.isbn13 });
 
@@ -96,8 +122,10 @@ export default function BookDetailModal({ book, onClose, onMove, onRemove, busy 
 
         {/* Description */}
         <div className="mt-5">
-          {book.description ? (
-            <p className="text-sm leading-relaxed text-muted">{book.description}</p>
+          {description ? (
+            <p className="text-sm leading-relaxed text-muted">{description}</p>
+          ) : descriptionPending ? (
+            <p className="text-sm text-faint italic">Looking for a description…</p>
           ) : (
             <p className="text-sm text-faint italic">No description on file for this one.</p>
           )}
