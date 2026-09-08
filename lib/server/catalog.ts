@@ -637,3 +637,48 @@ export async function openlibraryWorkDescription(db: Db, workKey: string): Promi
   if (!data) return null;
   return olDescription(data);
 }
+
+/**
+ * Fetch a description from a Google Books volume record (e.g. 'lKHW_5W0bKkC').
+ * The search response already carries `description`, so this is only for filling a
+ * gap after the fact. Cached in catalog_cache, so repeat calls are free.
+ */
+export async function googleBooksVolumeDescription(
+  db: Db,
+  volumeId: string
+): Promise<string | null> {
+  if (!volumeId) return null;
+  const params = new URLSearchParams();
+  const key = process.env.GOOGLE_BOOKS_API_KEY;
+  if (key) params.set('key', key);
+  const query = params.toString();
+  const url = `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(volumeId)}${
+    query ? `?${query}` : ''
+  }`;
+  const data = (await getJson(db, url, 'googlebooks')) as any;
+  const description = data?.volumeInfo?.description;
+  return typeof description === 'string' && description ? description : null;
+}
+
+/**
+ * Look up a description for an already-resolved catalog match. Returns null when the
+ * source is unknown or the catalog has no blurb; callers must treat null as "nothing
+ * to store", never as an error.
+ */
+export async function catalogDescription(
+  db: Db,
+  source: string | null,
+  resolvedId: string | null
+): Promise<string | null> {
+  if (!source || !resolvedId) return null;
+  if (source === 'openlibrary') {
+    if (resolvedId.startsWith('/works/')) return openlibraryWorkDescription(db, resolvedId);
+    if (resolvedId.startsWith('/books/')) {
+      const workKey = await openlibraryEditionWorkKey(db, resolvedId);
+      return workKey ? openlibraryWorkDescription(db, workKey) : null;
+    }
+    return null;
+  }
+  if (source === 'googlebooks') return googleBooksVolumeDescription(db, resolvedId);
+  return null;
+}
