@@ -99,24 +99,6 @@ billed requests are missing from local totals. The ledger is not billing truth.
 policy; concurrent identical requests create at most one billed run; an admin can halt shared-key
 spend without a deploy; the UI distinguishes tracked estimates from provider billing.
 
-### OPS-01 — Add repository CI and dependency automation
-
-**Source:** repo review · **Area:** delivery process
-**Evidence:** no `.github/workflows` directory exists (confirmed 2026-09-08)
-
-Nothing enforces the validation matrix on a branch or PR. With two runners of disjoint ownership
-(`npm test` for everything outside `lib/server/**` and `app/api/**`, `npm run test:server` for
-exactly those) and a build gate that is the only thing catching Next segment-config failures, manual
-execution will drift.
-
-- CI on a clean lockfile install running type-check, ESLint, Prettier check, Jest, Vitest, and
-  `npm run build`.
-- Dependabot or Renovate with grouped low-risk updates and framework/database updates kept separate.
-- An agreed `npm audit` threshold as a check.
-
-**Done when:** required branch checks reproduce the validation matrix from a clean environment, and
-a broken format, type, test, or build blocks merge.
-
 ### OPS-02 — Close launch configuration and background-job observability gaps
 
 **Source:** repo review + `todo.md` · **Area:** operations
@@ -506,8 +488,8 @@ not supported or converted into a scoped design item.
 
 Verified 2026-09-08 unless noted:
 
-- `npx prettier --check .` still reports `assets/reader-types/README.md` as the only unformatted
-  file. One-line fix; make formatting a CI requirement under `OPS-01`.
+- Formatting is now a CI requirement (`format:check` in `.github/workflows/ci.yml`), and
+  `prettier --check .` is clean as of 2026-09-08.
 - `tsconfig.check.tsbuildinfo` and the `.design-sync-build/` artifacts are tracked in git. Audit
   whether they are intentional source assets; untrack and add precise ignore rules if not.
 - Next infers `/home/chase` as the workspace root because a lockfile exists above the repository.
@@ -543,6 +525,20 @@ Carried over from `todo.md` with no committed sequencing:
 - Invite email delivery through an external service rather than Supabase's default.
 
 ## Recently closed
+
+- **OPS-01** — repository CI and dependency automation landed (2026-09-08).
+  `.github/workflows/ci.yml` runs the full validation matrix (type-check, ESLint, Prettier, Jest,
+  Vitest, `npm run build`) on every pull request and push to `main` from a clean `npm ci`, with no
+  environment variables set — verified against a fresh checkout, since every `process.env` read
+  under `lib/server/**` is inside a function. A separate `audit` job blocks on
+  `npm audit --omit=dev --audit-level=high` and reports the full tree non-blocking.
+  `.github/dependabot.yml` batches minor and patch updates while keeping `framework` (Next, React)
+  and `database` (drizzle, postgres) in their own pull requests and every major on its own.
+  The three high advisories open at the time — `brace-expansion`, `browserslist`, and `js-yaml`
+  — were closed with same-major `overrides` pins rather than left for the gate to trip on; see
+  "Dependency pins" in `docs/conventions.md`. **Still needs a human step:** the checks are not
+  required until branch protection on `main` marks "Validation matrix" and "Dependency audit"
+  required, which is a GitHub repository setting, not a file in this repo.
 
 - **SEC-01** — production authentication now fails closed (2026-09-08). `lib/server/authMode.ts`
   is the single validated auth-mode decision, called by both `lib/server/auth.ts` and

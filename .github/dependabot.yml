@@ -1,0 +1,81 @@
+# Dependency automation for OPS-01.
+#
+# The grouping rule is "low-risk updates arrive in batches, risky ones arrive alone". Every group
+# below is restricted to minor and patch updates, so majors fall outside all of them and Dependabot
+# opens one pull request per major -- which is what you want for a Next or drizzle jump that needs
+# its own migration and its own build gate.
+#
+# Groups are matched top to bottom and a dependency joins the first one it matches, so `framework`
+# and `database` are listed before the catch-alls and the catch-alls do not need to exclude them.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(deps)
+      prefix-development: chore(deps-dev)
+    groups:
+      # Next and React move together and break together. Kept out of the general batch so a
+      # failing build gate points at a small, obvious diff.
+      framework:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - next
+          - eslint-config-next
+          - react
+          - react-dom
+          - '@types/react'
+          - '@types/react-dom'
+
+      # drizzle-orm and drizzle-kit have to stay compatible with each other and with the
+      # checked-in drizzle/meta snapshots, and postgres is the driver underneath both. A bump here
+      # can change generated migration SQL, so it gets reviewed on its own.
+      database:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+        patterns:
+          - drizzle-orm
+          - drizzle-kit
+          - postgres
+
+      production:
+        applies-to: version-updates
+        dependency-type: production
+        update-types:
+          - minor
+          - patch
+
+      development:
+        applies-to: version-updates
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+
+  # Keeps actions/checkout and actions/setup-node current. Without this the workflow silently ages
+  # onto a runner-deprecated action version.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels:
+      - dependencies
+    commit-message:
+      prefix: chore(ci)
+    groups:
+      actions:
+        patterns:
+          - '*'
