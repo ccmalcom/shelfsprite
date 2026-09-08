@@ -187,8 +187,32 @@ off-target results. Discovery is a headline feature and this is a correctness fa
 deterministic retrieval stage, not the rerank — an author-constrained query is not producing that
 author's catalog entries.
 
-Likely overlaps `PROD-01` (canonical-edition ranking) and the `matchScore` author-token handling
-recorded in `todo.md`. Investigate retrieval before touching the prompt.
+**Root cause, verified 2026-09-08 (read before re-investigating).** The rerank is not at fault and
+neither is the prompt. `assemble()` is shared by the taste-profile and discovery paths and applies
+author-diversity caps unconditionally (`lib/server/recAssemble.ts:187`). For an author-named query:
+
+1. `MAX_PER_AUTHOR = 2` keeps two candidates for the requested author, in raw pool order — and a
+   live catalog query for a named author returns boxed sets, omnibus editions and "6-Book
+   Collection Set" listings among its top hits, so both slots are spent on those.
+2. `MAX_LIBRARY_AUTHOR_SHARE = 0.4` then treats the requested author as a library author — which
+   "my _next_ X read" guarantees — and reorders them **behind every non-library author**
+   (`[...non, ...lib.slice(0, maxLib)]` in `recFilters.ts`).
+3. `capPool` trims to `MAX_CANDIDATES`, cutting the now-demoted author.
+
+Both halves of the report (no Scalzi, plus collections) come from that one cap.
+
+The deeper cause is that the pipeline cannot represent an author-anchored request at all:
+`cleanConstraints` accepts only `languages`, `min_year`, `max_year`, and `exclude_subjects`, and the
+interpretation tool schema has no author field, so a named author survives only as free text inside
+a search string. No downstream stage knows the request was anchored. Prompt tuning cannot fix this.
+
+Collection/omnibus filtering is a real but secondary contributor — `isLearnerEdition` is the only
+edition-shape filter, and `dedupKey`/`fuzzyDuplicate` do not match "Old Man's War Boxed Set I"
+against an owned "Old Man's War". That part overlaps `PROD-01`.
+
+Three candidate fixes, not yet chosen: add an author constraint to the interpretation tool schema
+and bypass the caps when it is set; bypass author caps for the discovery path generally; or filter
+omnibus/collection editions. The first is the only one that fixes the representational gap.
 
 **Done when:** an author-named discovery query returns that author's works ranked first, covered by
 a fixture-based test rather than a single live search.
@@ -429,31 +453,6 @@ it behaves as a source preference rather than a tiebreaker.
 **Done when:** a dedicated fixture set of known ambiguous titles ranks canonical editions first, and
 the ranking stays explainable and provider-independent.
 
-### BUG-02 — Finishing a book should prompt for a review ([#70](https://github.com/ccmalcom/shelfsprite/issues/70))
-
-**Source:** GitHub · **Area:** library UX
-
-Clicking "finished" on a currently-reading book moves it straight to Read with no chance to rate or
-review. It should open the rating/review modal, with the text review optional.
-
-This is also the highest-leverage moment to capture an in-app review, and per the product decisions
-in-app reviews outweigh metadata inference in the taste profile — so this is a data-quality item as
-much as a UX one.
-
-**Done when:** finishing a book opens the review modal, a star rating can be set and a text review
-optionally added, and dismissing still completes the shelf move.
-
-### BUG-03 — Book descriptions missing on the To Read shelf ([#69](https://github.com/ccmalcom/shelfsprite/issues/69))
-
-**Source:** GitHub · **Area:** library display
-
-Descriptions do not render for books on the To Read shelf. Determine whether the description is
-absent from enrichment for unread books or simply not passed through to the card/detail view on
-that tab.
-
-**Done when:** To Read entries show descriptions on the same terms as other shelves, with a test
-covering the shelf-specific path.
-
 ### PROD-02 — Support alternative or lower-cost models ([#54](https://github.com/ccmalcom/shelfsprite/issues/54))
 
 **Source:** GitHub · **Area:** AI cost / product
@@ -525,6 +524,35 @@ Carried over from `todo.md` with no committed sequencing:
 - Invite email delivery through an external service rather than Supabase's default.
 
 ## Recently closed
+
+- **BUG-03 / [#69](https://github.com/ccmalcom/shelfsprite/issues/69)** — To Read descriptions now
+  render (2026-09-08). Two independent gaps, both fixed. `POST /api/books` accepted no
+  `description` and stored none, although all three add paths (`/discover`, `SimilarBooksModal`,
+  `AddBookModal`) already hold one from the catalog; it now persists it and they now send it. And
+  nothing could backfill one afterwards, because `candidateRows` in `enrichmentJobs.ts` filters to
+  books with an effective rating and a to-read book is unrated by definition — it is outside every
+  run, forced or not. `GET /api/books/[id]/description` fills a still-empty description from the
+  already-resolved catalog match when the detail view asks, via the new `catalogDescription`
+  dispatcher over `openlibraryWorkDescription` and `googleBooksVolumeDescription`. It is never an
+  error path (no match, or a match with no blurb, answers 200 with null and makes no network call),
+  and its write is scoped to a still-null row so a concurrent enrichment or user correction wins.
+  Covered by 7 route tests plus 4 on the add path; verified in the running app against a scratch
+  database on both branches (resolved work key → fetched, persisted, rendered; missing resolved id
+  → 200 null in 9ms, empty-state copy retained).
+
+- **BUG-02 / [#70](https://github.com/ccmalcom/shelfsprite/issues/70)** — finishing a book opens the
+  review modal again (2026-09-08). The feature was already wired: all three "Mark finished"
+  affordances passed `thenReview = true` and the handlers called `setReviewing`. The defect was JSX
+  ordering. `ToReadTab`, `CurrentlyReadingTab` and `DnfTab` each early-returned their empty state
+  above the modals at the bottom of the tree, while `moveTo` optimistically removes the acted-on
+  book from the list — so finishing the **last** book on a shelf emptied the list, fired the early
+  return, and unmounted the modal in the same commit that opened it. It therefore broke only at
+  n=1, which is why it read as unimplemented. The empty states are now rendered inline; ignoring
+  reindentation the change is 36 insertions / 25 deletions. Verified in the running app: modal opens
+  with the empty state behind it, a 3.5 rating and review text both persist, and dismissing still
+  completes the shelf move. **No automated regression test** — the tab components are local to a
+  1265-line `page.tsx` and are not importable, and extracting them belongs to `ARCH-01` rather than
+  to a bug fix. Fold that test into `ARCH-01` when the tabs move.
 
 - **OPS-01** — repository CI and dependency automation landed (2026-09-08).
   `.github/workflows/ci.yml` runs the full validation matrix (type-check, ESLint, Prettier, Jest,
