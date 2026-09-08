@@ -24,29 +24,7 @@ no longer the place to look for what is next.
 
 ## P0 — before the next deployment
 
-### SEC-01 — Fail closed when production authentication is misconfigured
-
-**Source:** repo review · **Area:** authentication / configuration
-**Evidence:** `lib/server/auth.ts:51-58`, `lib/server/auth.ts:27-29`, `utils/supabase/middleware.ts`
-
-`verifyRequestUser` returns `{ userId: 'local', isAdmin: true }` whenever `authEnabled()` is false,
-and `authEnabled()` is false whenever no Supabase URL or JWKS URL is present. A production or
-preview deploy with a missing or partially-set Supabase variable therefore serves every
-unauthenticated request as the local administrator, including the admin APIs. Page middleware
-becomes a no-op under the same condition, so the two layers can disagree.
-
-Confirmed still open — PR #68 addressed `SEC-02`, `SEC-03`, and `COST-01` but not this.
-
-- Gate local unauthenticated mode behind an explicit opt-in that is rejected outside
-  `NODE_ENV === 'development'`.
-- Validate the complete Supabase variable set at startup and fail with a useful configuration error
-  when it is partial.
-- Give API auth and page middleware one shared, validated auth-mode decision.
-- Validate the JWT issuer alongside the existing audience and algorithm checks.
-
-**Done when:** production-mode tests with no Supabase variables and with partial Supabase variables
-both fail closed; local mode requires deliberate configuration and stays covered by a test; no
-unauthenticated request can obtain `isAdmin: true` outside explicit local development.
+None open. `SEC-01` closed 2026-09-08; see **Recently closed**.
 
 ## P1 — before broadening the invite pool
 
@@ -565,6 +543,17 @@ Carried over from `todo.md` with no committed sequencing:
 - Invite email delivery through an external service rather than Supabase's default.
 
 ## Recently closed
+
+- **SEC-01** — production authentication now fails closed (2026-09-08). `lib/server/authMode.ts`
+  is the single validated auth-mode decision, called by both `lib/server/auth.ts` and
+  `utils/supabase/middleware.ts`, so the two layers can no longer disagree. Any Supabase variable
+  present means the set must be complete; a partial set raises `AuthConfigError` instead of
+  downgrading to local mode. Local unauthenticated mode requires `ALLOW_LOCAL_AUTH=true` and a
+  non-`production` `NODE_ENV`. A configuration fault answers 503, never 401 and never
+  `isAdmin: true`, and `instrumentation.ts` reports it once at server start. Access tokens are now
+  checked for `iss` (`<project URL>/auth/v1`, override `SUPABASE_JWT_ISSUER`) alongside audience
+  and algorithm — the value was confirmed against the live project's
+  `/auth/v1/.well-known/openid-configuration` and against a real signed-in session.
 
 Resolved by PR #68 and its precursors, retained so the review document is not re-read as open work:
 

@@ -18,35 +18,60 @@ code-only change.
 
 Current source readers under `lib`, `app`, and `utils` use:
 
-| Variable                               | Purpose                                                                  |
-| -------------------------------------- | ------------------------------------------------------------------------ |
-| `DATABASE_URL`                         | Supabase Postgres connection used by `getDb`; required for data access.  |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Browser Supabase client and server-side fallback for the project URL.    |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser/session middleware key.                                          |
-| `SUPABASE_URL`                         | Preferred server-side Supabase URL for JWKS and admin calls.             |
-| `SUPABASE_JWKS_URL`                    | Optional explicit JWKS endpoint override.                                |
-| `SUPABASE_SECRET_KEY`                  | Server-only GoTrue admin credential for invite/list/delete calls.        |
-| `ADMIN_EMAILS`                         | Comma-separated, case-insensitive admin allowlist.                       |
-| `FRONTEND_URL`                         | Public app origin used to build invite `redirect_to`; no trailing slash. |
-| `ENCRYPTION_KEY`                       | AES-256-GCM key for stored per-user Anthropic credentials.               |
-| `ANTHROPIC_API_KEY`                    | Server fallback when a user has no stored key.                           |
-| `GOOGLE_BOOKS_API_KEY`                 | Optional Google Books credential.                                        |
-| `MYLIBRARY_MODEL`                      | Claude model override; defaults to `claude-sonnet-5`.                    |
-| `MYLIBRARY_REQ_PER_SEC`                | Catalog request-rate override.                                           |
-| `MYLIBRARY_MONTHLY_SOFT_CAP_USD`       | Per-user monthly visibility cap; warn-only.                              |
-| `MYLIBRARY_USAGE_WARN_THRESHOLD`       | Fraction of the soft cap at which the warning appears.                   |
-| `FEEDBACK_PROMPTS_ENABLED`             | Global targeted-feedback prompt switch; defaults to `true`.              |
-| `FEEDBACK_SNOOZE_HOURS`                | Prompt snooze period; defaults to 72 hours.                              |
-| `GITHUB_TOKEN`                         | Fine-grained token used to create feedback issues.                       |
-| `GITHUB_REPO`                          | Target `owner/name`; defaults to `ccmalcom/shelfsprite`.                 |
-| `GITHUB_WEBHOOK_SECRET`                | Shared secret used to verify GitHub webhook signatures.                  |
-| `GITHUB_IN_PROGRESS_LABEL`             | Issue label mapped to active work; defaults to `in progress`.            |
-| `CRON_SECRET`                          | Bearer secret for enrichment tick and janitor routes.                    |
+| Variable                               | Purpose                                                                         |
+| -------------------------------------- | ------------------------------------------------------------------------------- |
+| `DATABASE_URL`                         | Supabase Postgres connection used by `getDb`; required for data access.         |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Browser Supabase client and server-side fallback for the project URL.           |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser/session middleware key. Required whenever any Supabase variable is set. |
+| `SUPABASE_URL`                         | Preferred server-side Supabase URL for JWKS and admin calls.                    |
+| `SUPABASE_JWKS_URL`                    | Optional explicit JWKS endpoint override.                                       |
+| `SUPABASE_JWT_ISSUER`                  | Optional expected `iss` override; defaults to `<project URL>/auth/v1`.          |
+| `ALLOW_LOCAL_AUTH`                     | Opt-in for local unauthenticated mode. Never honoured in production.            |
+| `SUPABASE_SECRET_KEY`                  | Server-only GoTrue admin credential for invite/list/delete calls.               |
+| `ADMIN_EMAILS`                         | Comma-separated, case-insensitive admin allowlist.                              |
+| `FRONTEND_URL`                         | Public app origin used to build invite `redirect_to`; no trailing slash.        |
+| `ENCRYPTION_KEY`                       | AES-256-GCM key for stored per-user Anthropic credentials.                      |
+| `ANTHROPIC_API_KEY`                    | Server fallback when a user has no stored key.                                  |
+| `GOOGLE_BOOKS_API_KEY`                 | Optional Google Books credential.                                               |
+| `MYLIBRARY_MODEL`                      | Claude model override; defaults to `claude-sonnet-5`.                           |
+| `MYLIBRARY_REQ_PER_SEC`                | Catalog request-rate override.                                                  |
+| `MYLIBRARY_MONTHLY_SOFT_CAP_USD`       | Per-user monthly visibility cap; warn-only.                                     |
+| `MYLIBRARY_USAGE_WARN_THRESHOLD`       | Fraction of the soft cap at which the warning appears.                          |
+| `FEEDBACK_PROMPTS_ENABLED`             | Global targeted-feedback prompt switch; defaults to `true`.                     |
+| `FEEDBACK_SNOOZE_HOURS`                | Prompt snooze period; defaults to 72 hours.                                     |
+| `GITHUB_TOKEN`                         | Fine-grained token used to create feedback issues.                              |
+| `GITHUB_REPO`                          | Target `owner/name`; defaults to `ccmalcom/shelfsprite`.                        |
+| `GITHUB_WEBHOOK_SECRET`                | Shared secret used to verify GitHub webhook signatures.                         |
+| `GITHUB_IN_PROGRESS_LABEL`             | Issue label mapped to active work; defaults to `in progress`.                   |
+| `CRON_SECRET`                          | Bearer secret for enrichment tick and janitor routes.                           |
 
-`getDb` requires Postgres even when auth is disabled. When the public Supabase variables are
-absent, page middleware is a no-op. API auth resolves the single `local` user only when no
-`SUPABASE_URL`, public project URL, or explicit JWKS URL enables bearer verification; that is the
-current local-development mode.
+`getDb` requires Postgres even when auth is disabled.
+
+### The auth-mode decision (fail-closed)
+
+`lib/server/authMode.ts#resolveAuthMode` is the one place that decides whether auth is on. Both API
+bearer verification (`lib/server/auth.ts`) and page middleware
+(`utils/supabase/middleware.ts`) call it, so the two layers can no longer disagree:
+
+1. **Any** Supabase variable present means hosted auth is intended. The set must then be complete —
+   a project URL (`SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`) **and**
+   `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. A partial set is a configuration error, never a
+   downgrade to local mode.
+2. Local unauthenticated mode requires `ALLOW_LOCAL_AUTH=true` **and** a `NODE_ENV` other than
+   `production`. Absent variables alone no longer mean "auth off".
+
+A configuration error is not an authentication failure. API routes answer `503 Server
+authentication is not configured` and log the detail; page middleware answers a plain `503` and
+logs; `instrumentation.ts` reports the same condition once at server start so it shows up in the
+deploy's first log lines. Nothing serves an anonymous request as the `local` administrator.
+
+The historical failure this closes: `authEnabled()` was false whenever no Supabase URL or JWKS URL
+was present, and `verifyRequestUser` then returned `{ userId: 'local', isAdmin: true }`. A
+production deploy missing one Supabase variable served every unauthenticated request — the admin
+APIs included — as the local administrator, with page middleware silently no-oping alongside it.
+
+Access tokens are verified against the project's JWKS with `aud: authenticated`, `alg: ES256`, and
+now an `iss` check against `<project URL>/auth/v1` (override with `SUPABASE_JWT_ISSUER`).
 
 ### GitHub issue integration
 

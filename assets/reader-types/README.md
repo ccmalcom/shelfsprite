@@ -11,8 +11,8 @@ motif.
 2. Sprite lookup lives in `lib/readerSprites.ts`; use `readerSprite(code)` for `{ src, name }`.
 3. Prefer the `components/ReaderSprite.tsx` component for rendering.
 4. Treat the sprite as decorative (`alt=""` + `aria-hidden="true"`), since the archetype name/code is rendered adjacent.
-Use WebP in the app and retain PNG as the lossless source/fallback. Every image is
-512×512 with genuine alpha transparency and a consistent transparent safety margin.
+   Use WebP in the app and retain PNG as the lossless source/fallback. Every image is
+   512×512 with genuine alpha transparency and a consistent transparent safety margin.
 
 Suggested display sizes:
 

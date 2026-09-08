@@ -5,9 +5,11 @@ import { _resetDebugCache } from '../../config';
 const FIXED_TEST_KEY = 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=';
 
 const ENV_KEYS = [
+  'ALLOW_LOCAL_AUTH',
   'SUPABASE_URL',
   'NEXT_PUBLIC_SUPABASE_URL',
   'SUPABASE_JWKS_URL',
+  'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY',
   'ENCRYPTION_KEY',
   'ANTHROPIC_API_KEY',
   'ADMIN_EMAILS',
@@ -31,6 +33,11 @@ export function setupTestEnv(): void {
     delete process.env.SUPABASE_URL;
     delete process.env.NEXT_PUBLIC_SUPABASE_URL;
     delete process.env.SUPABASE_JWKS_URL;
+    delete process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+    // Local single-user mode is now an explicit opt-in (lib/server/authMode.ts): with no
+    // Supabase variables AND no flag, resolveAuthMode() throws instead of handing out the
+    // local admin. The fixture run is exactly the deliberate local mode the flag names.
+    process.env.ALLOW_LOCAL_AUTH = 'true';
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.ADMIN_EMAILS;
     delete process.env.FEEDBACK_PROMPTS_ENABLED;

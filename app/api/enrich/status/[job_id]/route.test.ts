@@ -1,4 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { _resetJwksCache } from '@/lib/server/auth';
 import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from 'jose';
 import { eq } from 'drizzle-orm';
 import { makeTestDb } from '@/lib/server/__tests__/helpers/pglite';
@@ -22,7 +23,19 @@ let db: Db;
 let close: () => Promise<void>;
 let privateKey: KeyLike;
 let jwksBody: string;
-const oldJwksUrl = process.env.SUPABASE_JWKS_URL;
+// resolveAuthMode() (lib/server/authMode.ts) rejects a partial Supabase configuration, so these
+// route tests must set the whole set, not just the JWKS override. TEST_ISSUER is what the routes
+// will require as the token's `iss`.
+const TEST_ISSUER = 'https://auth.test/auth/v1';
+const SUPABASE_TEST_ENV = {
+  SUPABASE_URL: 'https://auth.test',
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'pk_test',
+  SUPABASE_JWKS_URL: 'https://auth.test/.well-known/jwks.json',
+  SUPABASE_JWT_ISSUER: TEST_ISSUER,
+} as const;
+const savedSupabaseEnv = Object.fromEntries(
+  Object.keys(SUPABASE_TEST_ENV).map((k) => [k, process.env[k]])
+);
 
 async function authHeaders(userId: string): Promise<HeadersInit> {
   const token = await new SignJWT({ sub: userId })
@@ -30,6 +43,7 @@ async function authHeaders(userId: string): Promise<HeadersInit> {
     .setIssuedAt()
     .setExpirationTime('1h')
     .setAudience('authenticated')
+    .setIssuer(TEST_ISSUER)
     .sign(privateKey);
   return { Authorization: `Bearer ${token}` };
 }
@@ -49,12 +63,16 @@ beforeAll(async () => {
   const publicJwk = await exportJWK(keys.publicKey);
   publicJwk.kid = 'route-test-key';
   jwksBody = JSON.stringify({ keys: [publicJwk] });
-  process.env.SUPABASE_JWKS_URL = 'https://auth.test/.well-known/jwks.json';
+  Object.assign(process.env, SUPABASE_TEST_ENV);
+  _resetJwksCache();
 });
 
 afterAll(() => {
-  if (oldJwksUrl === undefined) delete process.env.SUPABASE_JWKS_URL;
-  else process.env.SUPABASE_JWKS_URL = oldJwksUrl;
+  for (const [k, v] of Object.entries(savedSupabaseEnv)) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
+  _resetJwksCache();
 });
 
 beforeEach(async () => {

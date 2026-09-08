@@ -3,7 +3,7 @@
  * Auth (Supabase JWT or local mode) -> handler -> FastAPI-shaped errors,
  * one structured log line per request, Server-Timing headers in debug mode.
  */
-import { verifyRequestUser, AuthError, type AuthUser } from './auth';
+import { verifyRequestUser, AuthConfigError, AuthError, type AuthUser } from './auth';
 import { getDb } from './db';
 import { isDebugMode } from './config';
 import { logRequest, makeTimer, newRequestId, serverTimingHeader } from './log';
@@ -71,7 +71,12 @@ export function withApi(
         params,
       });
     } catch (err) {
-      if (err instanceof AuthError) {
+      if (err instanceof AuthConfigError) {
+        // Fail closed: the deployment meant to have auth and cannot prove who is calling.
+        // The detail goes to the log, not the client.
+        errorForLog = err.message;
+        response = errorResponse(503, 'Server authentication is not configured');
+      } else if (err instanceof AuthError) {
         response = errorResponse(401, err.message);
       } else if (err instanceof ApiError) {
         response = errorResponse(err.status, err.detail);

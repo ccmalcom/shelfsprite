@@ -161,8 +161,10 @@ describe('POST /api/admin/invite-requests/[id]/decline', () => {
 /**
  * Auth gating. setupTestEnv() deletes every SUPABASE_* variable, which puts verifyRequestUser in
  * local mode where the caller is an implicit admin — that is why every test above passes with no
- * Authorization header. Setting SUPABASE_JWKS_URL flips auth on; with no bearer token
- * verifyRequestUser throws AuthError before any network call, so no JWKS fetch happens.
+ * Authorization header. Configuring the full Supabase set flips auth on; with no bearer token
+ * verifyRequestUser throws AuthError before any network call, so no JWKS fetch happens. The set
+ * must be complete — resolveAuthMode() answers a partial one with AuthConfigError (503), which
+ * would pass an `expect(...).not.toBe(200)` assertion for the wrong reason.
  *
  * The authenticated-non-admin 403 case is NOT covered here on purpose. withApi calls
  * verifyRequestUser with no injectable JWKS, so reaching that branch from a route test would mean
@@ -173,6 +175,8 @@ describe('POST /api/admin/invite-requests/[id]/decline', () => {
 describe('admin gating', () => {
   it('401s an unauthenticated caller once auth is enabled', async () => {
     await withDb(async () => {
+      process.env.SUPABASE_URL = 'https://example.test';
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY = 'pk_test';
       process.env.SUPABASE_JWKS_URL = 'https://example.test/jwks.json';
       const res = await listRoute(listReq());
       expect(res.status).toBe(401);

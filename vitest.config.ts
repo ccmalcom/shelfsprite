@@ -5,6 +5,7 @@ export default defineConfig({
   test: {
     include: ['lib/server/**/*.test.ts', 'app/api/**/*.test.ts'],
     environment: 'node',
+    setupFiles: ['./vitest.setup.ts'],
     // Many test files spin up an in-memory PGlite (WASM Postgres) instance
     // per test. Under full-suite parallel load, enough of these running at
     // once causes contention that can push individual tests past vitest's
