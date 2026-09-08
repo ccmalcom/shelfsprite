@@ -115,7 +115,7 @@
 `main`. It is the same six commands `CLAUDE.md` lists, in one `verify` job, plus a separate
 `audit` job.
 
-- **The job sets no environment variables, and that is load-bearing.** Every `process.env` read
+- **The job sets no application secrets or runtime config env vars, and that is load-bearing.** Every `process.env` read
   under `lib/server/**` happens inside a function rather than at module load, so a checkout with no
   local configuration file type-checks, tests, and builds. If a gate ever starts needing
   configuration, the fix is the module-load-time read, not a secret in CI — putting production
