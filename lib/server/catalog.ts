@@ -672,7 +672,12 @@ export async function catalogDescription(
 ): Promise<string | null> {
   if (!source || !resolvedId) return null;
   if (source === 'openlibrary') {
-    return resolvedId.startsWith('/works/') ? openlibraryWorkDescription(db, resolvedId) : null;
+    if (resolvedId.startsWith('/works/')) return openlibraryWorkDescription(db, resolvedId);
+    if (resolvedId.startsWith('/books/')) {
+      const workKey = await openlibraryEditionWorkKey(db, resolvedId);
+      return workKey ? openlibraryWorkDescription(db, workKey) : null;
+    }
+    return null;
   }
   if (source === 'googlebooks') return googleBooksVolumeDescription(db, resolvedId);
   return null;
