@@ -115,7 +115,26 @@ never `Authorization`; Supabase interprets an Authorization value as a JWT, whil
 not `??`: `||` falls through on every falsy value, including an empty string, while `??` falls
 through only for null or undefined. The `admin_me` handler at `GET /api/admin/me` is intentionally
 configured with `requireAuth: false`; the route itself performs the admin check and must answer
-unauthenticated and non-admin callers instead of being pre-empted by the wrapper.
+unauthenticated and non-admin callers instead of being pre-empted by the wrapper. Its own `catch`
+swallows `AuthError` into `is_admin: false`, but must rethrow `AuthConfigError` so a misconfigured
+deployment answers 503 instead of a confident `false` it cannot stand behind.
+
+### The auth-mode decision
+
+`lib/server/authMode.ts#resolveAuthMode` is the single validated decision about whether auth is on.
+API bearer verification and page middleware both call it; neither may re-derive the answer from
+`process.env`, because two independent derivations are how the layers came to disagree.
+
+It fails closed by construction. Any Supabase variable present means hosted auth is intended and
+the set must be complete; a partial set raises `AuthConfigError` rather than downgrading to local
+mode. Local unauthenticated mode requires `ALLOW_LOCAL_AUTH=true` and a non-`production`
+`NODE_ENV`. `AuthConfigError` is a configuration fault, not an auth failure: `withApi` answers 503,
+never 401, and callers must not catch it into a permissive default. Keep `authMode.ts`
+dependency-free — page middleware imports it, so anything added there ships in the middleware
+bundle.
+
+Server tests run in that deliberate local mode via `vitest.setup.ts`, which sets the flag with
+`??=` so a test file can still delete it to exercise the fail-closed path.
 
 ### Page middleware versus API authentication
 
