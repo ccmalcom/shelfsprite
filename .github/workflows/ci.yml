@@ -48,10 +48,10 @@ jobs:
       # picture rather than only the first thing that broke. They stay skipped when the install
       # itself failed, because their output would be noise about missing modules.
       #
-      # This job deliberately sets no environment variables at all, and that was verified rather
-      # than assumed: every process.env read under lib/server/** happens inside a function, so a
-      # clean checkout with no local environment file type-checks, tests, and builds. If a future
-      # change makes a gate need configuration, fix the module-load-time read -- do not add
+      # This job deliberately sets no application secrets or runtime config env vars (beyond NODE_VERSION),
+      # and that was verified rather than assumed: every process.env read under lib/server/** happens
+      # inside a function, so a clean checkout with no local environment file type-checks, tests, and builds.
+      # If a future change makes a gate need configuration, fix the module-load-time read -- do not add
       # secrets here.
       - name: Type-check
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
