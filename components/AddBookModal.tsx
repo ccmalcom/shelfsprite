@@ -83,6 +83,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
         review: review.trim() || undefined,
         cover_url: selected.cover_url,
         subjects: selected.subjects,
+        description: selected.description,
         catalog_source: selected.source,
         catalog_id: selected.catalog_id,
       });

@@ -277,6 +277,8 @@ export interface AddBookRequest {
   review?: string | null;
   cover_url?: string | null;
   subjects?: string[] | null;
+  /** Catalog blurb. Unrated to-read books are never re-enriched, so send it on add. */
+  description?: string | null;
   catalog_source?: string | null;
   catalog_id?: string | null;
 }
@@ -529,6 +531,14 @@ export const api = {
 
   /** Manually add a book to the library (from a picked catalog result). */
   addBook: (req: AddBookRequest) => post<Book>('/books', req),
+
+  /**
+   * Lazily fill in a description the book was stored without. Unrated (to-read)
+   * books are excluded from every background enrichment run, so the detail view is
+   * the only thing that ever asks. Resolves to null when there is nothing to find.
+   */
+  bookDescription: (bookId: number) =>
+    get<{ description: string | null }>(`/books/${bookId}/description`),
 
   /**
    * Re-point a book's enrichment at a user-picked catalog match — fixes a

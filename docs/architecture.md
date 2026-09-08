@@ -68,8 +68,10 @@ applied with drizzle-kit from `drizzle/`.
 
 - `catalogCache.ts` — Postgres-backed catalog response cache keyed by request URL.
 - `catalog.ts` — Open Library and Google Books HTTP clients, throttling/statistics, normalization,
-  manual search/ranking, ISBN lookup, subject/author/query expansion, and Work-description lookup.
-  Its exported `Candidate` is the common catalog record used downstream.
+  manual search/ranking, ISBN lookup, subject/author/query expansion, and description lookup for an
+  already-resolved match (`openlibraryWorkDescription`, `googleBooksVolumeDescription`, and the
+  `catalogDescription` dispatcher over the two). Its exported `Candidate` is the common catalog
+  record used downstream.
 - `dedup.ts` and `similarity.ts` — shared title/author normalization, same-work checks, and
   deterministic title similarity (`normalizeTitle`, `sameWork`, `titleSim`, `STRONG_SIM`).
 - `enrichment.ts` — selects eligible books, resolves ISBN before title/author search, scores
@@ -84,6 +86,15 @@ applied with drizzle-kit from `drizzle/`.
 Synchronous enrichment is exposed at `POST /api/enrich`. The serverless background flow uses
 `POST /api/enrich/start`, `GET /api/enrich/status/{job_id}`, internal
 `POST /api/enrich/tick`, and the janitor route. It does not rely on a resident queue worker.
+
+Background enrichment only ever considers books with an effective rating (`candidateRows` in
+`enrichmentJobs.ts`), so unrated books — the whole to-read shelf — are outside every run, forced
+or not. Two paths compensate, and both are load-bearing for descriptions on that shelf:
+`POST /api/books` persists the `description` the caller already holds from the catalog, and
+`GET /api/books/[id]/description` lazily fills a still-empty one from the resolved match when the
+detail view asks. The lazy route is never an error path: no catalog match, or a match with no
+blurb, answers 200 with a null description, and its write is scoped to a still-null row so a
+concurrent enrichment or user correction wins.
 
 ### Taste profile and reveal
 
