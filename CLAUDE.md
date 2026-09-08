@@ -115,7 +115,9 @@ never `Authorization`; Supabase interprets an Authorization value as a JWT, whil
 not `??`: `||` falls through on every falsy value, including an empty string, while `??` falls
 through only for null or undefined. The `admin_me` handler at `GET /api/admin/me` is intentionally
 configured with `requireAuth: false`; the route itself performs the admin check and must answer
-unauthenticated and non-admin callers instead of being pre-empted by the wrapper.
+unauthenticated and non-admin callers instead of being pre-empted by the wrapper. Its own `catch`
+swallows `AuthError` into `is_admin: false`, but must rethrow `AuthConfigError` so a misconfigured
+deployment answers 503 instead of a confident `false` it cannot stand behind.
 
 ### The auth-mode decision
 

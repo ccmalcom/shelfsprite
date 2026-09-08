@@ -8,6 +8,12 @@ import { AuthConfigError, resolveAuthMode } from '@/lib/server/authMode';
 // middleware no-ops and / renders the dashboard.
 const PUBLIC_PREFIXES = ['/login', '/auth', '/welcome'];
 
+// A configuration fault is a property of the deployment, not of the request, so it is logged once
+// per server instance. The matcher covers nearly every page, so logging per request would turn a
+// single misconfiguration into a log line for every hit; instrumentation.ts already reports it at
+// startup, and this is the backstop for an instance that somehow missed that.
+let loggedAuthConfigError = false;
+
 /**
  * Refresh the Supabase session cookie on each request and gate page routes: an unauthenticated
  * request for / is rewritten to the public marketing page at /welcome, and every other
@@ -29,7 +35,10 @@ export async function updateSession(request: NextRequest) {
     mode = resolveAuthMode();
   } catch (err) {
     if (!(err instanceof AuthConfigError)) throw err;
-    console.error('[auth] refusing to serve pages:', err.message);
+    if (!loggedAuthConfigError) {
+      loggedAuthConfigError = true;
+      console.error('[auth] refusing to serve pages:', err.message);
+    }
     return new NextResponse('Server authentication is not configured.', {
       status: 503,
       headers: { 'cache-control': 'no-store' },

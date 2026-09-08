@@ -8,7 +8,9 @@
  *
  * This LOGS; it does not throw. Enforcement belongs on the request paths — lib/server/auth.ts and
  * utils/supabase/middleware.ts both fail closed on their own — and a throw here would take down a
- * server instance that can still serve /healthz and the marketing page.
+ * server instance that can still serve /api/healthz, which the proxy matcher excludes and which
+ * therefore keeps answering. Page routes do not: updateSession returns its 503 before it classifies
+ * a route as public, so /welcome and / are 503 too under a configuration fault.
  */
 import { AuthConfigError, describeAuthMode } from '@/lib/server/authMode';
 

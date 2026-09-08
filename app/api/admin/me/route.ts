@@ -1,5 +1,5 @@
 import { withApi } from '@/lib/server/http';
-import { verifyRequestUser } from '@/lib/server/auth';
+import { AuthConfigError, verifyRequestUser } from '@/lib/server/auth';
 
 /**
  * Port of api.py::admin_me. Deliberately ungated: this route IS the admin
@@ -15,7 +15,11 @@ export const GET = withApi(
     try {
       const user = await verifyRequestUser(req.headers.get('authorization'));
       isAdmin = user.isAdmin;
-    } catch {
+    } catch (err) {
+      // AuthError means "not signed in", which is simply not an admin. An AuthConfigError is a
+      // server fault, not an answer about this caller: rethrow so withApi answers 503 instead of
+      // reporting a confident is_admin:false the deployment cannot actually stand behind.
+      if (err instanceof AuthConfigError) throw err;
       isAdmin = false;
     }
     return Response.json({ is_admin: isAdmin });
