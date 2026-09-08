@@ -395,56 +395,59 @@ function ToReadTab({ books }: { books: Book[] }) {
     }
   }
 
-  if (books.length === 0) {
-    return (
-      <div className="py-12 text-center text-faint">
-        <ShelfSprite variant="sleep" sizes="128px" className="mx-auto mb-3 h-32 w-32" />
-        <p>Your to-read shelf is empty. Swipe right on something.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={search} onChange={setSearch} />
-        <SortSelect value={sort} onChange={setSort} options={TO_READ_SORT_OPTIONS} />
-      </div>
-
       {actionError && <p className="text-sm text-danger">{actionError}</p>}
 
-      {filtered.length === 0 ? (
-        <p className="py-12 text-center text-faint">
-          No matches. Check the spelling, or add it with + Add book.
-        </p>
+      {/* Empty state is rendered inline, never as an early return: finishing the last
+          book on a shelf empties this list, and returning here would unmount the
+          review modal below before it could open (#70). */}
+      {books.length === 0 ? (
+        <div className="py-12 text-center text-faint">
+          <ShelfSprite variant="sleep" sizes="128px" className="mx-auto mb-3 h-32 w-32" />
+          <p>Your to-read shelf is empty. Swipe right on something.</p>
+        </div>
       ) : (
-        <ul className="space-y-3">
-          {filtered.map((book) => {
-            return (
-              <li key={book.id} className="rounded-xl border border-border bg-surface">
-                <button
-                  type="button"
-                  onClick={() => setDetail(book)}
-                  className={[
-                    'flex w-full gap-4 p-4 text-left',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded-xl',
-                    'hover:bg-elevated transition',
-                  ].join(' ')}
-                >
-                  <CoverThumb book={book} size="md" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-semibold text-text">{book.title}</p>
-                    <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
-                    {book.year_published && (
-                      <p className="font-mono text-xs text-faint">{book.year_published}</p>
-                    )}
-                    <p className="mt-1 text-xs text-faint">Tap to view details</p>
-                  </div>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput value={search} onChange={setSearch} />
+            <SortSelect value={sort} onChange={setSort} options={TO_READ_SORT_OPTIONS} />
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="py-12 text-center text-faint">
+              No matches. Check the spelling, or add it with + Add book.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {filtered.map((book) => {
+                return (
+                  <li key={book.id} className="rounded-xl border border-border bg-surface">
+                    <button
+                      type="button"
+                      onClick={() => setDetail(book)}
+                      className={[
+                        'flex w-full gap-4 p-4 text-left',
+                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded-xl',
+                        'hover:bg-elevated transition',
+                      ].join(' ')}
+                    >
+                      <CoverThumb book={book} size="md" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-text">{book.title}</p>
+                        <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
+                        {book.year_published && (
+                          <p className="font-mono text-xs text-faint">{book.year_published}</p>
+                        )}
+                        <p className="mt-1 text-xs text-faint">Tap to view details</p>
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
 
       {reviewing && (
@@ -545,85 +548,88 @@ function CurrentlyReadingTab({ books }: { books: Book[] }) {
     }
   }
 
-  if (books.length === 0) {
-    return (
-      <div className="py-16 text-center text-faint">
-        Nothing in progress. Hit &ldquo;Start reading&rdquo; on a to-read book to track it here.
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={search} onChange={setSearch} />
-        <SortSelect value={sort} onChange={setSort} options={CURRENTLY_READING_SORT_OPTIONS} />
-      </div>
-
       {actionError && <p className="text-sm text-danger">{actionError}</p>}
 
-      {filtered.length === 0 ? (
-        <p className="py-12 text-center text-faint">
-          No matches. Check the spelling, or add it with + Add book.
-        </p>
+      {/* Empty state is rendered inline, never as an early return: finishing the last
+          book on a shelf empties this list, and returning here would unmount the
+          review modal below before it could open (#70). */}
+      {books.length === 0 ? (
+        <div className="py-16 text-center text-faint">
+          Nothing in progress. Hit &ldquo;Start reading&rdquo; on a to-read book to track it here.
+        </div>
       ) : (
-        <ul className="space-y-3">
-          {filtered.map((book) => {
-            const busy = busyId === book.id;
-            return (
-              <li
-                key={book.id}
-                className="flex gap-4 rounded-xl border border-accent/20 bg-surface p-4"
-              >
-                <CoverThumb book={book} size="md" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-text">{book.title}</p>
-                  <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
-                  {book.year_published && (
-                    <p className="font-mono text-xs text-faint">{book.year_published}</p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => moveTo(book, 'read', true)}
-                      className={[
-                        'rounded-md border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-medium text-success',
-                        'transition hover:bg-success/20 disabled:opacity-50',
-                      ].join(' ')}
-                    >
-                      Mark finished
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => moveTo(book, 'to-read')}
-                      className={[
-                        'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
-                        'transition hover:border-muted hover:text-text disabled:opacity-50',
-                      ].join(' ')}
-                    >
-                      Put back
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => moveTo(book, 'did-not-finish')}
-                      className={[
-                        'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-faint',
-                        'transition hover:border-muted hover:text-text disabled:opacity-50',
-                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-                      ].join(' ')}
-                    >
-                      Did not finish
-                    </button>
-                  </div>
-                </div>
-                <Badge variant="accent">reading</Badge>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput value={search} onChange={setSearch} />
+            <SortSelect value={sort} onChange={setSort} options={CURRENTLY_READING_SORT_OPTIONS} />
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="py-12 text-center text-faint">
+              No matches. Check the spelling, or add it with + Add book.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {filtered.map((book) => {
+                const busy = busyId === book.id;
+                return (
+                  <li
+                    key={book.id}
+                    className="flex gap-4 rounded-xl border border-accent/20 bg-surface p-4"
+                  >
+                    <CoverThumb book={book} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-text">{book.title}</p>
+                      <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
+                      {book.year_published && (
+                        <p className="font-mono text-xs text-faint">{book.year_published}</p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => moveTo(book, 'read', true)}
+                          className={[
+                            'rounded-md border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-medium text-success',
+                            'transition hover:bg-success/20 disabled:opacity-50',
+                          ].join(' ')}
+                        >
+                          Mark finished
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => moveTo(book, 'to-read')}
+                          className={[
+                            'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
+                            'transition hover:border-muted hover:text-text disabled:opacity-50',
+                          ].join(' ')}
+                        >
+                          Put back
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => moveTo(book, 'did-not-finish')}
+                          className={[
+                            'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-faint',
+                            'transition hover:border-muted hover:text-text disabled:opacity-50',
+                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                          ].join(' ')}
+                        >
+                          Did not finish
+                        </button>
+                      </div>
+                    </div>
+                    <Badge variant="accent">reading</Badge>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
 
       {reviewing && (
@@ -716,120 +722,125 @@ function DnfTab({ books }: { books: Book[] }) {
     }
   }
 
-  if (books.length === 0) {
-    return (
-      <div className="py-16 text-center text-faint">
-        Nothing abandoned yet. When a book isn&apos;t working, shelve it here guilt-free. Quitting
-        is data too.
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-center gap-2">
-        <SearchInput value={search} onChange={setSearch} />
-        <SortSelect value={sort} onChange={setSort} options={DNF_SORT_OPTIONS} />
-      </div>
-
       {actionError && <p className="text-sm text-danger">{actionError}</p>}
 
-      {filtered.length === 0 ? (
-        <p className="py-12 text-center text-faint">
-          No matches. Check the spelling, or add it with + Add book.
-        </p>
+      {/* Empty state is rendered inline, never as an early return: finishing the last
+          book on a shelf empties this list, and returning here would unmount the
+          review modal below before it could open (#70). */}
+      {books.length === 0 ? (
+        <div className="py-16 text-center text-faint">
+          Nothing abandoned yet. When a book isn&apos;t working, shelve it here guilt-free. Quitting
+          is data too.
+        </div>
       ) : (
-        <ul className="space-y-3">
-          {filtered.map((book) => {
-            const busy = busyId === book.id;
-            const armed = removeArmed === book.id;
-            return (
-              <li
-                key={book.id}
-                className="flex gap-4 rounded-xl border border-border bg-surface p-4"
-              >
-                <CoverThumb book={book} size="md" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold text-text">{book.title}</p>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
-                    {book.exclude_from_profile && (
-                      <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-border text-faint">
-                        excluded
-                      </span>
-                    )}
-                  </div>
-                  {book.app_review && (
-                    <p className="mt-1 text-xs text-faint line-clamp-2 italic">{book.app_review}</p>
-                  )}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => moveTo(book, 'to-read')}
-                      className={[
-                        'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
-                        'transition hover:border-muted hover:text-text disabled:opacity-50',
-                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-                      ].join(' ')}
-                    >
-                      Try again
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => moveTo(book, 'read', true)}
-                      className={[
-                        'rounded-md border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-medium text-success',
-                        'transition hover:bg-success/20 disabled:opacity-50',
-                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success',
-                      ].join(' ')}
-                    >
-                      Finished it
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setAddingNote(book)}
-                      className={[
-                        'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
-                        'transition hover:border-muted hover:text-text disabled:opacity-50',
-                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-                      ].join(' ')}
-                    >
-                      {book.app_review ? 'Edit note' : 'Add note'}
-                    </button>
-                    {armed ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => remove(book)}
-                        className={[
-                          'rounded-md border border-danger/60 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger',
-                          'transition hover:bg-danger/20 disabled:opacity-50',
-                        ].join(' ')}
-                      >
-                        {busy ? 'Removing\u2026' : 'Confirm remove'}
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => setRemoveArmed(book.id)}
-                        className={[
-                          'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-faint',
-                          'transition hover:border-danger/60 hover:text-danger disabled:opacity-50',
-                        ].join(' ')}
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchInput value={search} onChange={setSearch} />
+            <SortSelect value={sort} onChange={setSort} options={DNF_SORT_OPTIONS} />
+          </div>
+
+          {filtered.length === 0 ? (
+            <p className="py-12 text-center text-faint">
+              No matches. Check the spelling, or add it with + Add book.
+            </p>
+          ) : (
+            <ul className="space-y-3">
+              {filtered.map((book) => {
+                const busy = busyId === book.id;
+                const armed = removeArmed === book.id;
+                return (
+                  <li
+                    key={book.id}
+                    className="flex gap-4 rounded-xl border border-border bg-surface p-4"
+                  >
+                    <CoverThumb book={book} size="md" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-semibold text-text">{book.title}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
+                        {book.exclude_from_profile && (
+                          <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-border text-faint">
+                            excluded
+                          </span>
+                        )}
+                      </div>
+                      {book.app_review && (
+                        <p className="mt-1 text-xs text-faint line-clamp-2 italic">
+                          {book.app_review}
+                        </p>
+                      )}
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => moveTo(book, 'to-read')}
+                          className={[
+                            'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
+                            'transition hover:border-muted hover:text-text disabled:opacity-50',
+                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                          ].join(' ')}
+                        >
+                          Try again
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => moveTo(book, 'read', true)}
+                          className={[
+                            'rounded-md border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-medium text-success',
+                            'transition hover:bg-success/20 disabled:opacity-50',
+                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success',
+                          ].join(' ')}
+                        >
+                          Finished it
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => setAddingNote(book)}
+                          className={[
+                            'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
+                            'transition hover:border-muted hover:text-text disabled:opacity-50',
+                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                          ].join(' ')}
+                        >
+                          {book.app_review ? 'Edit note' : 'Add note'}
+                        </button>
+                        {armed ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => remove(book)}
+                            className={[
+                              'rounded-md border border-danger/60 bg-danger/10 px-2.5 py-1 text-xs font-semibold text-danger',
+                              'transition hover:bg-danger/20 disabled:opacity-50',
+                            ].join(' ')}
+                          >
+                            {busy ? 'Removing\u2026' : 'Confirm remove'}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => setRemoveArmed(book.id)}
+                            className={[
+                              'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-faint',
+                              'transition hover:border-danger/60 hover:text-danger disabled:opacity-50',
+                            ].join(' ')}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
       )}
 
       {addingNote && (
