@@ -109,12 +109,12 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 - **`ArchetypeShareModal`** — canvas share image using archetype color.
 - **`ArchetypeExplainerModal`** — static inline component in `TasteHero.tsx` (not a separate file). Explains the 4 axes. Opened via "What is this?" link.
 - **`BookEditModal`** — re-rate + review; diff-based save; optional `queuePosition`/`onFinishQueue` for step-through review queue; opt-in `allowRemove` shows two-step "Remove" → `DELETE /books/{id}` (passed only by Library row editor).
-- **`BookDetailModal`** — read-only detail view for a To-Read book: cover, description, "find it" links via `lib/bookLinks.ts`, shelf actions, and a "Find similar reads" button opening `SimilarBooksModal`. Used by `ToReadTab`.
+- **`BookDetailModal`** — read-only detail view for a To-Read book: cover, description, "find it" links via `lib/bookLinks.ts`, shelf actions, and a "Find similar reads" button opening `SimilarBooksModal`. Used by `ToReadTab`. When the book carries no description it asks `GET /books/{id}/description` once per book and shows "Looking for a description…" meanwhile; unrated to-read books are excluded from every background enrichment run, so this is the only thing that ever fills them in. A miss is not an error — it just leaves the empty-state copy. The fetched value is stored with the id it was fetched for so switching books derives a fresh pending state rather than resetting it inside the effect (a synchronous `setState` in an effect is a lint error here).
 - **`SimilarBooksModal`** — opened from `BookDetailModal`'s "Find similar reads" button.
   Fetches `POST /books/{id}/similar` on open and renders an **ephemeral** ranked list
   (rationale per result). Results are not persisted; "Add to to-read" routes through the
   existing `POST /books` add path. Does not touch the main recommendations feed / swipe deck.
-- **`AddBookModal`** — manual add: debounced `/catalog/search` → pick a real result → optional shelf + star rating + review text → `POST /books`. Used by Library page and setup wizard manual branch.
+- **`AddBookModal`** — manual add: debounced `/catalog/search` → pick a real result → optional shelf + star rating + review text → `POST /books`. Used by Library page and setup wizard manual branch. It, `/discover`, and `SimilarBooksModal` must all forward the picked result's `description` to `POST /books` alongside cover/subjects/catalog ids: nothing backfills a description for an unrated to-read book later.
 - **`EnrichmentCorrectionModal`** — Wave 3c "fix match" queue: reuses `AddBookModal`'s debounced `/catalog/search` pick pattern (title/author/cover/subjects/description only — no shelf/rating/review) to re-point a mis-resolved book's enrichment via `PATCH /books/{id}/enrichment`. Supports the same `queuePosition`/`onFinishQueue` step-through convention as `BookEditModal`'s review queue. Orchestrated at the `/library` page level (not per-tab) because a LOW-confidence book can be on any shelf.
 - **`ReprofileBanner`** — app-wide; shows only when `/profile/status` reports `dirty`, runs `/profile/update`.
 - **`UsageWarningBanner`** — app-wide, mounted in `(main)/layout.tsx` above the page content. Reads `GET /settings/usage` (`getUsage` / `USAGE_KEY`); renders nothing until `usage.warn` is true. Shows spend-vs-cap copy + a "Details" link to `/settings` and a **Dismiss** button (local `useState`, no persistence — reappears on next page load while `warn` stays true). Purely informational; never blocks any action.
@@ -128,6 +128,8 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 **Both `BookEditModal` and `AddBookModal`** enforce the review-requires-rating invariant client-side (save/add disabled + amber hint when review text entered with 0 rating). Both use `components/ui/Modal` (focus trap + Escape + `role="dialog"`) and call `useToast()` for feedback.
 
 Re-profiling is **never automatic** in the UI: editing a book marks the profile dirty, the banner appears, and the user chooses when to spend the Claude call.
+
+**Shelf-tab empty states are rendered inline, never as an early return.** Each `/library` tab (`ToReadTab`, `CurrentlyReadingTab`, `DnfTab`) renders its review/detail modals at the bottom of its tree, and its own actions optimistically remove the acted-on book from the list. An `if (books.length === 0) return …` above those modals therefore unmounts them in the same commit that opens one — which broke "Mark finished" → review modal for the last book on a shelf, and only for the last book. Keep the empty state inside the returned tree.
 
 ## UI primitives (`components/ui/`)
 
