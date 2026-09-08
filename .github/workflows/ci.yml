@@ -1,0 +1,102 @@
+# The validation matrix from CLAUDE.md, enforced on every branch instead of by hand.
+#
+# All three kinds of gate have to run. The two test runners own disjoint paths -- Jest for
+# everything outside lib/server/** and app/api/**, Vitest for exactly those two, as fixed by
+# vitest.config.ts's `include` -- so running one is not a test pass. And `npm run build` is the
+# only gate that catches Next segment-config and prerender failures, which no amount of unit
+# testing reaches.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# A newer push to a pull request makes the in-flight run obsolete. Pushes to main are never
+# cancelled: every commit on the default branch keeps its own result.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  # Matches the development machine. Nothing in the repo pins a Node version on purpose: an
+  # .nvmrc would also change the version Vercel builds production with, which is a deployment
+  # change and not this gate's business.
+  NODE_VERSION: '22'
+
+jobs:
+  verify:
+    name: Validation matrix
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install from the lockfile
+        id: install
+        run: npm ci
+
+      # Every gate below runs even after an earlier one fails, so a red run reports the whole
+      # picture rather than only the first thing that broke. They stay skipped when the install
+      # itself failed, because their output would be noise about missing modules.
+      #
+      # This job deliberately sets no environment variables at all, and that was verified rather
+      # than assumed: every process.env read under lib/server/** happens inside a function, so a
+      # clean checkout with no local environment file type-checks, tests, and builds. If a future
+      # change makes a gate need configuration, fix the module-load-time read -- do not add
+      # secrets here.
+      - name: Type-check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run type-check
+
+      - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
+
+      - name: Format check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run format:check
+
+      - name: Test (Jest -- everything outside lib/server and app/api)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test
+
+      - name: Test (Vitest -- lib/server and app/api)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:server
+
+      - name: Build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # No `npm ci` here: npm audit resolves the tree from package-lock.json alone.
+
+      # The blocking threshold. --omit=dev scopes it to what actually reaches the Vercel runtime,
+      # so a high advisory in build-only tooling reports without wedging the branch -- see the
+      # informational step below, which is where that class of finding shows up.
+      - name: Audit shipped dependencies (high and above)
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Audit the full tree (informational)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        run: npm audit

@@ -106,3 +106,44 @@
 
 - ESLint and Prettier are configured at the repository root. Run `npm run lint`,
   `npm run format:check`, and the rest of the gates documented in `CLAUDE.md` from that directory.
+- Prettier's scope includes `.github/`, so workflow and Dependabot YAML has to be Prettier-clean
+  like everything else. `.prettierignore` lists the deliberate exclusions and says why for each.
+
+## Continuous integration
+
+`.github/workflows/ci.yml` runs the validation matrix on every pull request and every push to
+`main`. It is the same six commands `CLAUDE.md` lists, in one `verify` job, plus a separate
+`audit` job.
+
+- **The job sets no environment variables, and that is load-bearing.** Every `process.env` read
+  under `lib/server/**` happens inside a function rather than at module load, so a checkout with no
+  local configuration file type-checks, tests, and builds. If a gate ever starts needing
+  configuration, the fix is the module-load-time read, not a secret in CI — putting production
+  credentials behind a compile gate is how they leak.
+- Each gate carries `if: ${{ !cancelled() && steps.install.outcome == 'success' }}` so one failure
+  reports alongside the others instead of hiding them. They skip only when `npm ci` itself failed.
+- Actions are pinned by major version and kept current by Dependabot. Check the real latest tag
+  before hand-editing one; `actions/checkout` and `actions/setup-node` are further along than the
+  `v4` that most examples still show.
+
+`npm audit --omit=dev --audit-level=high` is the blocking threshold. It scopes the gate to what
+actually reaches the Vercel runtime, so a high advisory in build-only tooling reports without
+wedging the branch; the full-tree `npm audit` runs beside it as `continue-on-error`. The four
+moderate advisories that survive there are the `drizzle-kit → @esbuild-kit → esbuild` chain, whose
+only npm-offered fix is a major _downgrade_ of drizzle-kit to 0.18.1.
+
+## Dependency pins
+
+The `overrides` block in `package.json` carries security pins for transitive packages whose direct
+parents have not released. Each entry is a patched version within the same major, so no consumer
+sees an API change:
+
+- `js-yaml@3` → `^3.15.1`. Reached through `ts-jest → @jest/transform → babel-plugin-istanbul →
+@istanbuljs/load-nyc-config`, which calls `yaml.safeLoad` — removed in js-yaml 4. Pinning inside
+  3.x is deliberate; bumping this to 4 or 5 would break coverage runs that read a YAML nyc config.
+- `brace-expansion@1|2|5` → `^1.1.18` / `^2.1.4` / `^5.0.9`. Three majors are installed at once
+  across the ESLint and Jest trees and each had its own advisory, so each needs its own pin.
+- `browserslist` → `^4.28.7`, via `autoprefixer` and `ts-jest`.
+
+`@eslint/eslintrc`'s nested `js-yaml` pin is separate and predates these. Re-check the whole block
+whenever `npm audit` goes quiet — a pin that is no longer doing anything is worth removing.

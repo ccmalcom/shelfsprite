@@ -63,7 +63,12 @@
     "postcss": "$postcss",
     "@eslint/eslintrc": {
       "js-yaml": "^4.3.2"
-    }
+    },
+    "js-yaml@3": "^3.15.1",
+    "brace-expansion@1": "^1.1.18",
+    "brace-expansion@2": "^2.1.4",
+    "brace-expansion@5": "^5.0.9",
+    "browserslist": "^4.28.7"
   },
   "allowScripts": {
     "sharp@0.35.4": true,
