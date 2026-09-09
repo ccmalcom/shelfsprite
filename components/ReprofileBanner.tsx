@@ -1,8 +1,15 @@
 'use client';
 
 import { useState } from 'react';
-import useSWR from 'swr';
-import { api, PROFILE_STATUS_KEY, type ProfileStatus } from '@/lib/api';
+import useSWR, { mutate as globalMutate } from 'swr';
+import {
+  api,
+  PROFILE_STATUS_KEY,
+  TRAITS_KEY,
+  ARCHETYPE_KEY,
+  type ProfileStatus,
+  type ProfileChangeSummary,
+} from '@/lib/api';
 import { Spinner } from '@/components/ui';
 
 export default function ReprofileBanner() {
@@ -11,15 +18,33 @@ export default function ReprofileBanner() {
 
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<ProfileChangeSummary | null>(null);
 
-  if (!status?.dirty) return null;
+  if (!status?.dirty && !summary) return null;
 
   async function handleReprofile() {
     setRunning(true);
     setError(null);
     try {
-      await api.updateProfile();
-      await mutate();
+      const result = await api.updateProfile();
+      setSummary(result.changes);
+      // This banner is mounted app-wide, so /profile and TasteHero are usually UNMOUNTED
+      // when this runs and a bare mutate(key) has no subscriber to revalidate -- arriving
+      // at /profile would then render the pre-refresh traits out of SWR's cache. Hand
+      // mutate the fetch itself (the SetupWizard pattern) so the cache holds fresh data
+      // either way, with no skeleton flash on the mounted path.
+      //
+      // The archetype needs it too: /api/profile/archetype derives is_stale from
+      // derived_at < last_profiled_at, and a successful rebuild stamps last_profiled_at,
+      // so every cached `is_stale: false` is wrong the moment this resolves.
+      //
+      // Kept off the success path: a failed re-read leaves stale UI, but the refresh
+      // itself succeeded and must not be reported as an error.
+      await Promise.all([
+        mutate(),
+        globalMutate(TRAITS_KEY, api.profile(), { revalidate: false }),
+        globalMutate(ARCHETYPE_KEY, api.getArchetype(), { revalidate: false }),
+      ]).catch(() => {});
     } catch (e) {
       setError(
         e instanceof Error
@@ -29,6 +54,60 @@ export default function ReprofileBanner() {
     } finally {
       setRunning(false);
     }
+  }
+
+  if (summary) {
+    const nothingChanged =
+      summary.added.length === 0 && summary.dropped.length === 0 && summary.reworded.length === 0;
+
+    return (
+      <div role="status" aria-live="polite" className="border-b border-accent/30 bg-accent/10">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-2 px-4 py-2.5">
+          <div className="space-y-1 text-sm text-text">
+            <p className="font-semibold">
+              {nothingChanged
+                ? 'Profile refreshed \u2014 no changes.'
+                : `Profile refreshed \u2014 ${summary.added.length} new, ${summary.dropped.length} dropped, ${summary.reworded.length} reworded, ${summary.unchanged} unchanged.`}
+            </p>
+            {nothingChanged ? (
+              <p className="text-xs text-muted">
+                Your taste traits already reflected everything in your library.
+              </p>
+            ) : (
+              <ul className="space-y-0.5 text-xs">
+                {summary.added.map((claim) => (
+                  <li key={`a-${claim}`} className="text-success">
+                    <span aria-hidden="true">+ </span>
+                    {claim}
+                  </li>
+                ))}
+                {summary.dropped.map((claim) => (
+                  <li key={`d-${claim}`} className="text-danger">
+                    <span aria-hidden="true">− </span>
+                    {claim}
+                  </li>
+                ))}
+                {summary.reworded.map((r) => (
+                  <li key={`r-${r.from}`} className="text-muted">
+                    <span aria-hidden="true">~ </span>
+                    <span className="line-through">{r.from}</span>
+                    <span aria-hidden="true"> → </span>
+                    <span className="text-text">{r.to}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSummary(null)}
+            className="rounded-md px-2 py-1 font-mono text-xs text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (

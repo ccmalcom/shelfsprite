@@ -17,6 +17,7 @@ import {
   ADMIN_ME_KEY,
   PROFILE_STATUS_KEY,
   USER_PROFILE_KEY,
+  TRAITS_KEY,
 } from '@/lib/api';
 import { Button, Badge, Card, useToast } from '@/components/ui';
 import { TasteHero } from '@/components/TasteHero';
@@ -25,7 +26,6 @@ import RevealSequence from '@/components/reveal/RevealSequence';
 import { useFeedbackPrompt } from '@/hooks/useFeedbackPrompt';
 import ShelfSprite from '@/components/ShelfSprite';
 
-const TRAITS_KEY = 'profile-traits';
 const STATS_KEY = 'stats';
 const SUBJECTS_KEY = 'profile-subjects';
 const BOOKS_KEY = 'books-all';
