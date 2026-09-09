@@ -142,5 +142,6 @@ export async function snapshotProposedClaims(db: Db, userId: string): Promise<Pr
   return db
     .select({ claim: schema.tasteTraits.claim, polarity: schema.tasteTraits.polarity })
     .from(schema.tasteTraits)
-    .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')));
+    .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')))
+    .orderBy(schema.tasteTraits.id);
 }

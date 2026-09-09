@@ -1,8 +1,14 @@
 'use client';
 
 import { useState } from 'react';
-import useSWR from 'swr';
-import { api, PROFILE_STATUS_KEY, type ProfileStatus, type ProfileChangeSummary } from '@/lib/api';
+import useSWR, { mutate as globalMutate } from 'swr';
+import {
+  api,
+  PROFILE_STATUS_KEY,
+  TRAITS_KEY,
+  type ProfileStatus,
+  type ProfileChangeSummary,
+} from '@/lib/api';
 import { Spinner } from '@/components/ui';
 
 export default function ReprofileBanner() {
@@ -20,8 +26,8 @@ export default function ReprofileBanner() {
     setError(null);
     try {
       const result = await api.updateProfile();
+      await Promise.all([mutate(), globalMutate(TRAITS_KEY)]);
       setSummary(result.changes);
-      await mutate();
     } catch (e) {
       setError(
         e instanceof Error
@@ -38,7 +44,7 @@ export default function ReprofileBanner() {
       summary.added.length === 0 && summary.dropped.length === 0 && summary.reworded.length === 0;
 
     return (
-      <div className="border-b border-accent/30 bg-accent/10">
+      <div role="status" aria-live="polite" className="border-b border-accent/30 bg-accent/10">
         <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-2 px-4 py-2.5">
           <div className="space-y-1 text-sm text-text">
             <p className="font-semibold">

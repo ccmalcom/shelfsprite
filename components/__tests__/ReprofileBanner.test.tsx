@@ -5,11 +5,13 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import ReprofileBanner from '@/components/ReprofileBanner';
 
 const mockUpdateProfile = jest.fn();
+const mockGlobalMutate = jest.fn();
 let mockStatus: { dirty: boolean } = { dirty: true };
 
 jest.mock('swr', () => ({
   __esModule: true,
   default: () => ({ data: mockStatus, mutate: jest.fn() }),
+  mutate: (...args: unknown[]) => mockGlobalMutate(...args),
 }));
 
 jest.mock('@/lib/api', () => ({
@@ -18,6 +20,7 @@ jest.mock('@/lib/api', () => ({
     profileStatus: jest.fn(),
   },
   PROFILE_STATUS_KEY: '/profile/status',
+  TRAITS_KEY: 'profile-traits',
 }));
 
 const noChanges = { added: [], dropped: [], reworded: [], unchanged: 4 };
@@ -25,6 +28,7 @@ const noChanges = { added: [], dropped: [], reworded: [], unchanged: 4 };
 beforeEach(() => {
   mockStatus = { dirty: true };
   mockUpdateProfile.mockReset();
+  mockGlobalMutate.mockReset();
 });
 
 it('shows the added, dropped and reworded traits after a refresh', async () => {
@@ -45,6 +49,7 @@ it('shows the added, dropped and reworded traits after a refresh', async () => {
   expect(screen.getByText('Avoids translated fiction')).toBeInTheDocument();
   expect(screen.getByText("Avoids military SF unless it's satirical")).toBeInTheDocument();
   expect(screen.getByText(/9 unchanged/i)).toBeInTheDocument();
+  expect(mockGlobalMutate).toHaveBeenCalledWith('profile-traits');
 });
 
 it('keeps the summary visible after the dirty flag clears', async () => {

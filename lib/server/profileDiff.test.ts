@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { diffProposedClaims, type ProposedClaim } from './profileDiff';
+import { diffProposedClaims, snapshotProposedClaims, type ProposedClaim } from './profileDiff';
+import { makeTestDb } from '@/lib/server/__tests__/helpers/pglite';
+import { setupTestEnv } from '@/lib/server/__tests__/helpers/testEnv';
+import * as schema from './schema';
+
+setupTestEnv();
 
 const reward = (claim: string): ProposedClaim => ({ claim, polarity: 'reward' });
 const aversion = (claim: string): ProposedClaim => ({ claim, polarity: 'aversion' });
@@ -110,5 +115,49 @@ describe('diffProposedClaims', () => {
     const out = diffProposedClaims(before, after);
     expect(out.unchanged).toBe(1);
     expect(out.dropped).toEqual([]);
+  });
+});
+
+describe('snapshotProposedClaims', () => {
+  it('filters to the given user and status = proposed only', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await db.insert(schema.tasteTraits).values([
+        {
+          userId: 'local',
+          status: 'proposed',
+          claim: 'A',
+          polarity: 'reward',
+          inferenceConfidence: 0.8,
+        },
+        {
+          userId: 'local',
+          status: 'confirmed',
+          claim: 'B',
+          polarity: 'reward',
+          inferenceConfidence: 0.8,
+        },
+        {
+          userId: 'local',
+          status: 'rejected',
+          claim: 'C',
+          polarity: 'reward',
+          inferenceConfidence: 0.8,
+        },
+        {
+          userId: 'other-user',
+          status: 'proposed',
+          claim: 'D',
+          polarity: 'reward',
+          inferenceConfidence: 0.8,
+        },
+      ]);
+
+      const out = await snapshotProposedClaims(db, 'local');
+      expect(out).toEqual([{ claim: 'A', polarity: 'reward' }]);
+      expect(out).toHaveLength(1);
+    } finally {
+      await close();
+    }
   });
 });

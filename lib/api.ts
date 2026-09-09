@@ -400,6 +400,12 @@ export interface FeedbackPromptResponse {
  */
 export const PROFILE_STATUS_KEY = 'profile-status';
 
+/**
+ * Shared SWR key for the profile-traits query, so a profile refresh can revalidate
+ * the trait list (`mutate(TRAITS_KEY)`) alongside the re-profile banner's own status.
+ */
+export const TRAITS_KEY = 'profile-traits';
+
 /** Shared SWR key for the reader archetype (GET /profile/archetype). */
 export const ARCHETYPE_KEY = 'archetype';
 

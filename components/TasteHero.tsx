@@ -10,6 +10,7 @@ import {
   type ArchetypeOut,
   PROFILE_STATUS_KEY,
   ARCHETYPE_KEY,
+  TRAITS_KEY,
 } from '@/lib/api';
 import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui';
@@ -111,7 +112,6 @@ function ArchetypeExplainerModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-const TRAITS_KEY = 'profile-traits';
 const SUBJECTS_KEY = 'profile-subjects';
 
 const AXIS_META = [
