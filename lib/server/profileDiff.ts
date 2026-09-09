@@ -65,13 +65,29 @@ export function claimSimilarity(a: string, b: string): number {
   return isWholeWordExtension(a, b) ? 1 : ratio(a, b);
 }
 
-/** Deduplicate by normalized claim, keeping the first occurrence's display text. */
-function byNormalized(claims: ProposedClaim[]): Map<string, ProposedClaim> {
-  const out = new Map<string, ProposedClaim>();
+interface ClaimEntry extends ProposedClaim {
+  /** Normalized claim text, kept separate from the map key so scoring never sees polarity. */
+  normalized: string;
+}
+
+/**
+ * Identity of a claim: polarity AND text. The same words flipped from 'reward' to
+ * 'aversion' are the model reversing its judgment about the reader, so they must not
+ * collide on one key and be counted `unchanged`. NUL-separated, so no polarity value can
+ * run into the claim text.
+ */
+function claimKey(polarity: string, normalized: string): string {
+  return `${polarity}\u0000${normalized}`;
+}
+
+/** Deduplicate by polarity + normalized claim, keeping the first occurrence's display text. */
+function byClaimKey(claims: ProposedClaim[]): Map<string, ClaimEntry> {
+  const out = new Map<string, ClaimEntry>();
   for (const c of claims) {
-    const key = normalizeClaim(c.claim);
-    if (!key) continue;
-    if (!out.has(key)) out.set(key, c);
+    const normalized = normalizeClaim(c.claim);
+    if (!normalized) continue;
+    const key = claimKey(c.polarity, normalized);
+    if (!out.has(key)) out.set(key, { ...c, normalized });
   }
   return out;
 }
@@ -79,20 +95,23 @@ function byNormalized(claims: ProposedClaim[]): Map<string, ProposedClaim> {
 /**
  * Compare two snapshots of proposed claims.
  *
- * Exact (normalized) matches are `unchanged`. Leftovers are paired greedily by
- * descending similarity -- highest-scoring pair first, each claim used at most once --
- * and reported as `reworded`; whatever stays unpaired is `dropped` or `added`.
+ * Exact matches -- same polarity AND same normalized text -- are `unchanged`. Leftovers
+ * are paired greedily by descending similarity -- highest-scoring pair first, each claim
+ * used at most once -- and reported as `reworded`; whatever stays unpaired is `dropped`
+ * or `added`.
  *
- * Pairing NEVER crosses polarity. A flip ('Rewards military SF' -> 'Avoids military
- * SF') scores 0.8108 and would otherwise render as a mild reword, when it is in fact
- * the model reversing its judgment about the reader.
+ * NOTHING crosses polarity, neither the exact match nor the pairing. A reworded flip
+ * ('Rewards military SF' -> 'Avoids military SF') scores 0.8108 and would otherwise
+ * render as a mild reword; a flip that keeps its wording verbatim would otherwise vanish
+ * into `unchanged`. Both are in fact the model reversing its judgment about the reader,
+ * so both surface as one dropped claim plus one added claim.
  */
 export function diffProposedClaims(
   before: ProposedClaim[],
   after: ProposedClaim[]
 ): ProfileChanges {
-  const beforeMap = byNormalized(before);
-  const afterMap = byNormalized(after);
+  const beforeMap = byClaimKey(before);
+  const afterMap = byClaimKey(after);
 
   let unchanged = 0;
   const droppedKeys: string[] = [];
@@ -110,7 +129,7 @@ export function diffProposedClaims(
       const dropped = beforeMap.get(droppedKeys[d])!;
       const added = afterMap.get(addedKeys[a])!;
       if (dropped.polarity !== added.polarity) continue;
-      const score = claimSimilarity(droppedKeys[d], addedKeys[a]);
+      const score = claimSimilarity(dropped.normalized, added.normalized);
       if (score >= REWORD_THRESHOLD) scored.push({ score, d, a });
     }
   }

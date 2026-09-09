@@ -86,6 +86,26 @@ describe('diffProposedClaims', () => {
     expect(out.added).toEqual(['Avoids military SF']);
   });
 
+  it('reports a polarity flip on VERBATIM text as a drop plus an add, not unchanged', () => {
+    const before = [reward('Military SF with heavy jargon')];
+    const after = [aversion('Military SF with heavy jargon')];
+    const out = diffProposedClaims(before, after);
+    expect(out.unchanged).toBe(0);
+    expect(out.reworded).toEqual([]);
+    expect(out.dropped).toEqual(['Military SF with heavy jargon']);
+    expect(out.added).toEqual(['Military SF with heavy jargon']);
+  });
+
+  it('keeps one claim per polarity when a snapshot carries both', () => {
+    const before = [reward('Military SF'), aversion('Military SF')];
+    const after = [aversion('Military SF')];
+    const out = diffProposedClaims(before, after);
+    expect(out.unchanged).toBe(1);
+    expect(out.dropped).toEqual(['Military SF']);
+    expect(out.added).toEqual([]);
+    expect(out.reworded).toEqual([]);
+  });
+
   it('pairs each claim at most once, taking the best score first', () => {
     const before = [reward('Rewards dense allusive prose')];
     const after = [
