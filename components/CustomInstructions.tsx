@@ -6,12 +6,16 @@ import {
   getDirective,
   putDirective,
   deleteDirective,
+  getPreferenceSuggestions,
   DIRECTIVE_KEY,
+  DIRECTIVE_SUGGESTIONS_KEY,
   type Directive,
   type DirectiveConstraints,
+  type PreferenceSuggestions,
 } from '@/lib/api';
 import { Button, Textarea, Card, Badge } from '@/components/ui';
 import DirectiveChat from '@/components/DirectiveChat';
+import FavoritesFields from '@/components/FavoritesFields';
 
 function constraintChips(c: DirectiveConstraints): string[] {
   const chips: string[] = [];
@@ -26,6 +30,10 @@ function constraintChips(c: DirectiveConstraints): string[] {
 export default function CustomInstructions() {
   const { mutate } = useSWRConfig();
   const { data } = useSWR<Directive>(DIRECTIVE_KEY, getDirective);
+  const { data: suggestions } = useSWR<PreferenceSuggestions>(
+    DIRECTIVE_SUGGESTIONS_KEY,
+    getPreferenceSuggestions
+  );
   const [text, setText] = useState<string | null>(null);
   const [constraints, setConstraints] = useState<DirectiveConstraints | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
@@ -36,14 +44,38 @@ export default function CustomInstructions() {
   const effectiveConstraints = constraints ?? data?.constraints ?? {};
   const chips = constraintChips(effectiveConstraints);
 
+  // Favorites edit the SAME constraints object the prose shares, so Save writes both
+  // in one PUT. PUT /directive replaces the record wholesale; a second writer would
+  // clobber whichever field it did not own.
+  //
+  // Empty lists are OMITTED rather than sent as [], matching how
+  // cleanDirectiveConstraints stores them — so the empty-record check in save() can
+  // just count keys instead of inspecting each one.
+  function setFavorites(next: { authors: string[]; subjects: string[] }): void {
+    const merged: DirectiveConstraints = { ...effectiveConstraints };
+    if (next.authors.length) merged.prefer_authors = next.authors;
+    else delete merged.prefer_authors;
+    if (next.subjects.length) merged.prefer_subjects = next.subjects;
+    else delete merged.prefer_subjects;
+    setConstraints(merged);
+  }
+
   async function save() {
     setSaving(true);
     try {
-      await putDirective({
-        nl_text: effectiveText.trim() || null,
-        constraints: effectiveConstraints,
-      });
-      await mutate(DIRECTIVE_KEY);
+      const text = effectiveText.trim();
+      // PUT /directive 422s when text and cleaned constraints are both empty, and
+      // there is no catch here — the reader would get a silent no-op. Removing your
+      // last favorite is a normal action, so route it to the delete path instead.
+      if (!text && Object.keys(effectiveConstraints).length === 0) {
+        await deleteDirective();
+      } else {
+        await putDirective({ nl_text: text || null, constraints: effectiveConstraints });
+      }
+      // Suggestions are computed server-side minus the reader's current lists, so a
+      // save changes them: an accepted suggestion must be replaced by the next
+      // candidate rather than just leaving a shorter row.
+      await Promise.all([mutate(DIRECTIVE_KEY), mutate(DIRECTIVE_SUGGESTIONS_KEY)]);
       setText(null);
       setConstraints(null);
     } finally {
@@ -55,7 +87,9 @@ export default function CustomInstructions() {
     setSaving(true);
     try {
       await deleteDirective();
-      await mutate(DIRECTIVE_KEY);
+      // Clearing the record un-excludes every value it held, so the suggestion row
+      // must be refetched too.
+      await Promise.all([mutate(DIRECTIVE_KEY), mutate(DIRECTIVE_SUGGESTIONS_KEY)]);
       setText('');
       setConstraints({});
     } finally {
@@ -82,6 +116,14 @@ export default function CustomInstructions() {
         onChange={(e) => setText(e.target.value)}
         placeholder="More character-driven literary fiction. No grimdark. Keep it under 400 pages."
       />
+      <FavoritesFields
+        authors={effectiveConstraints.prefer_authors ?? []}
+        subjects={effectiveConstraints.prefer_subjects ?? []}
+        excludeAuthors={effectiveConstraints.exclude_authors ?? []}
+        excludeSubjects={effectiveConstraints.exclude_subjects ?? []}
+        suggestions={suggestions}
+        onChange={setFavorites}
+      />
       {chips.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {chips.map((c) => (
@@ -93,7 +135,7 @@ export default function CustomInstructions() {
         <Button onClick={save} loading={saving} disabled={saving}>
           Save
         </Button>
-        {data?.nl_text && (
+        {(data?.nl_text || Object.keys(data?.constraints ?? {}).length > 0) && (
           <Button variant="ghost" onClick={clearAll} disabled={saving}>
             Clear
           </Button>
