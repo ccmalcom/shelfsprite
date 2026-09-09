@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import Link from 'next/link';
-import { Settings } from 'lucide-react';
+import { Settings, Shield } from 'lucide-react';
 import {
   api,
   setTraitVerdict,
@@ -13,6 +13,8 @@ import {
   type Book,
   type ProfileStatus,
   type UserProfile,
+  adminMe,
+  ADMIN_ME_KEY,
   PROFILE_STATUS_KEY,
   USER_PROFILE_KEY,
 } from '@/lib/api';
@@ -527,6 +529,7 @@ export default function ProfilePage() {
     () => api.profileSubjects()
   );
   const { data: allBooks = [] } = useSWR<Book[]>(BOOKS_KEY, () => api.books({ limit: 500 }));
+  const { data: me } = useSWR(ADMIN_ME_KEY, adminMe);
 
   const bookMap = new Map(allBooks.map((b) => [b.id, b.title]));
   const isLoading = traitsLoading || statsLoading || subjectsLoading;
@@ -550,7 +553,20 @@ export default function ProfilePage() {
   return (
     <div className="fade-in space-y-8 py-6">
       <div className="space-y-3">
-        <div className="flex justify-end sm:hidden">
+        {/* Mobile escape hatch for the routes the 5-tab bottom nav has no room for
+            (lib/nav.ts). /admin is not in NAV_ROUTES at all — it is conditional on
+            is_admin — so without this link an admin on a phone can only reach it by
+            typing the URL. */}
+        <div className="flex justify-end gap-1 sm:hidden">
+          {me?.is_admin && (
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            >
+              <Shield size={14} aria-hidden="true" />
+              Admin
+            </Link>
+          )}
           <Link
             href="/settings"
             className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
