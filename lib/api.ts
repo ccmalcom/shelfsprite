@@ -327,6 +327,20 @@ export interface ProfileStatus {
   last_profile_kind: string | null;
 }
 
+/** Added/dropped/reworded taste-trait claims from a profile refresh (POST /profile/update). */
+export interface ProfileChangeSummary {
+  added: string[];
+  dropped: string[];
+  reworded: { from: string; to: string }[];
+  unchanged: number;
+}
+
+export interface ProfileUpdateResult {
+  mode?: string;
+  note?: string;
+  changes: ProfileChangeSummary;
+}
+
 export interface ApiKeyStatus {
   /** True when a usable Anthropic key exists (stored per-user or env fallback). */
   configured: boolean;
@@ -555,7 +569,7 @@ export const api = {
   profileStatus: () => get<ProfileStatus>('/profile/status'),
 
   /** Incrementally refresh the taste profile from recent edits only. */
-  updateProfile: () => post<Record<string, unknown>>('/profile/update'),
+  updateProfile: () => post<ProfileUpdateResult>('/profile/update'),
 
   /** All recommendations the user has rejected, newest first. */
   rejectedRecs: () => get<Recommendation[]>('/recommendations/rejected'),

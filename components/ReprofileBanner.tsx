@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { api, PROFILE_STATUS_KEY, type ProfileStatus } from '@/lib/api';
+import { api, PROFILE_STATUS_KEY, type ProfileStatus, type ProfileChangeSummary } from '@/lib/api';
 import { Spinner } from '@/components/ui';
 
 export default function ReprofileBanner() {
@@ -11,14 +11,16 @@ export default function ReprofileBanner() {
 
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [summary, setSummary] = useState<ProfileChangeSummary | null>(null);
 
-  if (!status?.dirty) return null;
+  if (!status?.dirty && !summary) return null;
 
   async function handleReprofile() {
     setRunning(true);
     setError(null);
     try {
-      await api.updateProfile();
+      const result = await api.updateProfile();
+      setSummary(result.changes);
       await mutate();
     } catch (e) {
       setError(
@@ -29,6 +31,60 @@ export default function ReprofileBanner() {
     } finally {
       setRunning(false);
     }
+  }
+
+  if (summary) {
+    const nothingChanged =
+      summary.added.length === 0 && summary.dropped.length === 0 && summary.reworded.length === 0;
+
+    return (
+      <div className="border-b border-accent/30 bg-accent/10">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-start justify-between gap-2 px-4 py-2.5">
+          <div className="space-y-1 text-sm text-text">
+            <p className="font-semibold">
+              {nothingChanged
+                ? 'Profile refreshed — no changes.'
+                : `Profile refreshed — ${summary.added.length} new, ${summary.dropped.length} dropped, ${summary.reworded.length} reworded, ${summary.unchanged} unchanged.`}
+            </p>
+            {nothingChanged ? (
+              <p className="text-xs text-muted">
+                Your taste traits already reflected everything in your library.
+              </p>
+            ) : (
+              <ul className="space-y-0.5 text-xs">
+                {summary.added.map((claim) => (
+                  <li key={`a-${claim}`} className="text-success">
+                    <span aria-hidden="true">+ </span>
+                    {claim}
+                  </li>
+                ))}
+                {summary.dropped.map((claim) => (
+                  <li key={`d-${claim}`} className="text-danger">
+                    <span aria-hidden="true">− </span>
+                    {claim}
+                  </li>
+                ))}
+                {summary.reworded.map((r) => (
+                  <li key={`r-${r.from}`} className="text-muted">
+                    <span aria-hidden="true">~ </span>
+                    <span className="line-through">{r.from}</span>
+                    <span aria-hidden="true"> → </span>
+                    <span className="text-text">{r.to}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSummary(null)}
+            className="rounded-md px-2 py-1 font-mono text-xs text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
