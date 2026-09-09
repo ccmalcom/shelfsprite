@@ -38,6 +38,16 @@ export const SEED_RESERVE_SHARE = 0.3; // min share of the cap reserved for seed
 /** Python's (candidate, reason) tuple. */
 export type PoolEntry = [Candidate, string];
 
+/**
+ * The reader's explicit favorites, handed to metadataPool as an EXPLICIT argument
+ * rather than pre-merged into the signal: cold start must treat preferred and
+ * inferred authors differently, and a merged list cannot express that.
+ */
+export interface PoolPreferences {
+  prefer_subjects: string[];
+  prefer_authors: string[];
+}
+
 export interface AssembledCandidate {
   title: string;
   author: string | null;
