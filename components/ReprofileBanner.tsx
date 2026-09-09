@@ -6,6 +6,7 @@ import {
   api,
   PROFILE_STATUS_KEY,
   TRAITS_KEY,
+  ARCHETYPE_KEY,
   type ProfileStatus,
   type ProfileChangeSummary,
 } from '@/lib/api';
@@ -26,8 +27,24 @@ export default function ReprofileBanner() {
     setError(null);
     try {
       const result = await api.updateProfile();
-      await Promise.all([mutate(), globalMutate(TRAITS_KEY)]);
       setSummary(result.changes);
+      // This banner is mounted app-wide, so /profile and TasteHero are usually UNMOUNTED
+      // when this runs and a bare mutate(key) has no subscriber to revalidate -- arriving
+      // at /profile would then render the pre-refresh traits out of SWR's cache. Hand
+      // mutate the fetch itself (the SetupWizard pattern) so the cache holds fresh data
+      // either way, with no skeleton flash on the mounted path.
+      //
+      // The archetype needs it too: /api/profile/archetype derives is_stale from
+      // derived_at < last_profiled_at, and a successful rebuild stamps last_profiled_at,
+      // so every cached `is_stale: false` is wrong the moment this resolves.
+      //
+      // Kept off the success path: a failed re-read leaves stale UI, but the refresh
+      // itself succeeded and must not be reported as an error.
+      await Promise.all([
+        mutate(),
+        globalMutate(TRAITS_KEY, api.profile(), { revalidate: false }),
+        globalMutate(ARCHETYPE_KEY, api.getArchetype(), { revalidate: false }),
+      ]).catch(() => {});
     } catch (e) {
       setError(
         e instanceof Error
@@ -49,8 +66,8 @@ export default function ReprofileBanner() {
           <div className="space-y-1 text-sm text-text">
             <p className="font-semibold">
               {nothingChanged
-                ? 'Profile refreshed — no changes.'
-                : `Profile refreshed — ${summary.added.length} new, ${summary.dropped.length} dropped, ${summary.reworded.length} reworded, ${summary.unchanged} unchanged.`}
+                ? 'Profile refreshed \u2014 no changes.'
+                : `Profile refreshed \u2014 ${summary.added.length} new, ${summary.dropped.length} dropped, ${summary.reworded.length} reworded, ${summary.unchanged} unchanged.`}
             </p>
             {nothingChanged ? (
               <p className="text-xs text-muted">
