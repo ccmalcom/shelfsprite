@@ -47,7 +47,7 @@
     "autoprefixer": "^10",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
-    "eslint": "^9",
+    "eslint": "^10",
     "eslint-config-next": "^16.3.4",
     "jest": "^30.5.1",
     "jest-environment-jsdom": "^30.5.1",
