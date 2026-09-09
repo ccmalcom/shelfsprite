@@ -199,7 +199,11 @@ export function assemble(
   metadataEntries: PoolEntry[],
   seedEntries: PoolEntry[],
   signal: AssembleSignal,
-  cap: number
+  cap: number,
+  // NOT a field on AssembleSignal: adding one would force buildBookSignal to supply
+  // it and drag /similar into directive scope. recommendRun is the only caller that
+  // passes it; /similar and /discover keep the empty default.
+  preferredAuthorSurnames: Set<string> = new Set()
 ): AssembledCandidate[] {
   const allowedLangs = allowedLanguages(signal.library_languages);
   // A Map, so values() yields Python's dict insertion order.
@@ -251,7 +255,10 @@ export function assemble(
   for (const { pools, ...rest } of byKey.values()) {
     candidates.push({ ...rest, retrieval_pool: pools.size > 1 ? 'both' : [...pools][0] });
   }
-  return capPool(applyAuthorCaps(candidates, signal.library_authors), cap);
+  return capPool(
+    applyAuthorCaps(candidates, signal.library_authors, preferredAuthorSurnames),
+    cap
+  );
 }
 
 /**

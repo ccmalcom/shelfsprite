@@ -116,7 +116,8 @@ export function isLearnerEdition(cand: {
  */
 export function applyAuthorCaps<T extends { author?: string | null }>(
   candidates: T[],
-  libraryAuthors: Set<string>
+  libraryAuthors: Set<string>,
+  preferredAuthors: Set<string> = new Set()
 ): T[] {
   const perAuthor = new Map<string, number>();
   const kept: T[] = [];
@@ -124,6 +125,9 @@ export function applyAuthorCaps<T extends { author?: string | null }>(
     const a = surname(c.author ?? null);
     if (a) {
       const n = perAuthor.get(a) ?? 0;
+      // MAX_PER_AUTHOR is a QUALITY guard, not a weak-inference crutch, so preferred
+      // authors are deliberately NOT exempt from it: a favorite does not make ten
+      // books by one person a good deck.
       if (n >= MAX_PER_AUTHOR) continue;
       perAuthor.set(a, n + 1);
     }
@@ -132,8 +136,15 @@ export function applyAuthorCaps<T extends { author?: string | null }>(
 
   const total = kept.length;
   if (!total) return kept;
-  const lib = kept.filter((c) => libraryAuthors.has(surname(c.author ?? null)));
-  const non = kept.filter((c) => !libraryAuthors.has(surname(c.author ?? null)));
+  // The 40% library-author trim assumes "already on your shelf" means "not
+  // discovery". An explicit favorite is precisely the statement that the assumption
+  // is wrong, so a preferred author sorts into `non`: the trim never drops them and
+  // the reorder never pushes them down.
+  const isPreferred = (c: T) => preferredAuthors.has(surname(c.author ?? null));
+  const lib = kept.filter((c) => libraryAuthors.has(surname(c.author ?? null)) && !isPreferred(c));
+  const non = kept.filter((c) => !libraryAuthors.has(surname(c.author ?? null)) || isPreferred(c));
+  // `total` stays kept.length, so maxLib is computed against the same denominator as
+  // before and the budget for genuinely-library authors does not silently grow.
   // Python's int() truncates toward zero, unlike Math.round.
   const maxLib = Math.max(1, Math.trunc(total * MAX_LIBRARY_AUTHOR_SHARE));
   if (lib.length > maxLib) return [...non, ...lib.slice(0, maxLib)];

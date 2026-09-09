@@ -129,3 +129,49 @@ describe('capPool', () => {
     expect(out.every((c) => c.description === 'd')).toBe(true);
   });
 });
+
+describe('assemble threads preferred authors into the caps', () => {
+  test('the empty-set default matches the four-argument call', () => {
+    const signal = emptySignal();
+    signal.library_authors.add('wolfe');
+    const pool = [
+      entry(cand({ title: 'One', author: 'Gene Wolfe' })),
+      entry(cand({ title: 'Two', author: 'New Person' })),
+    ];
+    expect(assemble(pool, [], signal, 60)).toEqual(assemble(pool, [], signal, 60, new Set()));
+  });
+
+  test('a preferred library author is exempt from the library trim', () => {
+    // Same fixture shape as rec-filters.test.ts, and for the same reason: the
+    // preferred author must be one the CURRENT code drops, and enough non-preferred
+    // library authors must survive the exemption to keep lib.length > maxLib.
+    // 14 candidates → maxLib = trunc(14 * 0.4) = 5.
+    const signal = emptySignal();
+    for (const s of ['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'wolfe']) {
+      signal.library_authors.add(s);
+    }
+    const pool = [
+      entry(cand({ title: 'L1', author: 'L1 One' })),
+      entry(cand({ title: 'L2', author: 'L2 Two' })),
+      entry(cand({ title: 'L3', author: 'L3 Three' })),
+      entry(cand({ title: 'L4', author: 'L4 Four' })),
+      entry(cand({ title: 'L5', author: 'L5 Five' })),
+      entry(cand({ title: 'L6', author: 'L6 Six' })),
+      entry(cand({ title: 'L7', author: 'L7 Seven' })),
+      entry(cand({ title: 'P', author: 'Gene Wolfe' })),
+      entry(cand({ title: 'N1', author: 'N1 A' })),
+      entry(cand({ title: 'N2', author: 'N2 B' })),
+      entry(cand({ title: 'N3', author: 'N3 C' })),
+      entry(cand({ title: 'N4', author: 'N4 D' })),
+      entry(cand({ title: 'N5', author: 'N5 E' })),
+      entry(cand({ title: 'N6', author: 'N6 F' })),
+    ];
+    const without = assemble(pool, [], signal, 60).map((c) => c.title);
+    const withPref = assemble(pool, [], signal, 60, new Set(['wolfe'])).map((c) => c.title);
+    expect(without).not.toContain('P');
+    expect(withPref[0]).toBe('P');
+    // The trim still fired, so the exemption did not simply disable it.
+    expect(withPref).not.toContain('L6');
+    expect(withPref).not.toContain('L7');
+  });
+});

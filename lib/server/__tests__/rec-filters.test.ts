@@ -9,6 +9,7 @@ import {
   fuzzyDuplicate,
   isLearnerEdition,
   applyAuthorCaps,
+  MAX_PER_AUTHOR,
   subjectHits,
   applyDirectiveConstraints,
 } from '../recFilters';
@@ -181,5 +182,78 @@ describe('applyDirectiveConstraints', () => {
       applyDirectiveConstraints([cand()], { exclude_authors: ['Frank Herbert'] })
     ).toHaveLength(1);
     expect(applyDirectiveConstraints([cand()], { exclude_authors: ['Herbert'] })).toEqual([]);
+  });
+});
+
+describe('applyAuthorCaps with preferred authors', () => {
+  const c = (author: string) => ({ author });
+
+  test('the empty-set default is behavior-identical to the two-argument call', () => {
+    const pool = [c('A One'), c('B Two'), c('A One')];
+    const lib = new Set(['one']);
+    expect(applyAuthorCaps(pool, lib)).toEqual(applyAuthorCaps(pool, lib, new Set()));
+  });
+
+  // FIXTURE DESIGN, do not "simplify": the preferred author must be one the CURRENT
+  // code actually drops, and enough non-preferred library authors must remain after
+  // the exemption that `lib.length > maxLib` still holds — otherwise applyAuthorCaps
+  // returns `kept` untouched and the test proves nothing about either branch.
+  //
+  // 14 candidates → maxLib = trunc(14 * 0.4) = 5.
+  // kept order: L1..L7 (library, not preferred), P (library, PREFERRED), N1..N6 (new).
+  //   no preference: lib = [L1..L7, P] (8) > 5 → [N1..N6, L1..L5]; P is dropped.
+  //   preferring P:  lib = [L1..L7]   (7) > 5 → [P, N1..N6, L1..L5]; P survives, first.
+  const libAuthors = ['L1 One', 'L2 Two', 'L3 Three', 'L4 Four', 'L5 Five', 'L6 Six', 'L7 Seven'];
+  const capPool14 = [
+    ...libAuthors.map(c),
+    c('Gene Wolfe'),
+    ...['N1 A', 'N2 B', 'N3 C', 'N4 D', 'N5 E', 'N6 F'].map(c),
+  ];
+  // surname() lowercases via normalizeTitle and keeps the last token, so these are
+  // spelled out rather than importing surname() into this file just for the fixture.
+  const capLib = new Set(['one', 'two', 'three', 'four', 'five', 'six', 'seven', 'wolfe']);
+
+  test('a preferred library author survives a trim that drops them today', () => {
+    const trimmed = applyAuthorCaps(capPool14, capLib).map((x) => x.author);
+    expect(trimmed).not.toContain('Gene Wolfe');
+
+    const kept = applyAuthorCaps(capPool14, capLib, new Set(['wolfe'])).map((x) => x.author);
+    expect(kept).toContain('Gene Wolfe');
+  });
+
+  test('a preferred author is not reordered down, and the reorder branch still runs', () => {
+    const kept = applyAuthorCaps(capPool14, capLib, new Set(['wolfe'])).map((x) => x.author);
+    // Preferred sorts into the non-library partition, which is emitted first — and it
+    // was NOT first in the input, so this could only come from the partition change.
+    expect(kept[0]).toBe('Gene Wolfe');
+    // The trim genuinely fired: L6/L7 lost their slots to maxLib = 5.
+    expect(kept).not.toContain('L6 Six');
+    expect(kept).not.toContain('L7 Seven');
+  });
+
+  test('MAX_PER_AUTHOR still caps a preferred author at 2', () => {
+    const pool = [c('Gene Wolfe'), c('Gene Wolfe'), c('Gene Wolfe'), c('Gene Wolfe')];
+    const kept = applyAuthorCaps(pool, new Set(['wolfe']), new Set(['wolfe']));
+    expect(kept).toHaveLength(MAX_PER_AUTHOR);
+  });
+});
+
+describe('applyDirectiveConstraints and favorites', () => {
+  // A preference must NEVER remove a candidate. This object is non-empty, so it
+  // walks every candidate instead of taking the early return — correct today only
+  // because no branch reads the new keys. Pinned so a future unrecognized-key guard
+  // cannot silently empty the pool.
+  test('a constraints object containing only prefer_* keys returns every candidate', () => {
+    const pool = [
+      { author: 'Gene Wolfe', year: 1980, subjects: ['space opera'] },
+      { author: 'Someone Else', year: 2020, subjects: ['grimdark'] },
+      { author: null, year: null, subjects: null },
+    ];
+    expect(
+      applyDirectiveConstraints(pool, {
+        prefer_authors: ['Gene Wolfe'],
+        prefer_subjects: ['space opera'],
+      })
+    ).toEqual(pool);
   });
 });
