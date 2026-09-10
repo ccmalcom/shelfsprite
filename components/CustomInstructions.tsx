@@ -44,6 +44,15 @@ export default function CustomInstructions() {
   const effectiveConstraints = constraints ?? data?.constraints ?? {};
   const chips = constraintChips(effectiveConstraints);
 
+  // useSWR reports `undefined` while the first request is in flight, which the fallbacks
+  // above render as an EMPTY record -- indistinguishable from a reader who has no
+  // directive. Editing against that placeholder is destructive in two ways: a favorite
+  // added during the window builds a constraints object holding only that favorite, and
+  // the fetched exclude_*/languages are then never merged in; and Save with everything
+  // still blank takes the delete path below and erases a directive that does exist.
+  // Neither is exotic -- both need only a slow first paint. So no editing until loaded.
+  const loaded = data !== undefined;
+
   // Favorites edit the SAME constraints object the prose shares, so Save writes both
   // in one PUT. PUT /directive replaces the record wholesale; a second writer would
   // clobber whichever field it did not own.
@@ -67,7 +76,9 @@ export default function CustomInstructions() {
       // PUT /directive 422s when text and cleaned constraints are both empty, and
       // there is no catch here — the reader would get a silent no-op. Removing your
       // last favorite is a normal action, so route it to the delete path instead.
-      if (!text && Object.keys(effectiveConstraints).length === 0) {
+      // `loaded` is re-checked rather than trusted from the disabled button: an
+      // in-flight revalidation must never be able to route Save into a DELETE.
+      if (loaded && !text && Object.keys(effectiveConstraints).length === 0) {
         await deleteDirective();
       } else {
         await putDirective({ nl_text: text || null, constraints: effectiveConstraints });
@@ -101,7 +112,7 @@ export default function CustomInstructions() {
     <Card className="space-y-4">
       <div className="flex items-center justify-between">
         <h3 className="font-display text-lg font-bold text-text">Custom instructions</h3>
-        <Button variant="ghost" size="sm" onClick={() => setChatOpen(true)}>
+        <Button variant="ghost" size="sm" disabled={!loaded} onClick={() => setChatOpen(true)}>
           Help me write this
         </Button>
       </div>
@@ -113,6 +124,7 @@ export default function CustomInstructions() {
       <Textarea
         rows={4}
         value={effectiveText}
+        disabled={!loaded}
         onChange={(e) => setText(e.target.value)}
         placeholder="More character-driven literary fiction. No grimdark. Keep it under 400 pages."
       />
@@ -122,6 +134,7 @@ export default function CustomInstructions() {
         excludeAuthors={effectiveConstraints.exclude_authors ?? []}
         excludeSubjects={effectiveConstraints.exclude_subjects ?? []}
         suggestions={suggestions}
+        disabled={!loaded}
         onChange={setFavorites}
       />
       {chips.length > 0 && (
@@ -132,11 +145,11 @@ export default function CustomInstructions() {
         </div>
       )}
       <div className="flex gap-3">
-        <Button onClick={save} loading={saving} disabled={saving}>
+        <Button onClick={save} loading={saving} disabled={saving || !loaded}>
           Save
         </Button>
         {(data?.nl_text || Object.keys(data?.constraints ?? {}).length > 0) && (
-          <Button variant="ghost" onClick={clearAll} disabled={saving}>
+          <Button variant="ghost" onClick={clearAll} disabled={saving || !loaded}>
             Clear
           </Button>
         )}
@@ -147,7 +160,17 @@ export default function CustomInstructions() {
           onClose={() => setChatOpen(false)}
           onApply={(proposed, c) => {
             setText(proposed);
-            setConstraints(c);
+            // DISTILL_TOOL's schema declares only the hard filters, so a draft never
+            // carries prefer_authors/prefer_subjects and replacing constraints wholesale
+            // silently discarded the reader's favorites -- saved ones included. Carry
+            // them across. A draft that adds a conflicting exclusion still wins:
+            // cleanDirectiveConstraints drops the colliding favorite on save, which is
+            // the documented hard-filter-outranks-soft-boost rule.
+            const merged: DirectiveConstraints = { ...c };
+            const { prefer_authors, prefer_subjects } = effectiveConstraints;
+            if (prefer_authors?.length) merged.prefer_authors = prefer_authors;
+            if (prefer_subjects?.length) merged.prefer_subjects = prefer_subjects;
+            setConstraints(merged);
             setChatOpen(false);
           }}
         />

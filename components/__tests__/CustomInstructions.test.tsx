@@ -37,10 +37,21 @@ jest.mock('@/lib/api', () => {
   };
 });
 
-// DirectiveChat opens a Claude-backed modal; not under test here.
+// DirectiveChat opens a Claude-backed modal; the modal itself is not under test, but
+// its onApply contract is -- so the stub exposes a button that applies a fixed draft.
+// It only mounts once "Help me write this" is clicked, so tests that never open it are
+// unaffected.
 jest.mock('@/components/DirectiveChat', () => ({
   __esModule: true,
-  default: () => null,
+  default: ({
+    onApply,
+  }: {
+    onApply: (text: string, constraints: Record<string, unknown>) => void;
+  }) => (
+    <button onClick={() => onApply('Distilled prose.', { exclude_subjects: ['grimdark'] })}>
+      apply-draft
+    </button>
+  ),
 }));
 
 beforeEach(() => {
@@ -113,4 +124,56 @@ it('shows the Clear button for a constraints-only record', () => {
 it('hides the Clear button for a genuinely empty record', () => {
   render(<CustomInstructions />);
   expect(screen.queryByRole('button', { name: 'Clear' })).toBeNull();
+});
+
+// DISTILL_TOOL declares only the hard filters, so a draft never carries prefer_*.
+// Replacing constraints wholesale silently discarded the reader's favorites.
+it('keeps favorites when a chat draft is applied', async () => {
+  mockDirective = {
+    nl_text: 'Old prose.',
+    constraints: { prefer_authors: ['Gene Wolfe'], prefer_subjects: ['space opera'] },
+    updated_at: null,
+  };
+  render(<CustomInstructions />);
+
+  fireEvent.click(screen.getByRole('button', { name: 'Help me write this' }));
+  fireEvent.click(screen.getByRole('button', { name: 'apply-draft' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+  await waitFor(() => expect(mockPut).toHaveBeenCalledTimes(1));
+  expect(mockPut).toHaveBeenCalledWith({
+    nl_text: 'Distilled prose.',
+    constraints: {
+      exclude_subjects: ['grimdark'],
+      prefer_authors: ['Gene Wolfe'],
+      prefer_subjects: ['space opera'],
+    },
+  });
+});
+
+describe('while the directive record is still loading', () => {
+  // useSWR gives `undefined` during the first request, which the component's fallbacks
+  // render as an empty record -- indistinguishable from "this reader has no directive".
+  beforeEach(() => {
+    mockDirective = undefined as unknown as Record<string, unknown>;
+  });
+
+  it('disables every editing control', () => {
+    render(<CustomInstructions />);
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole('button', { name: 'Help me write this' }) as HTMLButtonElement).disabled
+    ).toBe(true);
+    expect((screen.getByLabelText('Favorite authors') as HTMLInputElement).disabled).toBe(true);
+  });
+
+  // The destructive half: Save with everything still blank used to take the delete path
+  // and erase a directive that does exist, on nothing worse than a slow first paint.
+  it('never issues a DELETE', async () => {
+    render(<CustomInstructions />);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(mockMutate).not.toHaveBeenCalled());
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(mockPut).not.toHaveBeenCalled();
+  });
 });
