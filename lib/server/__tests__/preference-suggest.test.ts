@@ -88,7 +88,10 @@ describe('suggestPreferences', () => {
       }
       const out = await suggestPreferences(db, 'local', {
         prefer_authors: ['Author 0'],
-        exclude_authors: ['author 1'],
+        // exclude_authors holds SURNAMES, and surname('Author 1') is its trailing
+        // token, '1'. Spelling the full name here would correctly filter nothing,
+        // because applyDirectiveConstraints would not filter it downstream either.
+        exclude_authors: ['1'],
         prefer_subjects: ['subject 0'],
         exclude_subjects: ['subject 1'],
       });
@@ -100,6 +103,22 @@ describe('suggestPreferences', () => {
       expect(out.authors.map((a) => a.value)).toContain('Author 13');
       expect(out.subjects.map((s) => s.value)).not.toContain('subject 0');
       expect(out.subjects.map((s) => s.value)).not.toContain('subject 1');
+    });
+  });
+
+  // A suggestion carries the library's VERBATIM value, while exclusions are surnames and
+  // whole-word subject terms. Comparing folded strings offered the reader a favorite that
+  // applyDirectiveConstraints would delete the instant they accepted it.
+  test('withholds a suggestion the exclusions would filter out downstream', async () => {
+    await withDb(async (db) => {
+      await addBook(db, { author: 'Frank Herbert', rating: 5, subjects: ['Space Opera'] });
+      await addBook(db, { author: 'Gene Wolfe', rating: 5, subjects: ['New Sun'] });
+      const out = await suggestPreferences(db, 'local', {
+        exclude_authors: ['herbert'],
+        exclude_subjects: ['opera'],
+      });
+      expect(out.authors.map((a) => a.value)).toEqual(['Gene Wolfe']);
+      expect(out.subjects.map((s) => s.value)).toEqual(['New Sun']);
     });
   });
 

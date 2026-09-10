@@ -7,6 +7,11 @@ import {
   type PreferenceSuggestion,
   type PreferenceSuggestions,
 } from '@/lib/api';
+// Bundle-safe: exclusions.ts imports only dedup.ts, and both are dependency-free. Same
+// precedent as lib/server/rating.ts in StarRating. It is imported rather than
+// reimplemented because a second copy of the conflict rule is what put this warning out
+// of step with the server in the first place.
+import { authorExcluded, subjectExcluded } from '@/lib/server/exclusions';
 
 const fold = (s: string) => s.trim().toLowerCase();
 const has = (list: string[], value: string) => list.some((x) => fold(x) === fold(value));
@@ -22,6 +27,10 @@ interface GroupProps {
    *  lowercases prefer_subjects and preserves prefer_authors' case. Without this the
    *  chip a reader adds silently changes case on their next page load. */
   lowercase: boolean;
+  /** The recommender's own exclusion rule for this family -- surname matching for
+   *  authors, whole-word-inside-subject for subjects. Never a string compare. */
+  isExcluded: (value: string, excluded: string[]) => boolean;
+  disabled: boolean;
   onChange: (next: string[]) => void;
 }
 
@@ -33,6 +42,8 @@ function Group({
   excluded,
   suggestions,
   lowercase,
+  isExcluded,
+  disabled,
   onChange,
 }: GroupProps) {
   const [draft, setDraft] = useState('');
@@ -60,8 +71,12 @@ function Group({
       return;
     }
     // The server drops a preference that collides with an exclusion. Say so here
-    // instead, so the reader learns why rather than watching it vanish on save.
-    if (has(excluded, value)) {
+    // instead, so the reader learns why rather than watching it vanish on save. Matched
+    // the way the recommender matches, so the warning fires on the near-misses that
+    // actually bite: 'Brandon Sanderson' against an exclusion of 'sanderson', or 'space
+    // opera' against an exclusion of 'opera'. A full-string compare accepted both, the
+    // server then dropped the favorite on save, and the reader was told nothing.
+    if (isExcluded(value, excluded)) {
       setError(`"${value}" is already on your avoid list. Remove it there first.`);
       return;
     }
@@ -86,7 +101,8 @@ function Group({
               <button
                 type="button"
                 aria-label={`Remove ${v}`}
-                className="ml-1.5 text-muted hover:text-text"
+                className="ml-1.5 text-muted hover:text-text disabled:opacity-50"
+                disabled={disabled}
                 onClick={() => onChange(values.filter((x) => x !== v))}
               >
                 &times;
@@ -101,6 +117,7 @@ function Group({
           aria-label={label}
           value={draft}
           placeholder={placeholder}
+          disabled={disabled}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter') {
@@ -114,6 +131,7 @@ function Group({
           variant="secondary"
           size="sm"
           aria-label={addLabel}
+          disabled={disabled}
           onClick={() => add(draft)}
         >
           Add
@@ -129,8 +147,9 @@ function Group({
                 key={s.value}
                 type="button"
                 aria-label={`Add ${s.value}`}
+                disabled={disabled}
                 onClick={() => add(s.value)}
-                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
               >
                 <Badge>
                   {s.value} &middot; {s.count}
@@ -160,6 +179,7 @@ export default function FavoritesFields({
   excludeAuthors,
   excludeSubjects,
   suggestions,
+  disabled = false,
   onChange,
 }: {
   authors: string[];
@@ -167,6 +187,9 @@ export default function FavoritesFields({
   excludeAuthors: string[];
   excludeSubjects: string[];
   suggestions: PreferenceSuggestions | undefined;
+  /** True while the directive record is still loading. Editing then would build a
+   *  constraints object out of an empty placeholder and drop the stored exclusions. */
+  disabled?: boolean;
   onChange: (next: { authors: string[]; subjects: string[] }) => void;
 }) {
   return (
@@ -179,6 +202,8 @@ export default function FavoritesFields({
         excluded={excludeAuthors}
         suggestions={suggestions?.authors ?? []}
         lowercase={false}
+        isExcluded={authorExcluded}
+        disabled={disabled}
         onChange={(next) => onChange({ authors: next, subjects })}
       />
       <Group
@@ -189,6 +214,8 @@ export default function FavoritesFields({
         excluded={excludeSubjects}
         suggestions={suggestions?.subjects ?? []}
         lowercase
+        isExcluded={subjectExcluded}
+        disabled={disabled}
         onChange={(next) => onChange({ authors, subjects: next })}
       />
     </div>

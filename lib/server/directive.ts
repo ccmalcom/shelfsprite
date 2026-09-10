@@ -1,3 +1,5 @@
+import { authorExcluded, subjectExcluded } from './exclusions';
+
 /** Cap per favorites family. Bounds the stored JSON blob and the retrieval budget.
  *  Mirrored — deliberately duplicated, never imported — as MAX_PREFER_ENTRIES in
  *  lib/api.ts, because a client component must not import from lib/server/**. */
@@ -28,16 +30,23 @@ function normalizePreferList(raw: unknown, lowercase: boolean): string[] {
 }
 
 /**
- * A hard filter outranks a soft boost: an entry present in both families is dropped
- * from the preference. Keeping both would boost a candidate into the pool and then
- * delete it from the pool. Conflicts are dropped BEFORE the cap so the reader does
- * not lose slots to entries that were never going to survive.
+ * A hard filter outranks a soft boost: an entry the exclusions would delete downstream
+ * is dropped from the preference. Keeping both would boost a candidate into the pool
+ * and then delete it from the pool. Conflicts are dropped BEFORE the cap so the reader
+ * does not lose slots to entries that were never going to survive.
+ *
+ * `isExcluded` MUST be the recommender's own matching rule, not a string comparison.
+ * A full-string check here read as correct and was not: exclusions match authors by
+ * surname and subjects by whole word inside the subject, so the near-misses that a
+ * string compare lets through ('sanderson' vs 'Brandon Sanderson', 'opera' vs 'space
+ * opera') are exactly the conflicts worth catching. See exclusions.ts.
  */
-function dropExcluded(values: string[], excluded: unknown): string[] {
-  const blocked = new Set(
-    (Array.isArray(excluded) ? excluded : []).map((e) => String(e).trim().toLowerCase())
-  );
-  return values.filter((v) => !blocked.has(v.toLowerCase())).slice(0, MAX_PREFER_ENTRIES);
+function dropExcluded(
+  values: string[],
+  excluded: unknown,
+  isExcluded: (value: string, excluded: unknown) => boolean
+): string[] {
+  return values.filter((v) => !isExcluded(v, excluded)).slice(0, MAX_PREFER_ENTRIES);
 }
 
 /** Port of directive._clean_directive_constraints — keep only supported,
@@ -74,13 +83,15 @@ export function cleanDirectiveConstraints(raw: unknown): Record<string, unknown>
   // normalized set rather than on whatever the caller sent.
   const preferSubjects = dropExcluded(
     normalizePreferList(r.prefer_subjects, true),
-    out.exclude_subjects
+    out.exclude_subjects,
+    subjectExcluded
   );
   if (preferSubjects.length) out.prefer_subjects = preferSubjects;
 
   const preferAuthors = dropExcluded(
     normalizePreferList(r.prefer_authors, false),
-    out.exclude_authors
+    out.exclude_authors,
+    authorExcluded
   );
   if (preferAuthors.length) out.prefer_authors = preferAuthors;
 

@@ -13,6 +13,7 @@
  */
 import { asc, eq } from 'drizzle-orm';
 import { schema, type Db } from './db';
+import { authorExcluded, subjectExcluded } from './exclusions';
 import { LOVED_MIN, mostCommon } from './recSignal';
 import { effectiveRating } from './serialize';
 
@@ -29,14 +30,14 @@ export interface PreferenceSuggestions {
   authors: Suggestion[];
 }
 
-/** Lowercased fold of every value already spoken for in the given constraint keys. */
-function claimed(constraints: Record<string, unknown>, keys: string[]): Set<string> {
+/** Lowercased fold of the values already on the reader's FAVORITES list. Exact match is
+ *  right here and only here: these are values this same editor wrote, so accepting a
+ *  suggestion must remove precisely that suggestion from the row. */
+function claimed(constraints: Record<string, unknown>, key: string): Set<string> {
   const out = new Set<string>();
-  for (const key of keys) {
-    for (const v of (Array.isArray(constraints[key]) ? constraints[key] : []) as unknown[]) {
-      const s = String(v).trim().toLowerCase();
-      if (s) out.add(s);
-    }
+  for (const v of (Array.isArray(constraints[key]) ? constraints[key] : []) as unknown[]) {
+    const s = String(v).trim().toLowerCase();
+    if (s) out.add(s);
   }
   return out;
 }
@@ -46,11 +47,22 @@ function claimed(constraints: Record<string, unknown>, keys: string[]): Set<stri
  * the next candidate rather than sees a shorter list. mostCommon keeps the
  * recommender's own tie ordering, so a suggestion list never disagrees with
  * top_subjects / top_authors.
+ *
+ * `excluded` is the recommender's own matching rule rather than a set lookup, because a
+ * suggestion carries the library's VERBATIM value ('Frank Herbert', 'Space Opera') while
+ * exclusions are surnames and whole-word subject terms. Comparing folded strings offered
+ * the reader a favorite that applyDirectiveConstraints would delete the moment they
+ * accepted it.
  */
-function pick(counts: Map<string, number>, blocked: Set<string>): Suggestion[] {
+function pick(
+  counts: Map<string, number>,
+  favorites: Set<string>,
+  excluded: (value: string) => boolean
+): Suggestion[] {
   const open = new Map<string, number>();
   for (const [value, count] of counts) {
-    if (blocked.has(value.trim().toLowerCase())) continue;
+    if (favorites.has(value.trim().toLowerCase())) continue;
+    if (excluded(value)) continue;
     open.set(value, count);
   }
   return mostCommon(open, SUGGESTION_LIMIT).map((value) => ({
@@ -87,7 +99,11 @@ export async function suggestPreferences(
   }
 
   return {
-    subjects: pick(subjectCounts, claimed(constraints, ['prefer_subjects', 'exclude_subjects'])),
-    authors: pick(authorCounts, claimed(constraints, ['prefer_authors', 'exclude_authors'])),
+    subjects: pick(subjectCounts, claimed(constraints, 'prefer_subjects'), (v) =>
+      subjectExcluded(v, constraints.exclude_subjects)
+    ),
+    authors: pick(authorCounts, claimed(constraints, 'prefer_authors'), (v) =>
+      authorExcluded(v, constraints.exclude_authors)
+    ),
   };
 }

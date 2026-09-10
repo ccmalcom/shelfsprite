@@ -51,20 +51,45 @@ describe('cleanDirectiveConstraints — favorites', () => {
     );
   });
 
-  it('drops a preference that collides with the matching exclude list', () => {
+  // The conflict rule is applyDirectiveConstraints' rule, not a string compare:
+  // exclude_authors holds SURNAMES and exclude_subjects match a whole word INSIDE a
+  // subject. A favorite that survives cleaning must be one the recommender would
+  // actually keep, or it drives retrieval and is then deleted from the candidate pool.
+  it('drops a preference the exclusions would filter out downstream', () => {
     expect(
       cleanDirectiveConstraints({
-        exclude_authors: ['Brandon Sanderson'],
-        prefer_authors: ['brandon sanderson', 'Gene Wolfe'],
+        exclude_authors: ['Sanderson'],
+        prefer_authors: ['Brandon Sanderson', 'Gene Wolfe'],
         exclude_subjects: ['GRIMDARK'],
-        prefer_subjects: ['grimdark', 'space opera'],
+        prefer_subjects: ['grimdark fantasy', 'space opera'],
       })
     ).toEqual({
-      exclude_authors: ['brandon sanderson'],
+      exclude_authors: ['sanderson'],
       exclude_subjects: ['grimdark'],
       prefer_authors: ['Gene Wolfe'],
       prefer_subjects: ['space opera'],
     });
+  });
+
+  // The narrower half of the same rule: whole-word, so an exclusion must not swallow a
+  // subject that merely contains it as a substring.
+  it('keeps a preference whose exclusion overlap is only a substring', () => {
+    const out = cleanDirectiveConstraints({
+      exclude_subjects: ['war'],
+      prefer_subjects: ['warmth'],
+    });
+    expect(out.prefer_subjects).toEqual(['warmth']);
+  });
+
+  // Inherited quirk, pinned: applyDirectiveConstraints tests a candidate's surname, so
+  // an exclusion stored as a full name matches nothing and filters nothing. Dropping the
+  // favorite for it would cost the reader a slot over an exclusion that never fires.
+  it('keeps a preference when the exclusion is a full name, which filters nothing', () => {
+    const out = cleanDirectiveConstraints({
+      exclude_authors: ['Brandon Sanderson'],
+      prefer_authors: ['Brandon Sanderson'],
+    });
+    expect(out.prefer_authors).toEqual(['Brandon Sanderson']);
   });
 
   it('ignores non-array values', () => {

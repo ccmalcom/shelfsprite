@@ -90,14 +90,52 @@ it('blocks adding past MAX_PREFER_ENTRIES with an inline message', () => {
   ).toBeTruthy();
 });
 
-it('refuses an entry that is already on the matching avoid list', () => {
-  const { onChange } = setup({ excludeAuthors: ['brandon sanderson'] });
+// exclude_authors holds SURNAMES (DISTILL_TOOL says so, and applyDirectiveConstraints
+// matches surname(candidate.author) against them), so the warning has to match the way
+// the recommender matches. A full-string compare here let 'Brandon Sanderson' through
+// against an exclusion of 'sanderson'; the server then dropped the favorite on save and
+// the reader was told nothing.
+it('refuses an author whose surname is on the avoid list', () => {
+  const { onChange } = setup({ excludeAuthors: ['sanderson'] });
   fireEvent.change(authorInput(), { target: { value: 'Brandon Sanderson' } });
   fireEvent.keyDown(authorInput(), { key: 'Enter' });
   expect(onChange).not.toHaveBeenCalled();
   expect(
     screen.getByText('"Brandon Sanderson" is already on your avoid list. Remove it there first.')
   ).toBeTruthy();
+});
+
+// Subject exclusions match a whole word INSIDE a subject, so 'opera' really does empty
+// out 'space opera' downstream. Exact equality missed it.
+it('refuses a subject that a broader exclusion term already covers', () => {
+  const { onChange } = setup({ excludeSubjects: ['opera'] });
+  fireEvent.change(subjectInput(), { target: { value: 'Space Opera' } });
+  fireEvent.keyDown(subjectInput(), { key: 'Enter' });
+  expect(onChange).not.toHaveBeenCalled();
+  expect(
+    screen.getByText('"space opera" is already on your avoid list. Remove it there first.')
+  ).toBeTruthy();
+});
+
+// The inherited quirk, pinned: an exclusion stored as a full name matches no surname and
+// therefore filters nothing, so the favorite must be ACCEPTED. Blocking it would cost the
+// reader a favorite over an exclusion that was never going to fire.
+it('accepts an author when the avoid entry is a full name, which filters nothing', () => {
+  const { onChange } = setup({ excludeAuthors: ['brandon sanderson'] });
+  fireEvent.change(authorInput(), { target: { value: 'Brandon Sanderson' } });
+  fireEvent.keyDown(authorInput(), { key: 'Enter' });
+  expect(onChange).toHaveBeenCalledWith({ authors: ['Brandon Sanderson'], subjects: [] });
+});
+
+it('disables every control while the directive record is still loading', () => {
+  setup({ disabled: true });
+  expect((authorInput() as HTMLInputElement).disabled).toBe(true);
+  expect(
+    (screen.getByRole('button', { name: 'Add favorite author' }) as HTMLButtonElement).disabled
+  ).toBe(true);
+  expect(
+    (screen.getByRole('button', { name: 'Add Gene Wolfe' }) as HTMLButtonElement).disabled
+  ).toBe(true);
 });
 
 it('renders nothing extra when suggestions have not loaded', () => {

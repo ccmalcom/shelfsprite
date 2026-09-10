@@ -4,6 +4,7 @@
  * /discover (3c-3), which is why they live apart from the orchestrators.
  */
 import { normalizeTitle, surname } from './dedup';
+import { subjectHits } from './exclusions';
 import { titleSim, STRONG_SIM } from './similarity';
 
 /** recommend.py:59-60 tuning knobs. */
@@ -151,26 +152,10 @@ export function applyAuthorCaps<T extends { author?: string | null }>(
   return kept;
 }
 
-/**
- * Python's `re.escape` escapes every character outside [A-Za-z0-9_]; this escapes
- * only JS regex metacharacters. The two produce equivalent patterns -- Python's extra
- * escapes (space, '-', '#') are semantic no-ops -- and this form stays valid under a
- * future /u flag, which blanket backslash-escaping would not.
- */
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * recommend._subject_hits: true when `term` appears as a whole word inside `subject`
- * (both already lowercased). Whole-word so excluding 'war' does not trip 'warmth'.
- *
- * DEVIATION: Python's `\b` is Unicode-aware for str patterns; JS's is ASCII-only.
- * Both operands here are lowercased English subject headings, where the two agree.
- */
-export function subjectHits(term: string, subject: string): boolean {
-  return new RegExp(`\\b${escapeRegExp(term)}\\b`).test(subject);
-}
+/** Re-exported so this module stays the one import site for candidate predicates.
+ *  The definition lives in exclusions.ts, which the favorites editor also imports;
+ *  recFilters cannot be that home because it pulls similarity.ts into any bundle. */
+export { subjectHits } from './exclusions';
 
 export interface ConstrainableCandidate {
   author?: string | null;
