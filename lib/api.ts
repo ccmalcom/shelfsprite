@@ -744,6 +744,23 @@ export interface DirectiveConstraints {
   max_year?: number;
   exclude_subjects?: string[];
   exclude_authors?: string[];
+  prefer_subjects?: string[];
+  prefer_authors?: string[];
+}
+
+/** Mirror of lib/server/directive.ts's cap. DUPLICATED ON PURPOSE: a client
+ *  component that imports lib/server/** drags drizzle into the browser bundle. */
+export const MAX_PREFER_ENTRIES = 10;
+
+export interface PreferenceSuggestion {
+  value: string;
+  count: number;
+}
+
+/** Client-side twin of lib/server/preferenceSuggest.ts's PreferenceSuggestions. */
+export interface PreferenceSuggestions {
+  subjects: PreferenceSuggestion[];
+  authors: PreferenceSuggestion[];
 }
 
 export interface Directive {
@@ -761,6 +778,9 @@ export interface DirectiveDraft {
 
 /** Shared SWR key for the user's custom instructions record. */
 export const DIRECTIVE_KEY = 'directive';
+
+/** Shared SWR key for the deterministic "from your library" favorites suggestions. */
+export const DIRECTIVE_SUGGESTIONS_KEY = 'directive-suggestions';
 
 // ─── Structured feedback (Tasks 3.1–3.3 backend endpoints) ────────────────────
 
@@ -811,6 +831,10 @@ export function recordTasteSignal(body: {
 
 /** GET /directive - the user's saved custom instructions. */
 export const getDirective = (): Promise<Directive> => get<Directive>('/directive');
+
+/** GET /directive/suggestions - favorite candidates drawn from the reader's loved books. */
+export const getPreferenceSuggestions = (): Promise<PreferenceSuggestions> =>
+  get<PreferenceSuggestions>('/directive/suggestions');
 
 /** PUT /directive - save/replace the durable custom-instructions record. */
 export const putDirective = (body: {

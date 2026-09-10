@@ -23,6 +23,7 @@ import {
 import { schema, type Db } from './db';
 import { ApiError } from './errors';
 import { logDebug } from './log';
+import { preferredAuthorSurnames, readPreferences } from './preferences';
 import { asIdList } from './profileBuild';
 import { ensureProfileMeta } from './profileMeta';
 import { booksChangedSince } from './profileUpdate';
@@ -107,8 +108,15 @@ export async function runRecommend(
     signal = { ...signal, library_languages: new Set(statedLanguages) } as RecSignal;
   }
 
+  // Read once: the pool needs the raw lists (subjects are queried verbatim) and the
+  // author caps need the surname()-keyed set.
+  const preferences = readPreferences(directiveConstraints);
+  const preferredSurnames = preferredAuthorSurnames(preferences.prefer_authors);
+
   const coldStart = isColdStart(signal);
-  const metaPool = useMetadata ? await metadataPool(db, signal, PER_QUERY, coldStart) : [];
+  const metaPool = useMetadata
+    ? await metadataPool(db, signal, PER_QUERY, coldStart, preferences)
+    : [];
 
   let seedQueries: string[] = [];
   let seedEntries: Awaited<ReturnType<typeof seedPool>> = [];
@@ -117,7 +125,7 @@ export async function runRecommend(
     seedEntries = await seedPool(db, seedQueries, PER_QUERY);
   }
 
-  let candidates = assemble(metaPool, seedEntries, signal, MAX_CANDIDATES);
+  let candidates = assemble(metaPool, seedEntries, signal, MAX_CANDIDATES, preferredSurnames);
   candidates = applyDirectiveConstraints(candidates, directiveConstraints);
   await fillOlDescriptions(db, candidates);
 

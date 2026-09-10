@@ -5,6 +5,7 @@
  * Every string here is copied VERBATIM from Python and asserted byte-for-byte in
  * parity-recommend-prompts.test.ts. Do not reflow or re-punctuate them.
  */
+import { readPreferences } from './preferences';
 import { profileModel } from './profileBuild';
 import type { AssembledCandidate } from './recAssemble';
 import { LOVED_SAMPLE, type RecSignal } from './recSignal';
@@ -181,6 +182,22 @@ export function buildSeedPrompt(signal: RecSignal, nQueries: number): PromptBloc
       pyJsonDumps(signal.less_like) +
       '.';
   }
+  // Emitted only when populated, so today's output is preserved byte-for-byte for a
+  // reader with no favorites (recommend-run.test.ts pins this prompt).
+  const preferences = readPreferences(signal.directive_constraints);
+  if (preferences.prefer_authors.length) {
+    steering +=
+      ' Favor queries that would surface books by these authors the reader has ' +
+      'marked as favorites: ' +
+      pyJsonDumps(preferences.prefer_authors) +
+      '.';
+  }
+  if (preferences.prefer_subjects.length) {
+    steering +=
+      ' Favor queries covering these subjects the reader has marked as favorites: ' +
+      pyJsonDumps(preferences.prefer_subjects) +
+      '.';
+  }
 
   const taskPrompt =
     "A reader's taste profile and a sample of their loved books are above. Propose " +
@@ -214,6 +231,25 @@ export function userSteeringBlock(signal: RecSignal): string {
       'LESS LIKE (books the reader explicitly wants less of):\n' + pyJsonDumps(signal.less_like)
     );
   }
+  // Favorites sit between the more/less-like books and the reader's own prose: more
+  // specific than prose guidance, less specific than their own sentences.
+  const preferences = readPreferences(signal.directive_constraints);
+  const hasFavorites =
+    preferences.prefer_authors.length > 0 || preferences.prefer_subjects.length > 0;
+  if (preferences.prefer_authors.length) {
+    lines.push(
+      'FAVORITE AUTHORS (the reader explicitly marked these as favorites; treat a ' +
+        'candidate written by one of them as a strong positive signal):\n' +
+        pyJsonDumps(preferences.prefer_authors)
+    );
+  }
+  if (preferences.prefer_subjects.length) {
+    lines.push(
+      'FAVORITE SUBJECTS (the reader explicitly marked these as favorites; treat a ' +
+        'candidate carrying one of them as a strong positive signal):\n' +
+        pyJsonDumps(preferences.prefer_subjects)
+    );
+  }
   if (signal.reject_reason_counts.size) {
     // A Map, so this joins in Python's dict insertion order.
     const reasons = [...signal.reject_reason_counts.entries()]
@@ -233,7 +269,15 @@ export function userSteeringBlock(signal: RecSignal): string {
     'Favor candidates resembling the more-like books; penalize candidates ' +
       'resembling the less-like books; penalize candidates matching frequent reject ' +
       "reasons; weight trait influence by each trait's `user_weight`: traits with a " +
-      'lower weight should influence the score less (0.0 = ignore, 1.0 = normal).'
+      'lower weight should influence the score less (0.0 = ignore, 1.0 = normal).' +
+      // CONDITIONAL ON PURPOSE. recommend-run.test.ts asserts this whole block
+      // byte-for-byte against fixtures/claude/prompts.json for a reader with no
+      // favorites; an unconditional clause breaks that fixture.
+      (hasFavorites
+        ? ' Separately, reward candidates by a favorite author or carrying a favorite ' +
+          'subject: treat those as strong positive evidence, second only to the ' +
+          "reader's own custom instructions."
+        : '')
   );
   return lines.join('\n\n');
 }

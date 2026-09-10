@@ -26,6 +26,7 @@ import {
   languageOk,
   seriesOk,
 } from './recFilters';
+import { TOP_AUTHORS, TOP_SUBJECTS } from './recSignal';
 import type { RecSignal } from './recSignal';
 import { pyRoundHalfEven } from './serialize';
 
@@ -37,6 +38,16 @@ export const SEED_RESERVE_SHARE = 0.3; // min share of the cap reserved for seed
 
 /** Python's (candidate, reason) tuple. */
 export type PoolEntry = [Candidate, string];
+
+/**
+ * The reader's explicit favorites, handed to metadataPool as an EXPLICIT argument
+ * rather than pre-merged into the signal: cold start must treat preferred and
+ * inferred authors differently, and a merged list cannot express that.
+ */
+export interface PoolPreferences {
+  prefer_subjects: string[];
+  prefer_authors: string[];
+}
 
 export interface AssembledCandidate {
   title: string;
@@ -64,32 +75,88 @@ export type AssembleSignal = Pick<
   | 'library_authors'
 >;
 
+/** Inferred slots that survive the merge in each list, so a full favorites list can
+ *  never silence the taste profile entirely. */
+const INFERRED_RESERVE = 2;
+
 /**
- * Deterministic expansion from the reader's loved subjects/authors. In cold-start
- * (thin library) author expansion is skipped -- it produces same-author clones -- and
- * discovery leans on subjects plus the Claude-seeded comp queries.
+ * Merge-and-truncate, NOT an additive budget: preferred entries take slots from
+ * inferred ones wherever the inferred list is already full, and the merged list is
+ * still capped at the same TOP_* limit, so the per-run catalog-call CEILING does not
+ * move. (A specific run can still gain calls — cold start issues no author calls
+ * today, and an under-full inferred list has spare slots.)
+ *
+ * Returns [value, isPreferred] pairs, preferred first.
+ *
+ * DEDUP IS ONE-DIRECTIONAL ON PURPOSE: an inferred entry is skipped only when it
+ * collides with a PREFERRED one. Inferred entries are never deduplicated against
+ * each other, because today's metadataPool does not deduplicate them either --
+ * /similar feeds it raw `enrichment.subjects` (recSignal.ts:363, only sliced to
+ * TOP_SUBJECTS), which can hold duplicates and case variants. Folding those together
+ * would silently change /similar's recorded catalog call sequence. With an empty
+ * `preferred` this function is therefore a pass-through.
+ *
+ * THIS TRUNCATION IS RETRIEVAL-ONLY. It governs which favorites spend a catalog
+ * call; recPrompts renders the FULL stored list (up to MAX_PREFER_ENTRIES), so a
+ * favorite past this cut still boosts any candidate that reaches the reranker by
+ * another route.
+ */
+function mergePreferred(
+  preferred: string[],
+  inferred: string[],
+  limit: number
+): Array<[string, boolean]> {
+  const out: Array<[string, boolean]> = [];
+  const claimed = new Set<string>();
+  for (const value of preferred.slice(0, Math.max(0, limit - INFERRED_RESERVE))) {
+    const fold = value.toLowerCase();
+    if (claimed.has(fold)) continue;
+    claimed.add(fold);
+    out.push([value, true]);
+  }
+  for (const value of inferred) {
+    if (out.length >= limit) break;
+    // Note: `value` is NOT added to `claimed` — see the one-directional note above.
+    if (claimed.has(value.toLowerCase())) continue;
+    out.push([value, false]);
+  }
+  return out.slice(0, limit);
+}
+
+/**
+ * Deterministic expansion from the reader's loved subjects/authors, merged with the
+ * favorites they named explicitly. In cold-start (thin library) INFERRED author
+ * expansion is skipped -- it produces same-author clones -- and discovery leans on
+ * subjects plus the Claude-seeded comp queries; explicit favorite authors bypass that
+ * skip, because a stated favorite is not an inference.
  */
 export async function metadataPool(
   db: Db,
   signal: Pick<RecSignal, 'top_subjects' | 'top_authors'>,
   perQuery: number,
-  coldStart: boolean
+  coldStart: boolean,
+  preferences: PoolPreferences = { prefer_subjects: [], prefer_authors: [] }
 ): Promise<PoolEntry[]> {
   const pool: PoolEntry[] = [];
-  for (const subject of signal.top_subjects) {
-    for (const c of await openlibrarySubject(db, subject, perQuery)) {
-      pool.push([c, `subject:${subject}`]);
-    }
-    for (const c of await googleBooksSubject(db, subject, perQuery)) {
-      pool.push([c, `subject:${subject}`]);
-    }
+  for (const [subject, preferred] of mergePreferred(
+    preferences.prefer_subjects,
+    signal.top_subjects,
+    TOP_SUBJECTS
+  )) {
+    const reason = `${preferred ? 'preferred_subject' : 'subject'}:${subject}`;
+    for (const c of await openlibrarySubject(db, subject, perQuery)) pool.push([c, reason]);
+    for (const c of await googleBooksSubject(db, subject, perQuery)) pool.push([c, reason]);
   }
-  if (!coldStart) {
-    for (const author of signal.top_authors) {
-      for (const c of await googleBooksAuthor(db, author, perQuery)) {
-        pool.push([c, `author:${author}`]);
-      }
-    }
+  // Preferred authors are queried FIRST and ALWAYS, cold start included: the cold-start
+  // skip exists because inferred authors are unreliable in a thin library, and an
+  // explicit favorite is not an inference. Inferred authors keep today's behavior.
+  for (const [author, preferred] of mergePreferred(
+    preferences.prefer_authors,
+    coldStart ? [] : signal.top_authors,
+    TOP_AUTHORS
+  )) {
+    const reason = `${preferred ? 'preferred_author' : 'author'}:${author}`;
+    for (const c of await googleBooksAuthor(db, author, perQuery)) pool.push([c, reason]);
   }
   return pool;
 }
@@ -132,7 +199,11 @@ export function assemble(
   metadataEntries: PoolEntry[],
   seedEntries: PoolEntry[],
   signal: AssembleSignal,
-  cap: number
+  cap: number,
+  // NOT a field on AssembleSignal: adding one would force buildBookSignal to supply
+  // it and drag /similar into directive scope. recommendRun is the only caller that
+  // passes it; /similar and /discover keep the empty default.
+  preferredAuthorSurnames: Set<string> = new Set()
 ): AssembledCandidate[] {
   const allowedLangs = allowedLanguages(signal.library_languages);
   // A Map, so values() yields Python's dict insertion order.
@@ -184,7 +255,7 @@ export function assemble(
   for (const { pools, ...rest } of byKey.values()) {
     candidates.push({ ...rest, retrieval_pool: pools.size > 1 ? 'both' : [...pools][0] });
   }
-  return capPool(applyAuthorCaps(candidates, signal.library_authors), cap);
+  return capPool(applyAuthorCaps(candidates, signal.library_authors, preferredAuthorSurnames), cap);
 }
 
 /**

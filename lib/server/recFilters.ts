@@ -4,6 +4,7 @@
  * /discover (3c-3), which is why they live apart from the orchestrators.
  */
 import { normalizeTitle, surname } from './dedup';
+import { subjectHits } from './exclusions';
 import { titleSim, STRONG_SIM } from './similarity';
 
 /** recommend.py:59-60 tuning knobs. */
@@ -116,7 +117,8 @@ export function isLearnerEdition(cand: {
  */
 export function applyAuthorCaps<T extends { author?: string | null }>(
   candidates: T[],
-  libraryAuthors: Set<string>
+  libraryAuthors: Set<string>,
+  preferredAuthors: Set<string> = new Set()
 ): T[] {
   const perAuthor = new Map<string, number>();
   const kept: T[] = [];
@@ -124,6 +126,9 @@ export function applyAuthorCaps<T extends { author?: string | null }>(
     const a = surname(c.author ?? null);
     if (a) {
       const n = perAuthor.get(a) ?? 0;
+      // MAX_PER_AUTHOR is a QUALITY guard, not a weak-inference crutch, so preferred
+      // authors are deliberately NOT exempt from it: a favorite does not make ten
+      // books by one person a good deck.
       if (n >= MAX_PER_AUTHOR) continue;
       perAuthor.set(a, n + 1);
     }
@@ -132,34 +137,25 @@ export function applyAuthorCaps<T extends { author?: string | null }>(
 
   const total = kept.length;
   if (!total) return kept;
-  const lib = kept.filter((c) => libraryAuthors.has(surname(c.author ?? null)));
-  const non = kept.filter((c) => !libraryAuthors.has(surname(c.author ?? null)));
+  // The 40% library-author trim assumes "already on your shelf" means "not
+  // discovery". An explicit favorite is precisely the statement that the assumption
+  // is wrong, so a preferred author sorts into `non`: the trim never drops them and
+  // the reorder never pushes them down.
+  const isPreferred = (c: T) => preferredAuthors.has(surname(c.author ?? null));
+  const lib = kept.filter((c) => libraryAuthors.has(surname(c.author ?? null)) && !isPreferred(c));
+  const non = kept.filter((c) => !libraryAuthors.has(surname(c.author ?? null)) || isPreferred(c));
+  // `total` stays kept.length, so maxLib is computed against the same denominator as
+  // before and the budget for genuinely-library authors does not silently grow.
   // Python's int() truncates toward zero, unlike Math.round.
   const maxLib = Math.max(1, Math.trunc(total * MAX_LIBRARY_AUTHOR_SHARE));
   if (lib.length > maxLib) return [...non, ...lib.slice(0, maxLib)];
   return kept;
 }
 
-/**
- * Python's `re.escape` escapes every character outside [A-Za-z0-9_]; this escapes
- * only JS regex metacharacters. The two produce equivalent patterns -- Python's extra
- * escapes (space, '-', '#') are semantic no-ops -- and this form stays valid under a
- * future /u flag, which blanket backslash-escaping would not.
- */
-function escapeRegExp(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
- * recommend._subject_hits: true when `term` appears as a whole word inside `subject`
- * (both already lowercased). Whole-word so excluding 'war' does not trip 'warmth'.
- *
- * DEVIATION: Python's `\b` is Unicode-aware for str patterns; JS's is ASCII-only.
- * Both operands here are lowercased English subject headings, where the two agree.
- */
-export function subjectHits(term: string, subject: string): boolean {
-  return new RegExp(`\\b${escapeRegExp(term)}\\b`).test(subject);
-}
+/** Re-exported so this module stays the one import site for candidate predicates.
+ *  The definition lives in exclusions.ts, which the favorites editor also imports;
+ *  recFilters cannot be that home because it pulls similarity.ts into any bundle. */
+export { subjectHits } from './exclusions';
 
 export interface ConstrainableCandidate {
   author?: string | null;

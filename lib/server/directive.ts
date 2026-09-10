@@ -1,3 +1,54 @@
+import { authorExcluded, subjectExcluded } from './exclusions';
+
+/** Cap per favorites family. Bounds the stored JSON blob and the retrieval budget.
+ *  Mirrored — deliberately duplicated, never imported — as MAX_PREFER_ENTRIES in
+ *  lib/api.ts, because a client component must not import from lib/server/**. */
+export const MAX_PREFER_ENTRIES = 10;
+
+/**
+ * Normalize one favorites list.
+ *
+ * DELIBERATE DIVERGENCE from the adjacent exclude_authors, which lowercases:
+ * `lowercase` is true for prefer_subjects and FALSE for prefer_authors. Lowercasing
+ * is harmless for an invisible filter but wrong for a field the reader types and
+ * then reads back on their own profile page, so prefer_authors preserves case and
+ * every comparison lowercases at the point of use instead.
+ */
+function normalizePreferList(raw: unknown, lowercase: boolean): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of Array.isArray(raw) ? raw : []) {
+    const collapsed = String(x).trim().replace(/\s+/g, ' ');
+    if (!collapsed) continue;
+    const value = lowercase ? collapsed.toLowerCase() : collapsed;
+    const fold = value.toLowerCase();
+    if (seen.has(fold)) continue;
+    seen.add(fold);
+    out.push(value);
+  }
+  return out;
+}
+
+/**
+ * A hard filter outranks a soft boost: an entry the exclusions would delete downstream
+ * is dropped from the preference. Keeping both would boost a candidate into the pool
+ * and then delete it from the pool. Conflicts are dropped BEFORE the cap so the reader
+ * does not lose slots to entries that were never going to survive.
+ *
+ * `isExcluded` MUST be the recommender's own matching rule, not a string comparison.
+ * A full-string check here read as correct and was not: exclusions match authors by
+ * surname and subjects by whole word inside the subject, so the near-misses that a
+ * string compare lets through ('sanderson' vs 'Brandon Sanderson', 'opera' vs 'space
+ * opera') are exactly the conflicts worth catching. See exclusions.ts.
+ */
+function dropExcluded(
+  values: string[],
+  excluded: unknown,
+  isExcluded: (value: string, excluded: unknown) => boolean
+): string[] {
+  return values.filter((v) => !isExcluded(v, excluded)).slice(0, MAX_PREFER_ENTRIES);
+}
+
 /** Port of directive._clean_directive_constraints — keep only supported,
  *  catalog-filterable constraints; normalize types. */
 export function cleanDirectiveConstraints(raw: unknown): Record<string, unknown> {
@@ -27,6 +78,22 @@ export function cleanDirectiveConstraints(raw: unknown): Record<string, unknown>
     .filter((x) => String(x).trim())
     .map((x) => String(x).trim().toLowerCase());
   if (authors.length) out.exclude_authors = authors;
+
+  // Compared against the CLEANED excludes above, so the conflict check runs on the
+  // normalized set rather than on whatever the caller sent.
+  const preferSubjects = dropExcluded(
+    normalizePreferList(r.prefer_subjects, true),
+    out.exclude_subjects,
+    subjectExcluded
+  );
+  if (preferSubjects.length) out.prefer_subjects = preferSubjects;
+
+  const preferAuthors = dropExcluded(
+    normalizePreferList(r.prefer_authors, false),
+    out.exclude_authors,
+    authorExcluded
+  );
+  if (preferAuthors.length) out.prefer_authors = preferAuthors;
 
   return out;
 }
