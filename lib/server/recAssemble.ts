@@ -255,10 +255,7 @@ export function assemble(
   for (const { pools, ...rest } of byKey.values()) {
     candidates.push({ ...rest, retrieval_pool: pools.size > 1 ? 'both' : [...pools][0] });
   }
-  return capPool(
-    applyAuthorCaps(candidates, signal.library_authors, preferredAuthorSurnames),
-    cap
-  );
+  return capPool(applyAuthorCaps(candidates, signal.library_authors, preferredAuthorSurnames), cap);
 }
 
 /**

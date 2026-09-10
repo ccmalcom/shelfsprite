@@ -54,7 +54,9 @@ describe('PUT /api/directive', () => {
 
   it('accepts a favorites-only record with no prose', async () => {
     await withDb(async () => {
-      const res = await PUT(put({ nl_text: null, constraints: { prefer_authors: ['Gene Wolfe'] } }));
+      const res = await PUT(
+        put({ nl_text: null, constraints: { prefer_authors: ['Gene Wolfe'] } })
+      );
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.nl_text).toBeNull();
