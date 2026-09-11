@@ -1,5 +1,7 @@
 'use client';
 
+import PageHeading from '@/components/PageHeading';
+
 import { useState, useRef, useEffect } from 'react';
 import useSWR, { mutate } from 'swr';
 import Link from 'next/link';
@@ -551,7 +553,12 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="fade-in space-y-8 py-6">
+    <div className="editorial-page fade-in space-y-8">
+      <PageHeading
+        eyebrow="The reader behind the ratings"
+        title="Your taste profile"
+        description="What your books have in common, and what makes a story work for you. Keep the parts that ring true. Correct the rest."
+      />
       <div className="space-y-3">
         {/* Mobile escape hatch for the routes the 5-tab bottom nav has no room for
             (lib/nav.ts). /admin is not in NAV_ROUTES at all — it is conditional on

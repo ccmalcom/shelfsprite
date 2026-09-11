@@ -1,5 +1,7 @@
 'use client';
 
+import PageHeading from '@/components/PageHeading';
+
 import { useState } from 'react';
 import useSWR from 'swr';
 import {
@@ -98,24 +100,25 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <div className="mb-8 flex items-start justify-between gap-3">
-        <div>
-          <h1 className="mb-1 font-display text-3xl font-bold tracking-tight text-text">Admin</h1>
-          <p className="text-sm text-muted">Invite new users and manage access.</p>
-        </div>
+    <div className="editorial-page fade-in">
+      <PageHeading
+        eyebrow="Behind the shelves"
+        title="Admin"
+        description="Manage invitations, look after readers, and keep an eye on the service."
+      >
         <Button variant="secondary" size="sm" loading={backfilling} onClick={handleBackfill}>
           {backfilling ? 'Syncing\u2026' : 'Sync from Supabase'}
         </Button>
-      </div>
+      </PageHeading>
 
-      <div className="mb-6 flex gap-1 border-b border-border">
+      <div className="mb-6 flex gap-1 overflow-x-auto border-b border-border">
         {(['users', 'requests', 'usage', 'feedback', 'system'] as const).map((t) => (
           <button
             key={t}
+            aria-pressed={tab === t}
             onClick={() => setTab(t)}
             className={[
-              '-mb-px border-b-2 px-3 py-2 text-sm font-medium capitalize transition-colors',
+              'shrink-0 border-b-2 px-4 py-3 text-sm font-medium capitalize transition-colors',
               tab === t
                 ? 'border-accent text-text'
                 : 'border-transparent text-muted hover:text-text',
@@ -249,7 +252,7 @@ function UserRow({ user, onRevoked }: { user: AdminUser; onRevoked: () => void }
   const canRevoke = user.status !== 'revoked';
 
   return (
-    <div className="flex items-center justify-between gap-3 px-5 py-3">
+    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
       <div className="min-w-0">
         <p className="truncate text-sm font-medium text-text">{user.email}</p>
         <p className="font-mono text-xs text-faint">{user.book_count} books</p>

@@ -1,5 +1,7 @@
 'use client';
 
+import PageHeading from '@/components/PageHeading';
+
 import { useState } from 'react';
 import useSWR, { mutate } from 'swr';
 import {
@@ -249,360 +251,365 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8">
-      <h1 className="mb-1 font-display text-3xl font-bold tracking-tight text-text">Settings</h1>
-      <p className="mb-8 text-sm text-muted">
-        ShelfSprite uses your own Anthropic API key for the taste profile and recommendations.
-      </p>
+    <div className="editorial-page fade-in">
+      <PageHeading
+        eyebrow="Make it yours"
+        title="Settings"
+        description="Your account, reading goals, and the tools that keep your library running."
+      />
 
-      {/* Display name */}
-      <section className="mb-6">
-        <Card>
-          <h2 className="mb-4 font-display text-lg font-semibold text-text">Display name</h2>
-
-          {userProfile?.display_name && (
-            <p className="mb-3 text-sm text-muted">
-              Currently: <span className="font-medium text-text">{userProfile.display_name}</span>
-            </p>
-          )}
-
-          <form onSubmit={handleSaveName} className="space-y-3">
-            <Field label={userProfile?.display_name ? 'Update name' : 'Set your name'}>
-              {(p) => (
-                <Input
-                  {...p}
-                  type="text"
-                  value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
-                  placeholder={userProfile?.display_name ?? 'e.g. Alex'}
-                />
-              )}
-            </Field>
-            <Button type="submit" loading={nameSaving} disabled={nameSaving || !nameInput.trim()}>
-              {nameSaving ? 'Saving\u2026' : 'Save name'}
-            </Button>
-          </form>
-        </Card>
-      </section>
-
-      {/* Reading goals */}
-      <section className="mb-6">
-        <ReadingGoalsSettings />
-      </section>
-
-      {/* Change email */}
-      {authEnabled && (
+      <div className="settings-grid">
+        {/* Display name */}
         <section className="mb-6">
           <Card>
-            <h2 className="mb-4 font-display text-lg font-semibold text-text">Change email</h2>
-            <form onSubmit={handleChangeEmail} className="space-y-3">
-              <Field label="Current password">
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="password"
-                    value={emailCurrentPassword}
-                    onChange={(e) => {
-                      setEmailCurrentPassword(e.target.value);
-                      setEmailError(null);
-                    }}
-                    autoComplete="current-password"
-                  />
-                )}
-              </Field>
-              <Field label="New email">
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => {
-                      setNewEmail(e.target.value);
-                      setEmailError(null);
-                    }}
-                    placeholder="new@example.com"
-                  />
-                )}
-              </Field>
-              {emailError && <p className="text-xs text-danger">{emailError}</p>}
-              <p className="text-xs text-faint">
-                A confirmation link will be sent to your new address.
+            <h2 className="mb-4 font-display text-lg font-semibold text-text">Display name</h2>
+
+            {userProfile?.display_name && (
+              <p className="mb-3 text-sm text-muted">
+                Currently: <span className="font-medium text-text">{userProfile.display_name}</span>
               </p>
-              <Button
-                type="submit"
-                loading={emailSaving}
-                disabled={emailSaving || !emailCurrentPassword || !newEmail.trim()}
-              >
-                {emailSaving ? 'Saving\u2026' : 'Update email'}
+            )}
+
+            <form onSubmit={handleSaveName} className="space-y-3">
+              <Field label={userProfile?.display_name ? 'Update name' : 'Set your name'}>
+                {(p) => (
+                  <Input
+                    {...p}
+                    type="text"
+                    value={nameInput}
+                    onChange={(e) => setNameInput(e.target.value)}
+                    placeholder={userProfile?.display_name ?? 'e.g. Alex'}
+                  />
+                )}
+              </Field>
+              <Button type="submit" loading={nameSaving} disabled={nameSaving || !nameInput.trim()}>
+                {nameSaving ? 'Saving\u2026' : 'Save name'}
               </Button>
             </form>
           </Card>
         </section>
-      )}
 
-      {/* Change password */}
-      {authEnabled && (
+        {/* Reading goals */}
+        <section className="mb-6">
+          <ReadingGoalsSettings />
+        </section>
+
+        {/* Change email */}
+        {authEnabled && (
+          <section className="mb-6">
+            <Card>
+              <h2 className="mb-4 font-display text-lg font-semibold text-text">Change email</h2>
+              <form onSubmit={handleChangeEmail} className="space-y-3">
+                <Field label="Current password">
+                  {(p) => (
+                    <Input
+                      {...p}
+                      type="password"
+                      value={emailCurrentPassword}
+                      onChange={(e) => {
+                        setEmailCurrentPassword(e.target.value);
+                        setEmailError(null);
+                      }}
+                      autoComplete="current-password"
+                    />
+                  )}
+                </Field>
+                <Field label="New email">
+                  {(p) => (
+                    <Input
+                      {...p}
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => {
+                        setNewEmail(e.target.value);
+                        setEmailError(null);
+                      }}
+                      placeholder="new@example.com"
+                    />
+                  )}
+                </Field>
+                {emailError && <p className="text-xs text-danger">{emailError}</p>}
+                <p className="text-xs text-faint">
+                  A confirmation link will be sent to your new address.
+                </p>
+                <Button
+                  type="submit"
+                  loading={emailSaving}
+                  disabled={emailSaving || !emailCurrentPassword || !newEmail.trim()}
+                >
+                  {emailSaving ? 'Saving\u2026' : 'Update email'}
+                </Button>
+              </form>
+            </Card>
+          </section>
+        )}
+
+        {/* Change password */}
+        {authEnabled && (
+          <section className="mb-6">
+            <Card>
+              <h2 className="mb-4 font-display text-lg font-semibold text-text">Change password</h2>
+              <form onSubmit={handleChangePassword} className="space-y-3">
+                <Field label="Current password">
+                  {(p) => (
+                    <Input
+                      {...p}
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => {
+                        setCurrentPassword(e.target.value);
+                        setPasswordError(null);
+                      }}
+                      autoComplete="current-password"
+                    />
+                  )}
+                </Field>
+                <Field label="New password">
+                  {(p) => (
+                    <Input
+                      {...p}
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => {
+                        setNewPassword(e.target.value);
+                        setPasswordError(null);
+                      }}
+                      autoComplete="new-password"
+                    />
+                  )}
+                </Field>
+                <Field label="Confirm new password">
+                  {(p) => (
+                    <Input
+                      {...p}
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        setPasswordError(null);
+                      }}
+                      autoComplete="new-password"
+                    />
+                  )}
+                </Field>
+                {confirmPassword && newPassword !== confirmPassword && (
+                  <p className="mt-1 text-xs text-danger">Passwords don&apos;t match.</p>
+                )}
+                {passwordError && <p className="text-xs text-danger">{passwordError}</p>}
+                <Button
+                  type="submit"
+                  loading={passwordSaving}
+                  disabled={
+                    passwordSaving ||
+                    !currentPassword ||
+                    !newPassword ||
+                    !confirmPassword ||
+                    newPassword !== confirmPassword
+                  }
+                >
+                  {passwordSaving ? 'Saving\u2026' : 'Update password'}
+                </Button>
+              </form>
+            </Card>
+          </section>
+        )}
+
+        {/* API key */}
         <section className="mb-6">
           <Card>
-            <h2 className="mb-4 font-display text-lg font-semibold text-text">Change password</h2>
-            <form onSubmit={handleChangePassword} className="space-y-3">
-              <Field label="Current password">
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => {
-                      setCurrentPassword(e.target.value);
-                      setPasswordError(null);
-                    }}
-                    autoComplete="current-password"
-                  />
-                )}
-              </Field>
-              <Field label="New password">
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => {
-                      setNewPassword(e.target.value);
-                      setPasswordError(null);
-                    }}
-                    autoComplete="new-password"
-                  />
-                )}
-              </Field>
-              <Field label="Confirm new password">
-                {(p) => (
-                  <Input
-                    {...p}
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => {
-                      setConfirmPassword(e.target.value);
-                      setPasswordError(null);
-                    }}
-                    autoComplete="new-password"
-                  />
-                )}
-              </Field>
-              {confirmPassword && newPassword !== confirmPassword && (
-                <p className="mt-1 text-xs text-danger">Passwords don&apos;t match.</p>
-              )}
-              {passwordError && <p className="text-xs text-danger">{passwordError}</p>}
-              <Button
-                type="submit"
-                loading={passwordSaving}
-                disabled={
-                  passwordSaving ||
-                  !currentPassword ||
-                  !newPassword ||
-                  !confirmPassword ||
-                  newPassword !== confirmPassword
-                }
-              >
-                {passwordSaving ? 'Saving\u2026' : 'Update password'}
-              </Button>
-            </form>
-          </Card>
-        </section>
-      )}
-
-      {/* API key */}
-      <section className="mb-6">
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold text-text">Anthropic API key</h2>
-            {!isLoading && (
-              <span
-                className={[
-                  'rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold',
-                  configured ? 'bg-success/20 text-success' : 'bg-elevated text-muted',
-                ].join(' ')}
-              >
-                {configured ? 'Configured' : 'Not set'}
-              </span>
-            )}
-          </div>
-
-          <form onSubmit={handleSave} className="space-y-3">
-            <Field label={configured ? 'Replace key' : 'Add your key'}>
-              {(p) => (
-                <Input
-                  {...p}
-                  type="password"
-                  value={key}
-                  onChange={(e) => setKey(e.target.value)}
-                  placeholder="sk-ant-..."
-                  autoComplete="off"
-                  className="font-mono"
-                />
-              )}
-            </Field>
-            <p className="mt-2 text-xs text-faint">
-              Stored encrypted on the server and never shown again. Get one at{' '}
-              <a
-                href="https://console.anthropic.com/"
-                target="_blank"
-                rel="noreferrer"
-                className="text-accent hover:underline"
-              >
-                console.anthropic.com
-              </a>
-              .
-            </p>
-
-            <div className="flex items-center gap-2">
-              <Button type="submit" loading={saving} disabled={saving || !key.trim()}>
-                {saving ? 'Saving\u2026' : 'Save key'}
-              </Button>
-              {configured && (
-                <Button type="button" variant="ghost" onClick={handleRemove} disabled={saving}>
-                  Remove key
-                </Button>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold text-text">Anthropic API key</h2>
+              {!isLoading && (
+                <span
+                  className={[
+                    'rounded-full px-2.5 py-0.5 font-mono text-xs font-semibold',
+                    configured ? 'bg-success/20 text-success' : 'bg-elevated text-muted',
+                  ].join(' ')}
+                >
+                  {configured ? 'Configured' : 'Not set'}
+                </span>
               )}
             </div>
-          </form>
-        </Card>
-      </section>
 
-      {/* Import books */}
-      <section className="mb-6">
-        <Card>
-          <h2 className="mb-1 font-display text-lg font-semibold text-text">Import books</h2>
-          <p className="mb-4 text-sm text-muted">
-            Bring in your library from Goodreads, StoryGraph, a ShelfSprite backup, or any CSV.
-          </p>
-          <Button onClick={() => setShowImport(true)}>Import from a file</Button>
-        </Card>
-      </section>
-
-      {/* Export / backup */}
-      <section className="mb-6">
-        <Card>
-          <h2 className="mb-1 font-display text-lg font-semibold text-text">Backup your library</h2>
-          <p className="mb-4 text-sm text-muted">
-            Download everything you have rated and reviewed. CSV re-imports into ShelfSprite; JSON
-            is a complete backup.
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              loading={exporting === 'csv'}
-              disabled={exporting !== null}
-              onClick={() => handleExport('csv')}
-            >
-              Download CSV
-            </Button>
-            <Button
-              variant="ghost"
-              loading={exporting === 'json'}
-              disabled={exporting !== null}
-              onClick={() => handleExport('json')}
-            >
-              Download JSON
-            </Button>
-          </div>
-        </Card>
-      </section>
-
-      {/* Claude spend */}
-      <section className="mb-6">
-        <Card>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="font-display text-lg font-semibold text-text">
-              Claude usage this month
-            </h2>
-            {usage?.warn && <Badge variant="warning">Approaching cap</Badge>}
-          </div>
-
-          {usage ? (
-            <>
-              <p className="mb-3 text-sm text-muted">
-                <span className="font-medium text-text">${usage.spent_usd.toFixed(2)}</span> of $
-                {usage.cap_usd.toFixed(2)} this month
+            <form onSubmit={handleSave} className="space-y-3">
+              <Field label={configured ? 'Replace key' : 'Add your key'}>
+                {(p) => (
+                  <Input
+                    {...p}
+                    type="password"
+                    value={key}
+                    onChange={(e) => setKey(e.target.value)}
+                    placeholder="sk-ant-..."
+                    autoComplete="off"
+                    className="font-mono"
+                  />
+                )}
+              </Field>
+              <p className="mt-2 text-xs text-faint">
+                Stored encrypted on the server and never shown again. Get one at{' '}
+                <a
+                  href="https://console.anthropic.com/"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-accent hover:underline"
+                >
+                  console.anthropic.com
+                </a>
+                .
               </p>
 
-              <div className="relative h-2 overflow-hidden rounded-full bg-elevated">
-                <div
-                  className={[
-                    'absolute h-2 rounded-full',
-                    usage.warn ? 'bg-accent' : 'bg-user',
-                  ].join(' ')}
-                  style={{ width: `${Math.min(100, Math.max(0, usage.pct * 100))}%` }}
-                />
+              <div className="flex items-center gap-2">
+                <Button type="submit" loading={saving} disabled={saving || !key.trim()}>
+                  {saving ? 'Saving\u2026' : 'Save key'}
+                </Button>
+                {configured && (
+                  <Button type="button" variant="ghost" onClick={handleRemove} disabled={saving}>
+                    Remove key
+                  </Button>
+                )}
               </div>
+            </form>
+          </Card>
+        </section>
 
-              {usage.warn && (
-                <p className="mt-2 text-xs text-accent">Approaching your monthly soft cap.</p>
-              )}
+        {/* Import books */}
+        <section className="mb-6">
+          <Card>
+            <h2 className="mb-1 font-display text-lg font-semibold text-text">Import books</h2>
+            <p className="mb-4 text-sm text-muted">
+              Bring in your library from Goodreads, StoryGraph, a ShelfSprite backup, or any CSV.
+            </p>
+            <Button onClick={() => setShowImport(true)}>Import from a file</Button>
+          </Card>
+        </section>
 
-              {Object.keys(usage.by_operation).length > 0 && (
-                <div className="mt-4 space-y-1.5 border-t border-border pt-3">
-                  {Object.entries(usage.by_operation).map(([op, amount]) => (
-                    <div key={op} className="flex items-center justify-between text-xs">
-                      <span className="capitalize text-faint">{op.replace(/_/g, ' ')}</span>
-                      <span className="font-mono text-muted">${amount.toFixed(2)}</span>
-                    </div>
-                  ))}
+        {/* Export / backup */}
+        <section className="mb-6">
+          <Card>
+            <h2 className="mb-1 font-display text-lg font-semibold text-text">
+              Backup your library
+            </h2>
+            <p className="mb-4 text-sm text-muted">
+              Download everything you have rated and reviewed. CSV re-imports into ShelfSprite; JSON
+              is a complete backup.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                loading={exporting === 'csv'}
+                disabled={exporting !== null}
+                onClick={() => handleExport('csv')}
+              >
+                Download CSV
+              </Button>
+              <Button
+                variant="ghost"
+                loading={exporting === 'json'}
+                disabled={exporting !== null}
+                onClick={() => handleExport('json')}
+              >
+                Download JSON
+              </Button>
+            </div>
+          </Card>
+        </section>
+
+        {/* Claude spend */}
+        <section className="mb-6">
+          <Card>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-lg font-semibold text-text">
+                Claude usage this month
+              </h2>
+              {usage?.warn && <Badge variant="warning">Approaching cap</Badge>}
+            </div>
+
+            {usage ? (
+              <>
+                <p className="mb-3 text-sm text-muted">
+                  <span className="font-medium text-text">${usage.spent_usd.toFixed(2)}</span> of $
+                  {usage.cap_usd.toFixed(2)} this month
+                </p>
+
+                <div className="relative h-2 overflow-hidden rounded-full bg-elevated">
+                  <div
+                    className={[
+                      'absolute h-2 rounded-full',
+                      usage.warn ? 'bg-accent' : 'bg-user',
+                    ].join(' ')}
+                    style={{ width: `${Math.min(100, Math.max(0, usage.pct * 100))}%` }}
+                  />
                 </div>
-              )}
 
-              <p className="mt-4 text-xs text-faint">
-                A soft cap for visibility only. Recommendations and profiling never stop.
-              </p>
-            </>
-          ) : (
-            <p className="text-sm text-faint">Loading usage…</p>
-          )}
-        </Card>
-      </section>
+                {usage.warn && (
+                  <p className="mt-2 text-xs text-accent">Approaching your monthly soft cap.</p>
+                )}
 
-      {/* Danger zone */}
-      <section className="rounded-2xl border border-danger/40 bg-surface p-6">
-        <h2 className="font-display text-lg font-semibold text-danger">Danger zone</h2>
-        <p className="mb-4 mt-1 text-sm text-muted">
-          These permanently delete your data and can&apos;t be undone.
-        </p>
+                {Object.keys(usage.by_operation).length > 0 && (
+                  <div className="mt-4 space-y-1.5 border-t border-border pt-3">
+                    {Object.entries(usage.by_operation).map(([op, amount]) => (
+                      <div key={op} className="flex items-center justify-between text-xs">
+                        <span className="capitalize text-faint">{op.replace(/_/g, ' ')}</span>
+                        <span className="font-mono text-muted">${amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-        <div className="space-y-3">
-          <DangerAction
-            title="Reset taste profile"
-            description="Deletes your taste traits and recommendations. Your books stay put; rebuild anytime."
-            buttonLabel="Reset profile"
-            onRun={async () => {
-              await api.clearProfile();
-              await Promise.all([
-                mutate('profile', [], { revalidate: false }),
-                mutate(PROFILE_STATUS_KEY),
-                mutate('recommendations', [], { revalidate: false }),
-              ]);
-            }}
-          />
+                <p className="mt-4 text-xs text-faint">
+                  A soft cap for visibility only. Recommendations and profiling never stop.
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-faint">Loading usage…</p>
+            )}
+          </Card>
+        </section>
 
-          <DangerAction
-            title="Clear library"
-            description="Deletes every book, all enrichment, and your taste profile: a factory reset for your library."
-            buttonLabel="Clear library"
-            onRun={async () => {
-              await api.clearLibrary();
-              window.location.assign('/');
-            }}
-          />
+        {/* Danger zone */}
+        <section className="settings-danger rounded-2xl border border-danger/40 bg-surface p-6">
+          <h2 className="font-display text-lg font-semibold text-danger">Danger zone</h2>
+          <p className="mb-4 mt-1 text-sm text-muted">
+            These permanently delete your data and can&apos;t be undone.
+          </p>
 
-          <DangerAction
-            title="Delete account data"
-            description="Deletes ALL your data: library, profile, recommendations, and your stored Anthropic key."
-            buttonLabel="Delete everything"
-            onRun={async () => {
-              await api.deleteAccount();
-              window.location.assign('/');
-            }}
-          />
-        </div>
-      </section>
+          <div className="space-y-3">
+            <DangerAction
+              title="Reset taste profile"
+              description="Deletes your taste traits and recommendations. Your books stay put; rebuild anytime."
+              buttonLabel="Reset profile"
+              onRun={async () => {
+                await api.clearProfile();
+                await Promise.all([
+                  mutate('profile', [], { revalidate: false }),
+                  mutate(PROFILE_STATUS_KEY),
+                  mutate('recommendations', [], { revalidate: false }),
+                ]);
+              }}
+            />
+
+            <DangerAction
+              title="Clear library"
+              description="Deletes every book, all enrichment, and your taste profile: a factory reset for your library."
+              buttonLabel="Clear library"
+              onRun={async () => {
+                await api.clearLibrary();
+                window.location.assign('/');
+              }}
+            />
+
+            <DangerAction
+              title="Delete account data"
+              description="Deletes ALL your data: library, profile, recommendations, and your stored Anthropic key."
+              buttonLabel="Delete everything"
+              onRun={async () => {
+                await api.deleteAccount();
+                window.location.assign('/');
+              }}
+            />
+          </div>
+        </section>
+      </div>
 
       {showImport && (
         <ImportModal

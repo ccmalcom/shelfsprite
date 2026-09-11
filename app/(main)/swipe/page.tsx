@@ -1,5 +1,7 @@
 'use client';
 
+import PageHeading from '@/components/PageHeading';
+
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR, { mutate } from 'swr';
@@ -184,123 +186,131 @@ export default function SwipePage() {
 
   return (
     <>
-      <div className="fade-in flex flex-col items-center gap-6 py-6">
-        {/* Progress */}
-        <p className="font-mono text-xs uppercase tracking-widest text-faint">
-          {dismissed.size} /{' '}
-          {(recs ?? []).filter((r) => r.status === 'served' || dismissed.has(r.id)).length} reviewed
-        </p>
+      <div className="editorial-page fade-in">
+        <PageHeading
+          eyebrow="Picked for your shelves"
+          title="Your next reads"
+          description="Take your time with each book. Your choices help shape the next batch."
+        />
+        <div className="flex flex-col items-center gap-6">
+          {/* Progress */}
+          <p className="font-mono text-xs uppercase tracking-widest text-faint">
+            {dismissed.size} /{' '}
+            {(recs ?? []).filter((r) => r.status === 'served' || dismissed.has(r.id)).length}{' '}
+            reviewed
+          </p>
 
-        {/* Card stack */}
-        <div className="relative h-[440px] sm:h-[560px] w-full max-w-sm">
-          {visibleStack
-            .slice()
-            .reverse()
-            .map((rec, idx) => {
-              const isTop = idx === visibleStack.length - 1;
-              return (
-                <SwipeCard
-                  key={rec.id}
-                  rec={rec}
-                  traits={traits}
-                  onDecide={handleDecide}
-                  zIndex={idx + 1}
-                  isTop={isTop}
-                />
-              );
-            })}
-        </div>
+          {/* Card stack */}
+          <div className="relative h-[440px] sm:h-[560px] w-full max-w-sm">
+            {visibleStack
+              .slice()
+              .reverse()
+              .map((rec, idx) => {
+                const isTop = idx === visibleStack.length - 1;
+                return (
+                  <SwipeCard
+                    key={rec.id}
+                    rec={rec}
+                    traits={traits}
+                    onDecide={handleDecide}
+                    zIndex={idx + 1}
+                    isTop={isTop}
+                  />
+                );
+              })}
+          </div>
 
-        {/* Button controls */}
-        <div className="flex gap-4 items-center">
-          <button
-            onClick={() => {
-              const top = pending[0];
-              if (top) void handleDecide(top.id, 'rejected');
-            }}
-            aria-label="Not interested"
-            className={[
-              'flex h-14 w-14 items-center justify-center rounded-full',
-              'border-2 border-danger bg-surface text-danger shadow',
-              'transition hover:bg-danger/10 active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-            ].join(' ')}
-          >
-            <span className="text-xl font-bold" aria-hidden="true">
-              X
-            </span>
-          </button>
-          <button
-            onClick={() => {
-              const top = pending[0];
-              if (top) void handleDecide(top.id, 'already_read');
-            }}
-            aria-label="Already read"
-            className={[
-              'flex h-12 w-12 items-center justify-center self-center rounded-full',
-              'border-2 border-warning bg-surface text-warning shadow',
-              'transition hover:bg-warning/10 active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-            ].join(' ')}
-          >
-            <span className="text-base font-mono font-bold" aria-hidden="true">
-              R
-            </span>
-          </button>
-          <button
-            onClick={() => {
-              const top = pending[0];
-              if (top) void handleDecide(top.id, 'accepted');
-            }}
-            aria-label="Add to to-read list"
-            className={[
-              'flex h-14 w-14 items-center justify-center rounded-full',
-              'border-2 border-success bg-surface text-success shadow',
-              'transition hover:bg-success/10 active:scale-95',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-            ].join(' ')}
-          >
-            <span className="text-xl font-bold" aria-hidden="true">
-              +
-            </span>
-          </button>
-        </div>
-
-        <p className="font-mono text-xs text-faint">Drag left/right or use the buttons</p>
-
-        {/* Taste signal row */}
-        {pending[0] && (
-          <div className="flex gap-3">
+          {/* Button controls */}
+          <div className="flex gap-4 items-center">
             <button
               onClick={() => {
                 const top = pending[0];
-                if (top) void handleTasteSignal(top, 'less');
+                if (top) void handleDecide(top.id, 'rejected');
               }}
-              aria-label="Less like this"
+              aria-label="Not interested"
               className={[
-                'rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-muted',
-                'transition hover:border-danger/60 hover:text-danger active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'flex h-14 w-14 items-center justify-center rounded-full',
+                'border-2 border-danger bg-surface text-danger shadow',
+                'transition hover:bg-danger/10 active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
-              Less like this
+              <span className="text-xl font-bold" aria-hidden="true">
+                X
+              </span>
             </button>
             <button
               onClick={() => {
                 const top = pending[0];
-                if (top) void handleTasteSignal(top, 'more');
+                if (top) void handleDecide(top.id, 'already_read');
               }}
-              aria-label="More like this"
+              aria-label="Already read"
               className={[
-                'rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-muted',
-                'transition hover:border-success/60 hover:text-success active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'flex h-12 w-12 items-center justify-center self-center rounded-full',
+                'border-2 border-warning bg-surface text-warning shadow',
+                'transition hover:bg-warning/10 active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
-              More like this
+              <span className="text-base font-mono font-bold" aria-hidden="true">
+                R
+              </span>
+            </button>
+            <button
+              onClick={() => {
+                const top = pending[0];
+                if (top) void handleDecide(top.id, 'accepted');
+              }}
+              aria-label="Add to to-read list"
+              className={[
+                'flex h-14 w-14 items-center justify-center rounded-full',
+                'border-2 border-success bg-surface text-success shadow',
+                'transition hover:bg-success/10 active:scale-95',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+              ].join(' ')}
+            >
+              <span className="text-xl font-bold" aria-hidden="true">
+                +
+              </span>
             </button>
           </div>
-        )}
+
+          <p className="font-mono text-xs text-faint">Drag left/right or use the buttons</p>
+
+          {/* Taste signal row */}
+          {pending[0] && (
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  const top = pending[0];
+                  if (top) void handleTasteSignal(top, 'less');
+                }}
+                aria-label="Less like this"
+                className={[
+                  'rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-muted',
+                  'transition hover:border-danger/60 hover:text-danger active:scale-95',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                ].join(' ')}
+              >
+                Less like this
+              </button>
+              <button
+                onClick={() => {
+                  const top = pending[0];
+                  if (top) void handleTasteSignal(top, 'more');
+                }}
+                aria-label="More like this"
+                className={[
+                  'rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-muted',
+                  'transition hover:border-success/60 hover:text-success active:scale-95',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                ].join(' ')}
+              >
+                More like this
+              </button>
+            </div>
+          )}
+        </div>
       </div>
       {reviewing && (
         <BookEditModal

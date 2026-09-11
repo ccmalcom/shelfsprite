@@ -3,34 +3,34 @@
 @tailwind utilities;
 
 :root {
-  /* base */
-  --bg: #161412;
-  --bg-rgb: 22 20 18;
-  --surface: #1f1b18;
-  --surface-rgb: 31 27 24;
-  --elevated: #2a2420;
-  --elevated-rgb: 42 36 32;
+  /* Ink & Paper structure with Ember & Ivory colors, shared by every route. */
+  --bg: #191613;
+  --bg-rgb: 25 22 19;
+  --surface: #24201c;
+  --surface-rgb: 36 32 28;
+  --elevated: #302a24;
+  --elevated-rgb: 48 42 36;
   --border: #3a332d;
   --border-rgb: 58 51 45;
   --border-strong: #7a6f66;
   --border-strong-rgb: 122 111 102; /* >=3:1 on surface+elevated — interactive control edges (WCAG 1.4.11) */
-  --hairline: #2a2420;
-  --hairline-rgb: 42 36 32;
+  --hairline: #3b342d;
+  --hairline-rgb: 59 52 45;
 
   /* text */
   --text: #f5f0e8;
   --text-rgb: 245 240 232;
-  --muted: #a89f92;
-  --muted-rgb: 168 159 146;
-  --faint: #948b81;
-  --faint-rgb: 148 139 129; /* >=4.5:1 on bg/surface/elevated — was #6e665c (3.03 on surface) */
+  --muted: #b7ab9c;
+  --muted-rgb: 183 171 156;
+  --faint: #afa294;
+  --faint-rgb: 175 162 148; /* >=4.5:1 on bg/surface/elevated — was #6e665c (3.03 on surface) */
 
   /* brand + semantics */
-  --accent: #ff5c3a;
-  --accent-rgb: 255 92 58;
-  --accent-hover: #ff7355;
-  --accent-hover-rgb: 255 115 85;
-  --accent-quiet: rgba(255, 92, 58, 0.12);
+  --accent: #ff7959;
+  --accent-rgb: 255 121 89;
+  --accent-hover: #ff9075;
+  --accent-hover-rgb: 255 144 117;
+  --accent-quiet: rgba(255, 121, 89, 0.12);
   --success: #5bbf7b;
   --success-rgb: 91 191 123;
   --danger: #ea6b64;
@@ -148,26 +148,6 @@ body {
   }
 }
 
-/* Approved mix: Ink & Paper structure with Ember & Ivory colors. */
-.app-shell {
-  --bg: #191613;
-  --bg-rgb: 25 22 19;
-  --surface: #24201c;
-  --surface-rgb: 36 32 28;
-  --elevated: #302a24;
-  --elevated-rgb: 48 42 36;
-  --hairline: #3b342d;
-  --hairline-rgb: 59 52 45;
-  --muted: #b7ab9c;
-  --muted-rgb: 183 171 156;
-  --faint: #afa294;
-  --faint-rgb: 175 162 148;
-  --accent: #ff7959;
-  --accent-rgb: 255 121 89;
-  --accent-hover: #ff9075;
-  --accent-hover-rgb: 255 144 117;
-  --accent-quiet: rgba(255, 121, 89, 0.12);
-}
 .shell-nav {
   display: flex;
   align-items: center;
@@ -197,7 +177,7 @@ body {
 .shell-link[aria-current='page'] svg {
   color: var(--accent);
 }
-.app-shell :is(a, button, summary):focus-visible {
+:is(a, button, summary):focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -320,5 +300,59 @@ body {
   }
   .filter-panel {
     max-width: 100%;
+  }
+}
+
+/* Shared editorial rhythm for the pages beyond Home and Library. */
+.page-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 28px;
+  margin-bottom: 28px;
+}
+.editorial-page {
+  max-width: 960px;
+  margin-inline: auto;
+}
+.marketing-section {
+  width: 100%;
+  max-width: 1152px;
+  margin-inline: auto;
+  padding: 64px 20px;
+}
+@media (min-width: 640px) {
+  .marketing-section {
+    padding: 88px 32px;
+  }
+}
+@media (max-width: 639px) {
+  .entry-story h2 {
+    max-width: 16ch;
+    font-size: 2.25rem;
+  }
+  .entry-story > p:last-of-type {
+    display: none;
+  }
+}
+
+.settings-grid {
+  display: grid;
+  gap: 24px;
+  align-items: start;
+}
+.settings-grid > section {
+  margin-bottom: 0;
+  min-width: 0;
+}
+@media (min-width: 1200px) {
+  .settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .settings-danger {
+    grid-column: 1 / -1;
   }
 }
