@@ -170,10 +170,10 @@ export default function WelcomePage() {
           </div>
           <figure className="mx-auto max-w-[1000px]">
             <Image
-              src="/marketing/library.png"
+              src="/marketing/library-reading-room.png"
               alt="The ShelfSprite library, listing books with their covers, half-star ratings and shelf counts"
-              width={2000}
-              height={1500}
+              width={2400}
+              height={1600}
               sizes="(max-width: 1000px) 100vw, 1000px"
               className="h-auto w-full rounded-xl border border-border"
             />
@@ -221,10 +221,10 @@ export default function WelcomePage() {
           </div>
           <figure className="mx-auto max-w-[1000px]">
             <Image
-              src="/marketing/taste-profile.png"
+              src="/marketing/taste-profile-reading-room.png"
               alt="A ShelfSprite taste profile showing the reader archetype and traits grounded in their books"
-              width={2000}
-              height={1700}
+              width={2400}
+              height={2100}
               sizes="(max-width: 1000px) 100vw, 1000px"
               className="h-auto w-full rounded-xl border border-border"
             />

@@ -66,15 +66,15 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
   `'/'` so crawlers reaching `/welcome` attribute the page to the shared URL.
   `WaitlistForm` calls `fetch('/api/invite-requests')` directly rather than going through
   `lib/api.ts`, because that client attaches a Supabase token and would pull the Supabase browser
-  client into a bundle whose entire audience is signed out. `ResolveArtifact` is the hero: a
-  drawn CSV-row-to-catalog-record composition, not a screenshot.
-  The two real screenshots (`public/marketing/library.png`, `taste-profile.png`) are captured at
-  **2x** — a 1700px-wide asset of an 850px layout — and the `next/image` `width`/`height` props
-  carry that intrinsic size while the `<figure>` stays capped at `max-w-[850px]`. Keep both halves
-  of that: dropping the cap renders the app UI inside at half scale, and capturing at 1x is what
-  made the first pair look soft. Neither shot is a real account; they come from a throwaway
-  Postgres seeded under `user_id = 'local'` with hand-authored traits, so recapturing spends
-  nothing on Claude.
+  client into a bundle whose entire audience is signed out. The hero is an explicitly illustrative shelf of three real books;
+  `ResolveArtifact` explains catalog matching further down the page. The public header provides
+  sign-in and a link to the import/enrichment/recommendation walkthrough. The two invite forms
+  retain the same endpoint and honeypot behavior.
+  The screenshots (`public/marketing/library-reading-room.png`, `taste-profile-reading-room.png`) show the redesigned
+  Library and Profile, captured at **2x** from a 1200px desktop viewport (2400px-wide assets).
+  Their `next/image` dimensions match the assets and figures are capped at 1000px. Both use
+  fictional browser-intercepted API fixtures in an isolated local copy: no real account data,
+  database writes, or paid Claude calls. Captions identify the examples.
   **Never write `text-base` on this page** — `base` is a registered color token, so Tailwind
   resolves `text-base` to `color: var(--bg)` and paints the copy in the background (see
   `docs/conventions.md`).
@@ -86,8 +86,9 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
   catalog matches with a per-result rationale, and "Add to to-read" per result (routes through
   the existing `POST /books`). **Ephemeral** — results are not persisted and never touch the
   recommendations feed / swipe deck. Reachable from a NavBar "Discover" link, a home-page CTA, and
-  the mobile `BottomNav` (`primary: true` in `NAV_ROUTES`).
-- `/to-read` — per-book: start reading / mark finished → review / remove.
+  the mobile `BottomNav` (`primary: true` in `NAV_ROUTES`). Suggested prompts fill the input;
+  the reader still submits Search. Results use the same divided list rhythm as Library.
+- `/to-read` — legacy redirect to `/library?tab=to-read`; it has no independent page UI.
 - `/library` — rated books; click a row to re-rate/review; each tab's sort dropdown is sticky per tab via `useStickySort` under `shelfsprite:library-sort:<tab>` (issue #63), so the hardcoded default only applies to a browser that has never chosen one — search text and the star-band filter stay transient by design; "N books waiting on a rating" button steps through unrated read books; **+ Add book** button opens `AddBookModal`; "N books need a match check" button (shown whenever any book across all four shelves has `confidence_label === 'LOW'`) steps through `EnrichmentCorrectionModal`.
 - `/profile` — `TasteHero` archetype card at top; taste traits with inline editing, `CustomInstructions` editor, rating distribution, genre breakdown. Also carries the **mobile escape-hatch row** (`sm:hidden`, top-right): links to `/settings` and — gated on `me?.is_admin` — `/admin`. Both routes are unreachable on a phone otherwise, since the `NavBar` link row is `hidden sm:flex` and the `BottomNav` is capped at 5 items (issue #80).
 - `/setup` — CSV import wizard plus a no-CSV "add books manually" branch (`ManualStep`). Now a thin wrapper around `components/SetupWizard.tsx`. `UploadStep` also links a downloadable blank template (`public/shelfsprite-template.csv`, headers = the `canonical` import format) for testers with no Goodreads/StoryGraph export — fills through the same upload/`detect_format` path, no separate code path.
@@ -100,6 +101,16 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 - `/auth/callback` — public (middleware's `PUBLIC_PREFIXES` includes `/auth`) landing page for Supabase invite links. Client-only: parses the session tokens Supabase puts in the URL hash (`lib/authCallback.ts`) and establishes the session via `supabase.auth.setSession(...)`, then prompts the invited user (no password yet) to set one before hard-reloading into `/`. **It must call `setSession` itself and cannot rely on the client auto-detecting the hash:** `@supabase/ssr` hardcodes `flowType: 'pkce'`, and invite/recovery links use the implicit grant (tokens in the hash), which auth-js refuses to auto-consume under PKCE (`_getSessionFromURL` throws "Not a valid PKCE flow url"). `setSession` ignores `flowType` and persists to the same cookie storage so middleware sees the session. `/login` forwards any invite/recovery hash here as a fallback (see Auth section).
 
 `(main)/layout.tsx` mounts `NavBar` + `ReprofileBanner` + `UsageWarningBanner` + `BottomNav` around all application pages and wraps `children` in **`LibraryGate`**. The root `app/layout.tsx` `<body>` carries `suppressHydrationWarning` (browser extensions mutate `<body>` pre-hydration — silences benign attribute mismatches only).
+
+## Shared page design
+
+The Ember & Ivory palette now lives at `:root` in `app/globals.css`, including both hex values
+and RGB channels. Public entry pages, setup, app pages, and portaled dialogs share it.
+`PageHeading` supplies the editorial title, introductory copy, and divider on Discover,
+Profile, Settings, Admin, and the active recommendation deck. Settings uses two columns from
+1200px and a single column below; Admin tabs scroll within their own strip on narrow screens.
+`EntryFrame` gives login and invite acceptance a shared branded layout without authenticated
+navigation. Auth token consumption and full-document navigation remain unchanged.
 
 ## Components
 

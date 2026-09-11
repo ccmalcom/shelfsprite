@@ -7,7 +7,7 @@ September 11, 2026. Approved by Chase: Ink & Paper UI with Ember & Ivory colors;
 - Shared application shell: 220px desktop rail, compact logo/Account header below 1024px, five opaque bottom destinations, and reserved safe-area space. Settings, conditional Admin, feedback, and sign-out remain accessible. Existing route names remain.
 - Home: recommendations first, saved book preview linked to the to-read shelf, two current reads with finish/review, compact reader identity, and compact annual goals. All displayed books and goals come from the existing API. There are no fabricated recommendations or personalized claims. Full Profile identity/analysis is retained.
 - Library: list browsing, wrapping titles, larger covers, numeric half ratings, search, sticky per-shelf sorting, favorites and rating-band filters, all five shelves, Add book, review queue, and match-correction queue. Unrated read books now appear directly in the list as well as the queue. Filters preserve the existing whole-star band semantics: e.g. the 4 band includes 4 and 4.5.
-- Warm colors are scoped to the application shell. Existing public pages retain their palette. Shared Tailwind color tokens now support alpha modifiers through RGB channels; hex values remain for direct CSS consumers. Keep both representations in sync.
+- The initial pass scoped warm colors to the application shell. The subsequent remaining-pages pass moved them to the root palette, including public pages. Shared Tailwind color tokens now support alpha modifiers through RGB channels; hex values remain for direct CSS consumers. Keep both representations in sync.
 - Feedback uses the existing submission modal through Help & feedback. Completion prompts are retained. Logo and sprites are unchanged. Broken or absent covers use a neutral book icon.
 
 No API, auth, tenancy, database, recommendation-generation, import, or deployment changes. Discover and recommendation screens inherit the shell/palette but keep their existing content and behavior. No new theme picker or navigation rename. Existing 500-book shelf fetch limits remain; this work does not add pagination.
@@ -25,4 +25,36 @@ Chase authorized committing the completed design and implementation. The applica
 
 Next-session prompt:
 
-> Read the repository instructions, `docs/frontend.md`, and `docs/design-concepts/home-library/implementation.md`. The locked direction is Ink & Paper’s layout with Ember & Ivory’s warm palette. Home, Library, and the shared shell are implemented. Preserve the existing API and modal lifetimes. Recheck Git state and use the validation notes before changing or committing anything. Continue only with the work Chase requests.
+> Read the repository instructions, `docs/frontend.md`, and `docs/design-concepts/home-library/implementation.md`. The locked direction is Ink & Paper’s layout with Ember & Ivory’s warm palette. Home, Library, the shared shell, and the remaining-pages expansion below are implemented. Preserve the existing API and modal lifetimes. Recheck Git state and use the validation notes before changing or committing anything. Continue only with the work Chase requests.
+
+## Remaining pages expansion — September 11, 2026
+
+Chase requested extending the approved redesign to the remaining pages, especially the
+unauthenticated landing page, and authorized commits during implementation.
+
+- Landing: book-focused illustrative hero, public navigation, shorter reading-focused copy,
+  import/enrichment/recommendation walkthrough, updated Library/Profile screenshots, and the
+  existing invite forms. Examples are labeled; canonical URL and invite-hash rescue remain.
+- Login and invite acceptance: shared `EntryFrame`, warm surfaces, responsive split layout.
+- Setup: matching palette, visible welcome heading, and existing CSV/manual steps.
+- Discover: editorial heading, editable example prompts, roomy search and divided results.
+- Profile and recommendations: shared page headings around existing analysis and swipe behavior.
+- Settings: responsive two-column sections; Admin: matching heading and scrollable narrow tabs.
+- `/to-read` remains a redirect into Library.
+
+The main UI checkpoint is `711cfa3`. No API, auth, schema, or tenant behavior changed.
+
+Validation: Jest 34 suites / 294 tests; Vitest 79 files / 624 tests; TypeScript, lint (only
+existing full-document auth navigation warnings), formatting, and a clean standard Turbopack
+production build passed. Initial build attempts hit sandbox process/port restrictions; the
+Webpack fallback exposed different generated API route types. A clean standard build passed
+without changing the API wrapper or Next configuration.
+
+Browser validation used an isolated local app and synthetic API responses. All eight redesigned
+page layouts were checked at 320, 390, 768, and 1440px, with no horizontal page overflow.
+Interaction checks cover discovery prompts/search/save, invite success/rate-limit responses,
+local login configuration errors, callback redirect without configured auth, Settings layout
+and import modal, profile explanation, manual onboarding, Admin tabs, and recommendation
+acceptance/empty state. Live Supabase sign-in/password creation, database mutations, paid AI
+calls, and real invite delivery were not exercised. Screenshot examples use fictional books
+and traits, captured at 2x from a 1200px desktop viewport.
