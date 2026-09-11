@@ -9,6 +9,7 @@ interface Props {
   book: Book;
   listKey: string;
   onClose: () => void;
+  onSaved?: () => void;
   queuePosition?: { index: number; total: number };
   onFinishQueue?: () => void;
   allowRemove?: boolean;
@@ -22,6 +23,7 @@ export default function BookEditModal({
   book,
   listKey,
   onClose,
+  onSaved,
   queuePosition,
   onFinishQueue,
   allowRemove,
@@ -82,6 +84,7 @@ export default function BookEditModal({
       );
       // Profile-status may have flipped to dirty; revalidate quietly, unawaited.
       void mutate(PROFILE_STATUS_KEY);
+      onSaved?.();
       toast.success('Saved.');
       if (queuePosition && onFinishQueue) onFinishQueue();
       else onClose();

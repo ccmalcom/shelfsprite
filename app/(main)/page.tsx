@@ -114,7 +114,7 @@ export default function HomePage() {
               disabled={running || recBlocked}
               onClick={handleRun}
             >
-              {running ? 'Choosing carefully…' : 'Find my next books'}
+              {running ? 'Choosing carefully\u2026' : 'Find my next books'}
             </Button>
             <Link href="/discover" className="text-sm text-muted hover:text-text">
               Explore a mood →
@@ -147,6 +147,7 @@ export default function HomePage() {
           {savedLoading ? (
             <div
               className="h-48 w-32 rounded bg-elevated motion-safe:animate-pulse"
+              role="status"
               aria-label="Loading saved books"
             />
           ) : savedError ? (

@@ -31,7 +31,12 @@ export default function NavBar() {
   function utilityLinks() {
     return (
       <>
-        <Link href="/settings" className="shell-link" onClick={() => setAccountOpen(false)}>
+        <Link
+          href="/settings"
+          className="shell-link"
+          aria-current={pathname === '/settings' ? 'page' : undefined}
+          onClick={() => setAccountOpen(false)}
+        >
           Settings
         </Link>
         {me?.is_admin && (
@@ -103,7 +108,7 @@ export default function NavBar() {
       </header>
       {feedbackOpen && (
         <FeedbackModal
-          heading="What’s working? What isn’t?"
+          heading={'What\u2019s working? What isn\u2019t?'}
           onClose={closeFeedback}
           onResolved={closeFeedback}
         />

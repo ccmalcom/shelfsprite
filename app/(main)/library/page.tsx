@@ -188,7 +188,7 @@ function ReadTab({ books }: { books: Book[] }) {
         <SortSelect value={sort} onChange={setSort} options={READ_SORT_OPTIONS} />
         <details className="library-filters">
           <summary className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm text-muted">
-            Filters{filterStar !== null || favoritesOnly ? ' •' : ''}
+            Filters{filterStar !== null || favoritesOnly ? ' \u2022' : ''}
           </summary>
           <div className="filter-panel">
             <p className="mb-3 text-xs text-muted">Rating band</p>
@@ -240,7 +240,7 @@ function ReadTab({ books }: { books: Book[] }) {
       </div>
       <p className="text-xs text-muted" role="status">
         {filtered.length} of {books.length} books · {rated.length} rated
-        {unrated.length > 0 ? ` · ${unrated.length} unrated` : ''}
+        {unrated.length > 0 ? ` \u00b7 ${unrated.length} unrated` : ''}
       </p>
 
       {filtered.length === 0 ? (

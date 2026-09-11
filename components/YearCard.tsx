@@ -69,7 +69,7 @@ export default function YearCard({ compact = false }: { compact?: boolean }) {
         </div>
         <p className="mt-3 text-sm text-muted">
           {stats.books} books read this year
-          {stats.undated > 0 ? ` · ${stats.undated} undated, not counted` : ''}
+          {stats.undated > 0 ? ` \u00b7 ${stats.undated} undated, not counted` : ''}
         </p>
         <div className="mt-4 space-y-3">
           {goals.length ? (
@@ -79,7 +79,7 @@ export default function YearCard({ compact = false }: { compact?: boolean }) {
                   <span>{goalLabel(g)}</span>
                   <span className="font-mono text-muted">
                     {g.progress} / {g.target}
-                    {g.done ? ' · Done' : ''}
+                    {g.done ? ' \u00b7 Done' : ''}
                   </span>
                 </div>
                 <Bar pct={g.target > 0 ? (g.progress / g.target) * 100 : 0} />

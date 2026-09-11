@@ -110,6 +110,7 @@ export default function CurrentReads() {
         <BookEditModal
           book={reviewing}
           listKey="books-read"
+          onSaved={() => void mutate('stats')}
           onClose={() => {
             setReviewing(null);
             void refresh();
