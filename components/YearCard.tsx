@@ -20,7 +20,7 @@ function Bar({ pct }: { pct: number }) {
   return (
     <div className="flex-1 overflow-hidden rounded-full bg-elevated h-2">
       <div
-        className="h-2 rounded-full bg-accent transition-all"
+        className="h-2 rounded-full bg-success transition-all"
         style={{ width: `${Math.min(100, Math.max(0, pct))}%` }}
       />
     </div>
@@ -36,7 +36,7 @@ function Figure({ value, label }: { value: string; label: string }) {
   );
 }
 
-export default function YearCard() {
+export default function YearCard({ compact = false }: { compact?: boolean }) {
   const { data, isLoading, error } = useSWR<GoalsResponse>(GOALS_KEY, () => api.listGoals());
 
   if (isLoading) {
@@ -57,6 +57,43 @@ export default function YearCard() {
 
   const { year, stats, goals } = data;
   const topGenreCount = stats.top_genres[0]?.count ?? 0;
+
+  if (compact)
+    return (
+      <Card>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-xl font-semibold">Your {year}</h2>
+          <Link href="/settings" className="text-xs text-muted underline underline-offset-4">
+            Manage goals
+          </Link>
+        </div>
+        <p className="mt-3 text-sm text-muted">
+          {stats.books} books read this year
+          {stats.undated > 0 ? ` · ${stats.undated} undated, not counted` : ''}
+        </p>
+        <div className="mt-4 space-y-3">
+          {goals.length ? (
+            goals.map((g) => (
+              <div key={g.id}>
+                <div className="mb-2 flex justify-between gap-3 text-sm">
+                  <span>{goalLabel(g)}</span>
+                  <span className="font-mono text-muted">
+                    {g.progress} / {g.target}
+                    {g.done ? ' · Done' : ''}
+                  </span>
+                </div>
+                <Bar pct={g.target > 0 ? (g.progress / g.target) * 100 : 0} />
+                {g.unknown > 0 && (
+                  <p className="mt-1 text-xs text-faint">{g.unknown} books have no page count.</p>
+                )}
+              </div>
+            ))
+          ) : (
+            <p className="text-sm text-muted">Set a reading goal in Settings.</p>
+          )}
+        </div>
+      </Card>
+    );
 
   return (
     <Card>

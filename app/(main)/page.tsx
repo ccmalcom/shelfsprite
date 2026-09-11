@@ -7,109 +7,18 @@ import useSWR, { mutate } from 'swr';
 import {
   api,
   type Stats,
+  type Book,
   type ProfileStatus,
   type ArchetypeOut,
   type UserProfile,
   PROFILE_STATUS_KEY,
   ARCHETYPE_KEY,
 } from '@/lib/api';
-import { Card, Button, useToast } from '@/components/ui';
-import { TasteHero } from '@/components/TasteHero';
+import { Button, useToast } from '@/components/ui';
+import ReaderSprite from '@/components/ReaderSprite';
+import BookCover from '@/components/BookCover';
+import CurrentReads from '@/components/CurrentReads';
 import YearCard from '@/components/YearCard';
-import { tasteAccent } from '@/lib/tasteAccent';
-
-// ── Stats strip ───────────────────────────────────────────────────────────────
-
-function StatsStrip({ stats }: { stats: Stats }) {
-  const toRead = stats.shelves?.['to-read'] ?? 0;
-  const items = [
-    { label: 'Books', value: stats.total },
-    { label: 'Rated', value: stats.rated },
-    {
-      label: 'Avg rating',
-      value: stats.mean_rating != null ? stats.mean_rating.toFixed(1) : '--',
-    },
-    { label: 'To read', value: toRead },
-  ];
-
-  return (
-    <Card>
-      <div className="grid grid-cols-2 gap-y-4 sm:gap-y-0 sm:grid-cols-4 sm:divide-x sm:divide-border sm:-mx-1">
-        {items.map(({ label, value }) => (
-          <div key={label} className="px-4 text-center">
-            <p className="font-mono text-xl font-semibold text-text">{value}</p>
-            <p className="mt-0.5 font-mono text-xs uppercase tracking-widest text-faint">{label}</p>
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-function StatsStripSkeleton() {
-  return (
-    <Card>
-      <div className="grid grid-cols-2 gap-y-4 sm:gap-y-0 sm:grid-cols-4 sm:divide-x sm:divide-border sm:-mx-1">
-        {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="px-4 text-center space-y-2">
-            <div className="h-6 w-12 mx-auto rounded bg-elevated motion-safe:animate-pulse" />
-            <div className="h-3 w-16 mx-auto rounded bg-elevated motion-safe:animate-pulse" />
-          </div>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-// ── Ratings breakdown ─────────────────────────────────────────────────────────
-
-function RatingsBreakdown({ stats }: { stats: Stats }) {
-  if (!stats.by_star || Object.keys(stats.by_star).length === 0) return null;
-  const buckets = Array.from(
-    new Set([
-      5,
-      4,
-      3,
-      2,
-      1,
-      ...Object.keys(stats.by_star)
-        .map(Number)
-        .filter((n) => Number.isFinite(n) && n > 0),
-    ])
-  ).sort((a, b) => b - a);
-
-  return (
-    <Card>
-      <p className="mb-4 font-mono text-xs font-medium uppercase tracking-widest text-muted">
-        Ratings breakdown
-      </p>
-      <div className="space-y-2">
-        {buckets.map((star) => {
-          const count = stats.by_star[String(star)] ?? 0;
-          const pct = stats.rated > 0 ? (count / stats.rated) * 100 : 0;
-          return (
-            <div key={star} className="flex items-center gap-3">
-              {/* w-12, not w-8: a half-star label ("4.5 ★") wraps at the narrower width. */}
-              <span className="w-12 shrink-0 whitespace-nowrap text-right font-mono text-sm text-muted">
-                {star}
-                <span aria-hidden="true"> ★</span>
-              </span>
-              <div className="flex-1 overflow-hidden rounded-full bg-elevated h-2">
-                <div
-                  className="h-2 rounded-full bg-accent transition-all"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <span className="w-8 text-right font-mono text-sm text-faint">{count}</span>
-            </div>
-          );
-        })}
-      </div>
-    </Card>
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function HomePage() {
   const router = useRouter();
@@ -122,16 +31,18 @@ export default function HomePage() {
     error: statsError,
   } = useSWR<Stats>('stats', () => api.stats());
 
-  const { data: profileStatus } = useSWR<ProfileStatus>(PROFILE_STATUS_KEY, () =>
-    api.profileStatus()
-  );
+  const {
+    data: profileStatus,
+    error: profileError,
+    mutate: retryProfile,
+  } = useSWR<ProfileStatus>(PROFILE_STATUS_KEY, () => api.profileStatus());
 
   const { data: userProfile } = useSWR<UserProfile>('user-profile', () => api.getProfile());
   const { data: archetype } = useSWR<ArchetypeOut | null>(ARCHETYPE_KEY, () => api.getArchetype());
 
   const noProfile = profileStatus != null && profileStatus.last_profiled_at === null;
   const isDirty = profileStatus?.dirty ?? false;
-  const recBlocked = noProfile || isDirty;
+  const recBlocked = !profileStatus || noProfile || isDirty;
 
   const recBlockMsg = noProfile
     ? 'No taste profile yet. Build one on your profile page first.'
@@ -140,7 +51,13 @@ export default function HomePage() {
       : null;
 
   const displayName = userProfile?.display_name ?? null;
-  const accent = tasteAccent(archetype ? archetype.code : null);
+  const {
+    data: savedBooks,
+    isLoading: savedLoading,
+    error: savedError,
+    mutate: retrySaved,
+  } = useSWR<Book[]>('books-to-read', () => api.books({ shelf: 'to-read', limit: 500 }));
+  const saved = savedBooks?.[0];
 
   async function handleRun() {
     setRunning(true);
@@ -171,69 +88,135 @@ export default function HomePage() {
   }
 
   return (
-    <div
-      className="fade-in py-6"
-      style={{
-        ['--user-accent' as string]: accent.vivid,
-        ['--user-surface' as string]: accent.surface,
-        ['--user-ink-rgb' as string]: '245 240 232',
-      }}
-    >
-      {/* 1. Greeting */}
-      <h1 className="font-display text-4xl sm:text-5xl font-extrabold tracking-tight text-text leading-tight">
-        {displayName ? (
-          <>
-            Hey, <span className="text-user">{displayName}.</span>
-          </>
-        ) : (
-          'Hey there.'
-        )}
+    <div className="fade-in">
+      <p className="eyebrow">Your reading room</p>
+      <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+        {displayName ? `Welcome back, ${displayName}.` : 'Welcome back.'}
       </h1>
-
-      {/* 2. The hero: the user's taste identity, not a 14px badge at 60% opacity. */}
-      <div className="mt-6">
-        <TasteHero />
-      </div>
-
-      {/* 3. The quiet utility tier -- tighter rhythm so the hero keeps the room. */}
-      <div className="mt-10 space-y-4">
-        {statsLoading ? (
-          <StatsStripSkeleton />
-        ) : statsError ? (
-          <p className="text-sm text-danger">Your stats didn&apos;t load. Refresh to retry.</p>
-        ) : stats ? (
-          <StatsStrip stats={stats} />
-        ) : null}
-
-        <YearCard />
-
-        {stats && <RatingsBreakdown stats={stats} />}
-      </div>
-
-      {/* 4. Run recommendations CTA */}
-      <Card className="mt-10">
-        <div className="text-center">
-          <h2 className="mb-1 font-display text-lg font-semibold text-text">
-            Ready for new picks?
-          </h2>
-          <p className="mb-5 text-sm text-muted">
-            Ten books, chosen against your taste profile and explained. Takes 30–60 seconds.
-          </p>
-
-          <Button size="lg" loading={running} disabled={running || recBlocked} onClick={handleRun}>
-            {running ? 'Choosing carefully\u2026' : 'Find my next books'}
-          </Button>
-
-          {recBlockMsg && <p className="mt-4 text-sm text-warning">{recBlockMsg}</p>}
-
-          <Link
-            href="/discover"
-            className="mt-4 block text-sm text-muted transition-colors hover:text-text"
+      <section className="home-hero" aria-labelledby="next-read-title">
+        <div className="min-w-0">
+          <p className="eyebrow">A little further into your next story</p>
+          <h2
+            id="next-read-title"
+            className="mt-4 max-w-lg font-display text-[2.6rem] font-bold leading-[1.06] tracking-tight sm:text-6xl"
           >
-            Or ask for something specific &rarr;
-          </Link>
+            Find a book
+            <br />
+            that stays with you.
+          </h2>
+          <p className="mt-5 max-w-md text-sm leading-relaxed text-muted">
+            Ten books chosen for your taste, with a reason for each. Takes 30–60 seconds.
+          </p>
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <Button
+              size="lg"
+              loading={running}
+              disabled={running || recBlocked}
+              onClick={handleRun}
+            >
+              {running ? 'Choosing carefully…' : 'Find my next books'}
+            </Button>
+            <Link href="/discover" className="text-sm text-muted hover:text-text">
+              Explore a mood →
+            </Link>
+          </div>
+          {recBlockMsg && (
+            <p className="mt-4 text-sm text-muted">
+              {recBlockMsg}{' '}
+              <Link href="/profile" className="underline underline-offset-4">
+                Go to profile
+              </Link>
+            </p>
+          )}
+          {profileError ? (
+            <p className="mt-4 text-sm text-danger">
+              Your profile status didn’t load.{' '}
+              <button type="button" className="underline" onClick={() => void retryProfile()}>
+                Retry
+              </button>
+            </p>
+          ) : (
+            !profileStatus && (
+              <p className="mt-4 text-sm text-muted" role="status">
+                Checking your taste profile…
+              </p>
+            )
+          )}
         </div>
-      </Card>
+        <div className="home-saved">
+          {savedLoading ? (
+            <div
+              className="h-48 w-32 rounded bg-elevated motion-safe:animate-pulse"
+              aria-label="Loading saved books"
+            />
+          ) : savedError ? (
+            <p className="text-sm text-muted">
+              Your saved shelf didn’t load.{' '}
+              <button type="button" className="underline" onClick={() => void retrySaved()}>
+                Retry
+              </button>
+            </p>
+          ) : saved ? (
+            <Link
+              href="/library?tab=to-read"
+              className="flex items-center gap-5 sm:flex-col sm:text-center"
+            >
+              <BookCover book={saved} className="h-24 w-16 sm:h-56 sm:w-36" />
+              <div className="min-w-0">
+                <p className="eyebrow">On your to-read shelf</p>
+                <p className="mt-2 font-display text-lg font-semibold">{saved.title}</p>
+                <p className="mt-1 text-xs text-muted">{saved.author ?? 'Unknown author'}</p>
+              </div>
+            </Link>
+          ) : (
+            <div>
+              <p className="font-display text-xl">Room for a new favorite.</p>
+              <p className="mt-2 text-sm leading-relaxed text-muted">
+                Save a book in your library to keep your next read close.
+              </p>
+              <Link
+                href="/library?tab=to-read"
+                className="mt-4 inline-block text-sm underline underline-offset-4"
+              >
+                Browse your shelves
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
+      <CurrentReads />
+      <section className="mt-9 grid gap-5 lg:grid-cols-2" aria-label="Your reading life">
+        <Link
+          href="/profile"
+          className="flex items-center gap-4 rounded-xl border border-border bg-surface p-5"
+        >
+          {archetype && <ReaderSprite code={archetype.code} size={72} className="shrink-0" />}
+          <div className="min-w-0">
+            <p className="eyebrow">Your reader type</p>
+            <h2 className="mt-2 font-display text-xl font-semibold">
+              {archetype?.name ?? 'Get to know your reading taste'}
+            </h2>
+            <p className="mt-2 text-sm text-muted">
+              {archetype?.is_stale
+                ? 'Your profile changed. Visit your profile to refresh your reader type.'
+                : (archetype?.tagline ?? 'Your favorite books tell a story about you.')}
+            </p>
+            <p className="mt-3 text-xs text-muted">Explore your profile →</p>
+          </div>
+        </Link>
+        <YearCard compact />
+      </section>
+      <div className="mt-8 border-t border-border pt-5 text-sm text-muted">
+        {statsLoading ? (
+          <p role="status">Loading library summary…</p>
+        ) : statsError ? (
+          <p>Your library summary didn’t load. Refresh to retry.</p>
+        ) : stats ? (
+          <Link href="/library">
+            {stats.total} books in your library · {stats.rated} rated · View library →
+          </Link>
+        ) : null}
+      </div>
     </div>
   );
 }
