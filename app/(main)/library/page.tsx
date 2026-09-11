@@ -14,13 +14,14 @@ import {
   type Recommendation,
   type Shelf,
 } from '@/lib/api';
-import { Button, Badge, Card, Modal, StarRating } from '@/components/ui';
+import { Button, Badge, Card, Modal } from '@/components/ui';
 import { inStarBand } from '@/lib/server/rating';
 import BookEditModal from '@/components/BookEditModal';
 import BookDetailModal from '@/components/BookDetailModal';
 import AddBookModal from '@/components/AddBookModal';
 import EnrichmentCorrectionModal from '@/components/EnrichmentCorrectionModal';
 import ShelfSprite from '@/components/ShelfSprite';
+import BookCover from '@/components/BookCover';
 
 const READ_KEY = 'books-read';
 const TO_READ_KEY = 'books-to-read';
@@ -35,7 +36,15 @@ type Tab = 'read' | 'to-read' | 'currently-reading' | 'did-not-finish' | 'reject
 
 function StarDisplay({ rating }: { rating: number | null }) {
   if (!rating) return <span className="font-mono text-xs text-faint">unrated</span>;
-  return <StarRating value={rating} readOnly allowHalf size={14} label="Rating" />;
+  return (
+    <span
+      className="whitespace-nowrap font-mono text-sm text-muted"
+      aria-label={`Rating: ${rating} out of 5`}
+    >
+      <span aria-hidden="true">★ </span>
+      {rating}
+    </span>
+  );
 }
 
 function CoverThumb({
@@ -45,20 +54,7 @@ function CoverThumb({
   book: Book | { cover_url?: string | null; title?: string };
   size?: 'sm' | 'md';
 }) {
-  const dims = size === 'sm' ? 'h-14 w-10' : 'h-20 w-14';
-  const src = 'cover_url' in book ? book.cover_url : null;
-  const title = 'title' in book ? (book as Book).title : '';
-  return (
-    <div className={`relative ${dims} shrink-0 overflow-hidden rounded bg-elevated`}>
-      {src ? (
-        <Image src={src} alt={`Cover of ${title}`} fill className="object-cover" unoptimized />
-      ) : (
-        <div className="flex h-full items-center justify-center text-faint">
-          <BookOpen className="h-4 w-4" />
-        </div>
-      )}
-    </div>
-  );
+  return <BookCover book={book} className={size === 'sm' ? 'h-[72px] w-12' : 'h-20 w-14'} />;
 }
 
 // The placeholder uses an expression container, not a bare attribute: an escape written in a
@@ -129,6 +125,7 @@ const READ_SORT_VALUES = sortValues(READ_SORT_OPTIONS);
 
 function ReadTab({ books }: { books: Book[] }) {
   const [filterStar, setFilterStar] = useState<number | null>(null);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [sort, setSort] = useStickySort<ReadSort>(
     'shelfsprite:library-sort:read',
@@ -158,7 +155,8 @@ function ReadTab({ books }: { books: Book[] }) {
     });
   }
 
-  const filtered = rated
+  const filtered = books
+    .filter((b) => !favoritesOnly || b.is_favorite)
     .filter((b) => (filterStar !== null ? inStarBand(b.effective_rating, filterStar) : true))
     .filter((b) => {
       if (!search) return true;
@@ -185,43 +183,65 @@ function ReadTab({ books }: { books: Book[] }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <p className="text-sm text-muted">
-          {rated.length} rated book{rated.length !== 1 ? 's' : ''}
-          {unrated.length > 0 && ` · ${unrated.length} unrated`}
-        </p>
-        {unrated.length > 0 && (
-          <Button variant="secondary" size="sm" onClick={startReviewQueue} className="mt-3">
-            {unrated.length} book{unrated.length !== 1 ? 's' : ''} waiting on a rating
-          </Button>
-        )}
-      </div>
-
-      {/* Controls row */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="library-toolbar">
         <SearchInput value={search} onChange={setSearch} />
         <SortSelect value={sort} onChange={setSort} options={READ_SORT_OPTIONS} />
-        {/* Wraps: five star chips are wider than a 320px phone, and an unwrapped row
-            scrolled the page sideways. */}
-        <div className="flex flex-wrap gap-1">
-          {STARS.map((s) => (
+        <details className="library-filters">
+          <summary className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm text-muted">
+            Filters{filterStar !== null || favoritesOnly ? ' \u2022' : ''}
+          </summary>
+          <div className="filter-panel">
+            <p className="mb-3 text-xs text-muted">Rating band</p>
+            <div className="flex flex-wrap gap-2">
+              {STARS.map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  aria-label={`Filter by ${star} stars`}
+                  aria-pressed={filterStar === star}
+                  onClick={() => setFilterStar(filterStar === star ? null : star)}
+                  className={`min-h-10 rounded border border-border px-3 text-sm ${filterStar === star ? 'bg-accent text-[color:var(--bg)]' : 'text-muted'}`}
+                >
+                  {star} ★
+                </button>
+              ))}
+            </div>
+            <label className="mt-3 flex min-h-11 items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={favoritesOnly}
+                onChange={(e) => setFavoritesOnly(e.target.checked)}
+              />{' '}
+              Favorites only
+            </label>
             <button
-              key={s}
-              onClick={() => setFilterStar(filterStar === s ? null : s)}
-              aria-label={`Filter by ${s} stars`}
-              className={[
-                'rounded-md px-3 py-1.5 font-mono text-sm transition',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-                filterStar === s
-                  ? 'bg-accent text-base font-semibold'
-                  : 'border border-border text-muted hover:border-muted',
-              ].join(' ')}
+              type="button"
+              className="min-h-10 text-sm underline"
+              onClick={() => {
+                setFilterStar(null);
+                setFavoritesOnly(false);
+                setSearch('');
+              }}
             >
-              {'\u2605'.repeat(s)}
+              Clear filters
             </button>
-          ))}
-        </div>
+            {unrated.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={startReviewQueue}
+                className="mt-2 w-full min-h-11"
+              >
+                {unrated.length} book{unrated.length !== 1 ? 's' : ''} waiting on a rating
+              </Button>
+            )}
+          </div>
+        </details>
       </div>
+      <p className="text-xs text-muted" role="status">
+        {filtered.length} of {books.length} books · {rated.length} rated
+        {unrated.length > 0 ? ` \u00b7 ${unrated.length} unrated` : ''}
+      </p>
 
       {filtered.length === 0 ? (
         <p className="py-12 text-center text-faint">Nothing matches those filters.</p>
@@ -236,16 +256,18 @@ function ReadTab({ books }: { books: Book[] }) {
                 type="button"
                 onClick={() => setEditing(book)}
                 className={[
-                  'flex flex-1 min-w-0 items-center gap-4 text-left',
+                  'library-read-book flex flex-1 min-w-0 items-center gap-4 text-left',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base rounded',
                 ].join(' ')}
               >
                 <CoverThumb book={book} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium text-text">{book.title}</p>
+                <div className="library-book-copy min-w-0 flex-1">
+                  <p className="font-display text-lg font-semibold leading-snug text-text">
+                    {book.title}
+                  </p>
                   <p className="truncate text-sm text-faint">{book.author}</p>
                 </div>
-                <div className="shrink-0">
+                <div className="library-rating shrink-0">
                   <StarDisplay rating={book.effective_rating} />
                 </div>
               </button>
@@ -272,7 +294,7 @@ function ReadTab({ books }: { books: Book[] }) {
                       });
                   }}
                   className={[
-                    'rounded-full p-1 transition active:scale-95',
+                    'rounded-full p-3 transition active:scale-95',
                     'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
                     book.is_favorite ? 'text-warning' : 'text-muted hover:text-warning/70',
                   ].join(' ')}
@@ -419,10 +441,10 @@ function ToReadTab({ books }: { books: Book[] }) {
               No matches. Check the spelling, or add it with + Add book.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-hairline">
               {filtered.map((book) => {
                 return (
-                  <li key={book.id} className="rounded-xl border border-border bg-surface">
+                  <li key={book.id} className="rounded-lg bg-surface">
                     <button
                       type="button"
                       onClick={() => setDetail(book)}
@@ -434,7 +456,9 @@ function ToReadTab({ books }: { books: Book[] }) {
                     >
                       <CoverThumb book={book} size="md" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold text-text">{book.title}</p>
+                        <p className="font-display text-lg font-semibold leading-snug text-text">
+                          {book.title}
+                        </p>
                         <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
                         {book.year_published && (
                           <p className="font-mono text-xs text-faint">{book.year_published}</p>
@@ -571,17 +595,16 @@ function CurrentlyReadingTab({ books }: { books: Book[] }) {
               No matches. Check the spelling, or add it with + Add book.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-hairline">
               {filtered.map((book) => {
                 const busy = busyId === book.id;
                 return (
-                  <li
-                    key={book.id}
-                    className="flex gap-4 rounded-xl border border-accent/20 bg-surface p-4"
-                  >
+                  <li key={book.id} className="flex gap-4 rounded-lg bg-surface p-4">
                     <CoverThumb book={book} size="md" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-text">{book.title}</p>
+                      <p className="font-display text-lg font-semibold leading-snug text-text">
+                        {book.title}
+                      </p>
                       <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
                       {book.year_published && (
                         <p className="font-mono text-xs text-faint">{book.year_published}</p>
@@ -746,18 +769,17 @@ function DnfTab({ books }: { books: Book[] }) {
               No matches. Check the spelling, or add it with + Add book.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="divide-y divide-hairline">
               {filtered.map((book) => {
                 const busy = busyId === book.id;
                 const armed = removeArmed === book.id;
                 return (
-                  <li
-                    key={book.id}
-                    className="flex gap-4 rounded-xl border border-border bg-surface p-4"
-                  >
+                  <li key={book.id} className="flex gap-4 rounded-lg bg-surface p-4">
                     <CoverThumb book={book} size="md" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-semibold text-text">{book.title}</p>
+                      <p className="font-display text-lg font-semibold leading-snug text-text">
+                        {book.title}
+                      </p>
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
                         {book.exclude_from_profile && (
@@ -948,7 +970,7 @@ function RejectedTab({ recs }: { recs: Recommendation[] }) {
       ) : (
         <ul className="space-y-3">
           {filtered.map((rec) => (
-            <li key={rec.id} className="flex gap-4 rounded-xl border border-border bg-surface p-4">
+            <li key={rec.id} className="flex gap-4 rounded-lg bg-surface p-4">
               <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded-md bg-elevated">
                 {rec.cover_url ? (
                   <Image
@@ -965,7 +987,9 @@ function RejectedTab({ recs }: { recs: Recommendation[] }) {
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate font-semibold text-text">{rec.title}</p>
+                <p className="font-display text-lg font-semibold leading-snug text-text">
+                  {rec.title}
+                </p>
                 <p className="text-sm text-muted">
                   {rec.author ?? 'Unknown author'}
                   {rec.year ? ` · ${rec.year}` : ''}
@@ -1075,23 +1099,33 @@ function LibraryInner() {
     ]);
   }
 
-  const { data: readBooks = [], isLoading: readLoading } = useSWR<Book[]>(READ_KEY, () =>
-    api.books({ shelf: 'read', limit: 500 })
+  const {
+    data: readBooks = [],
+    isLoading: readLoading,
+    error: readError,
+  } = useSWR<Book[]>(READ_KEY, () => api.books({ shelf: 'read', limit: 500 }));
+  const {
+    data: toReadBooks = [],
+    isLoading: toReadLoading,
+    error: toReadError,
+  } = useSWR<Book[]>(TO_READ_KEY, () => api.books({ shelf: 'to-read', limit: 500 }));
+  const {
+    data: currentlyReadingBooks = [],
+    isLoading: currentlyReadingLoading,
+    error: currentlyReadingError,
+  } = useSWR<Book[]>(CURRENTLY_READING_KEY, () =>
+    api.books({ shelf: 'currently-reading', limit: 500 })
   );
-  const { data: toReadBooks = [], isLoading: toReadLoading } = useSWR<Book[]>(TO_READ_KEY, () =>
-    api.books({ shelf: 'to-read', limit: 500 })
-  );
-  const { data: currentlyReadingBooks = [], isLoading: currentlyReadingLoading } = useSWR<Book[]>(
-    CURRENTLY_READING_KEY,
-    () => api.books({ shelf: 'currently-reading', limit: 500 })
-  );
-  const { data: dnfBooks = [], isLoading: dnfLoading } = useSWR<Book[]>(DNF_KEY, () =>
-    api.books({ shelf: 'did-not-finish', limit: 500 })
-  );
-  const { data: rejectedRecs = [], isLoading: recsLoading } = useSWR<Recommendation[]>(
-    REJECTED_KEY,
-    () => api.rejectedRecs()
-  );
+  const {
+    data: dnfBooks = [],
+    isLoading: dnfLoading,
+    error: dnfError,
+  } = useSWR<Book[]>(DNF_KEY, () => api.books({ shelf: 'did-not-finish', limit: 500 }));
+  const {
+    data: rejectedRecs = [],
+    isLoading: recsLoading,
+    error: recsError,
+  } = useSWR<Recommendation[]>(REJECTED_KEY, () => api.rejectedRecs());
 
   const lowConfidenceBooks = [
     ...readBooks,
@@ -1164,22 +1198,27 @@ function LibraryInner() {
     (activeTab === 'did-not-finish' && dnfLoading) ||
     (activeTab === 'rejected' && recsLoading);
 
+  const activeError = {
+    read: readError,
+    'to-read': toReadError,
+    'currently-reading': currentlyReadingError,
+    'did-not-finish': dnfError,
+    rejected: recsError,
+  }[activeTab];
+
   return (
-    <div className="fade-in space-y-6 py-6">
+    <div className="library-page fade-in space-y-3">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-3xl font-bold tracking-tight text-text">My library</h1>
+        <div>
+          <p className="eyebrow mb-2">Your collection</p>
+          <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-text">
+            My library
+          </h1>
+        </div>
         <Button onClick={() => setAdding(true)}>+ Add book</Button>
       </div>
 
       {adding && <AddBookModal onAdded={handleAdded} onClose={() => setAdding(false)} />}
-
-      {lowConfidenceBooks.length > 0 && (
-        <Button variant="secondary" size="sm" onClick={startLowConfidenceQueue}>
-          {lowConfidenceBooks.length === 1
-            ? '1 book needs a match check'
-            : `${lowConfidenceBooks.length} books need a match check`}
-        </Button>
-      )}
 
       {lcQueue && lcQueue[lcIndex] && (
         <EnrichmentCorrectionModal
@@ -1192,22 +1231,23 @@ function LibraryInner() {
         />
       )}
 
-      {/* Tab bar. Wraps instead of overflowing: five tabs never fit one phone-width row, and
-          an unwrapped flex row pushed Rejected off-screen and scrolled the whole page sideways.
-          The one-third basis fixes the phone layout at three tabs then two — three fit a row
-          exactly (3 * (33.333% - gap) + 2 gaps), a fourth cannot — so the rows stay balanced
-          instead of breaking wherever the labels happen to land. */}
-      <div className="flex flex-wrap gap-1 rounded-xl border border-border bg-elevated p-1">
+      {/* Shelf navigation scrolls locally on phones, keeping all shelves reachable. */}
+      <div
+        className="library-shelves flex gap-1 border-b border-border"
+        aria-label="Library shelves"
+      >
         {tabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             aria-current={activeTab === t.id ? 'true' : undefined}
             className={[
-              'flex grow basis-[calc(33.333%_-_0.25rem)] items-center justify-center gap-2 whitespace-nowrap',
-              'rounded-lg px-3 py-3 text-sm font-medium transition sm:basis-0 sm:py-2',
+              'flex shrink-0 items-center justify-center gap-2 whitespace-nowrap',
+              'border-b-2 px-3 py-3 text-sm font-medium transition',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-elevated',
-              activeTab === t.id ? 'bg-surface text-text shadow' : 'text-muted hover:text-text',
+              activeTab === t.id
+                ? 'border-accent text-text'
+                : 'border-transparent text-muted hover:text-text',
             ].join(' ')}
           >
             {/* Only one of these is in the layout (and the a11y tree) at a time. */}
@@ -1227,13 +1267,35 @@ function LibraryInner() {
         ))}
       </div>
 
-      {isLoading ? (
+      {lowConfidenceBooks.length > 0 && (
+        <details className="text-sm text-muted">
+          <summary className="cursor-pointer py-2">
+            Library care · {lowConfidenceBooks.length} match checks
+          </summary>
+          <Button variant="ghost" size="sm" onClick={startLowConfidenceQueue}>
+            {lowConfidenceBooks.length === 1
+              ? '1 book needs a match check'
+              : `${lowConfidenceBooks.length} books need a match check`}
+          </Button>
+        </details>
+      )}
+      {activeError ? (
+        <p role="alert" className="py-8 text-sm text-danger">
+          This shelf didn’t load.{' '}
+          <button
+            type="button"
+            className="underline"
+            onClick={() =>
+              void mutate(activeTab === 'rejected' ? REJECTED_KEY : shelfListKey(activeTab)!)
+            }
+          >
+            Retry
+          </button>
+        </p>
+      ) : isLoading ? (
         <div className="space-y-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div
-              key={i}
-              className="h-20 rounded-xl border border-border bg-surface motion-safe:animate-pulse"
-            />
+            <div key={i} className="h-20 rounded-lg bg-surface motion-safe:animate-pulse" />
           ))}
         </div>
       ) : (
@@ -1257,14 +1319,16 @@ export default function LibraryPage() {
   return (
     <Suspense
       fallback={
-        <div className="fade-in space-y-6 py-6">
-          <h1 className="font-display text-3xl font-bold tracking-tight text-text">My library</h1>
+        <div className="library-page fade-in space-y-3">
+          <div>
+            <p className="eyebrow mb-2">Your collection</p>
+            <h1 className="font-display text-3xl sm:text-4xl font-bold tracking-tight text-text">
+              My library
+            </h1>
+          </div>
           <div className="space-y-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="h-20 rounded-xl border border-border bg-surface motion-safe:animate-pulse"
-              />
+              <div key={i} className="h-20 rounded-lg bg-surface motion-safe:animate-pulse" />
             ))}
           </div>
         </div>

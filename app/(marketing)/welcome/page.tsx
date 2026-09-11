@@ -31,17 +31,17 @@ const STEPS = [
   {
     variant: 'analyze' as const,
     title: 'Import',
-    body: 'Export from Goodreads or StoryGraph and drop the file in. That is the whole of onboarding, and it is the only thing ShelfSprite asks you to do by hand.',
+    body: 'Bring your Goodreads export, or start small by adding books yourself. Your ratings give ShelfSprite a place to begin.',
   },
   {
     variant: 'discover' as const,
     title: 'Enrich',
-    body: 'A row in that file is thin: a title, an author, a number. ShelfSprite fills in the rest from Open Library and Google Books, so that one book can be compared to another. Anything it cannot pin down is labelled LOW and stays flagged.',
+    body: 'Your books become a connected library, with covers, subjects, and catalog details. Uncertain matches stay flagged for you to check.',
   },
   {
     variant: 'success' as const,
     title: 'Recommend',
-    body: 'Retrieval narrows the catalog to candidates that actually exist. Claude ranks that set and writes the reason each book is on it.',
+    body: 'Find real books with reasons tied to your taste. Save the ones that catch your eye and tell ShelfSprite what missed.',
   },
 ];
 
@@ -49,205 +49,233 @@ export default function WelcomePage() {
   return (
     <>
       <InviteHashRedirect />
-
+      <header className="mx-auto flex max-w-6xl items-center justify-between gap-5 border-b border-border px-5 py-5 sm:px-8">
+        <BrandLogo priority sizes="180px" className="h-auto w-36 sm:w-44" />
+        <nav aria-label="Public navigation" className="flex items-center gap-6 text-sm">
+          <a href="#how-it-works" className="hidden text-muted hover:text-text sm:block">
+            How it works
+          </a>
+          <a
+            href="/login"
+            className="rounded-lg border border-border-strong px-4 py-2 text-text hover:bg-surface"
+          >
+            Sign in
+          </a>
+        </nav>
+      </header>
       <main>
-        {/* ── Hero ─────────────────────────────────────────────────────────────
-            Asymmetric two-column: the argument on the left, the artifact on the
-            right. The artifact IS the product shot — a CSV row becoming a
-            catalog record — so the fold shows the mechanism, not a mood. */}
-        <section className="mx-auto w-full max-w-6xl px-5 pb-20 pt-14 sm:px-8 sm:pb-28 sm:pt-20">
-          <BrandLogo priority sizes="208px" className="mb-12 h-auto w-40 sm:mb-16 sm:w-48" />
-
-          <div className="grid items-start gap-12 lg:grid-cols-[1.15fr_1fr] lg:gap-16">
-            <div className="flex flex-col gap-6">
-              <h1 className="max-w-[15ch] text-balance font-display text-[2.5rem] font-extrabold leading-[1.05] tracking-tight text-text sm:text-6xl">
-                Finding your next book shouldn&apos;t be this hard.
+        <section className="marketing-section">
+          <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
+            <div>
+              <p className="eyebrow mb-5">For the love of the next good book</p>
+              <h1 className="max-w-[14ch] text-balance font-display text-[2.75rem] font-bold leading-[1.06] tracking-tight sm:text-6xl">
+                A reading life that feels like <span className="text-accent">you.</span>
               </h1>
-              <p className="max-w-[58ch] text-pretty text-lg leading-relaxed text-muted">
-                Goodreads surfaces what&apos;s popular. A chatbot will invent a title that
-                doesn&apos;t exist. ShelfSprite builds a taste profile from what you actually rated
-                and recommends real books that match it — no popularity contest, nothing made up.
+              <p className="mt-6 max-w-md text-lg leading-relaxed text-muted">
+                Keep your shelves close. Understand what moves you. Find your next favorite among
+                real books, chosen with your taste in mind.
               </p>
-
-              <div className="mt-2 max-w-md">
+              <div className="mt-8 max-w-sm">
                 <WaitlistForm />
               </div>
-
-              <p className="font-mono text-xs text-faint">
-                Have an invite?{' '}
-                <a
-                  href="/login"
-                  className="rounded text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  Sign in
-                </a>
+              <p className="mt-4 text-xs text-muted">
+                A small, invite-only project. Built by a reader.
               </p>
             </div>
+            <div className="relative rounded-2xl border border-border bg-surface p-6 sm:p-8">
+              <div className="flex items-center justify-between border-b border-border pb-5">
+                <div>
+                  <p className="eyebrow">Between the covers</p>
+                  <h2 className="mt-2 font-display text-2xl font-bold">There is a thread.</h2>
+                </div>
+                <ShelfSprite
+                  variant="discover"
+                  priority
+                  sizes="96px"
+                  className="h-24 w-24 shrink-0"
+                />
+              </div>
+              <p className="mt-6 text-sm leading-relaxed text-muted">
+                The strange worlds. The complicated people. The endings you kept thinking about.
+              </p>
+              <div
+                className="my-6 grid grid-cols-3 items-end gap-3"
+                aria-label="An illustrative reading shelf"
+              >
+                {[
+                  ['Piranesi', 'Susanna Clarke', 'bg-[#344941]'],
+                  ['The Left Hand of Darkness', 'Ursula K. Le Guin', 'bg-[#524337]'],
+                  ['Never Let Me Go', 'Kazuo Ishiguro', 'bg-[#434052]'],
+                ].map(([title, author, color], i) => (
+                  <div
+                    key={title}
+                    className={`${color} flex min-h-44 flex-col justify-between rounded-r-md border-l-4 border-white/10 p-3 shadow-lg sm:min-h-52`}
+                  >
+                    <span className="font-mono text-[10px] text-white/70">0{i + 1}</span>
+                    <p className="my-3 font-display text-sm font-bold leading-snug text-white sm:text-lg">
+                      {title}
+                    </p>
+                    <p className="text-[10px] leading-relaxed text-white/80">{author}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="border-t border-border pt-5">
+                <p className="text-sm leading-relaxed text-text">
+                  Your books tell a story about you.
+                  <br />
+                  ShelfSprite helps you follow it.
+                </p>
+                <p className="mt-3 text-xs text-muted">
+                  An example shelf. Your profile begins with your own books.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
 
+        <section id="how-it-works" className="border-y border-border bg-surface/50 scroll-mt-6">
+          <div className="marketing-section">
+            <p className="eyebrow mb-4">From your shelves to your next read</p>
+            <h2 className="mb-10 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Start with what you&apos;ve read.
+            </h2>
+            <ol className="grid gap-10 sm:grid-cols-3 sm:gap-8">
+              {STEPS.map((step, i) => (
+                <li key={step.title} className="border-t border-border pt-5">
+                  <div className="mb-4 flex items-baseline gap-3">
+                    <span className="font-mono text-xs text-accent">0{i + 1}</span>
+                    <h3 className="font-display text-xl font-bold">{step.title}</h3>
+                  </div>
+                  <p className="text-sm leading-relaxed text-muted">{step.body}</p>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="marketing-section">
+          <div className="mb-10 flex flex-wrap items-end justify-between gap-5">
+            <div>
+              <p className="eyebrow mb-4">A home for every chapter</p>
+              <h2 className="max-w-md font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                Less managing.
+                <br />
+                More reading.
+              </h2>
+            </div>
+            <p className="max-w-sm text-sm leading-relaxed text-muted">
+              Your current read, your old favorites, and the books waiting their turn. A little
+              order, with room for curiosity.
+            </p>
+          </div>
+          <figure className="mx-auto max-w-[1000px]">
+            <Image
+              src="/marketing/library-reading-room.png"
+              alt="The ShelfSprite library, listing books with their covers, half-star ratings and shelf counts"
+              width={2400}
+              height={1600}
+              sizes="(max-width: 1000px) 100vw, 1000px"
+              className="h-auto w-full rounded-xl border border-border"
+            />
+            <figcaption className="mt-3 text-xs text-muted">
+              An example library in ShelfSprite. All your shelves in one place.
+            </figcaption>
+          </figure>
+        </section>
+
+        <section className="border-y border-border bg-surface">
+          <div className="marketing-section grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+            <div>
+              <p className="eyebrow mb-4">Real books. Reasons that matter.</p>
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                The books it recommends exist
+              </h2>
+              <p className="mt-6 text-sm leading-relaxed text-muted">
+                ShelfSprite searches real catalogs first. Then Claude ranks those books and explains
+                how they connect to your taste. Every pick has a title you can find and a reason you
+                can judge.
+              </p>
+            </div>
             <ResolveArtifact />
           </div>
         </section>
 
-        {/* ── The three moves ──────────────────────────────────────────────────
-            A genuine ordered sequence, so it is numbered on purpose rather than
-            decorated with a kicker. Sprites carry the personality. */}
-        <section className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
-          <ol className="grid gap-12 sm:grid-cols-3 sm:gap-8">
-            {STEPS.map((step, i) => (
-              <li key={step.title} className="flex flex-col gap-4">
-                <ShelfSprite variant={step.variant} sizes="112px" className="h-20 w-20" />
-                <div className="flex items-baseline gap-3">
-                  <span className="font-mono text-xs text-accent">{i + 1}</span>
-                  <h2 className="font-display text-xl font-bold tracking-tight text-text">
-                    {step.title}
-                  </h2>
-                </div>
-                <p className="max-w-[46ch] text-pretty text-[0.9375rem] leading-relaxed text-muted">
-                  {step.body}
-                </p>
-              </li>
-            ))}
-          </ol>
-
-          {/* Both screenshots are captured at 2x (1700px wide for an 850px layout) and displayed
-              at 850, so they stay sharp on retina. Keep the display cap at 850: at the asset's
-              full width the UI inside would render at half scale and read as tiny. */}
-          <figure className="mx-auto mt-14 max-w-[850px]">
-            <Image
-              src="/marketing/library.png"
-              alt="The ShelfSprite library, listing imported books with their covers, half-star ratings and shelf counts"
-              width={1700}
-              height={1740}
-              sizes="(max-width: 850px) 100vw, 850px"
-              className="h-auto w-full rounded-xl border border-border"
-            />
-            <figcaption className="mt-3 font-mono text-xs text-faint">
-              Sixteen rated books after an import, enriched and matched.
-            </figcaption>
-          </figure>
-        </section>
-
-        {/* ── The premise ──────────────────────────────────────────────────────
-            The one real differentiator, so it gets the only contrasting band on
-            the page and the page's single pull quote. */}
-        <section className="border-y border-border bg-surface">
-          <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
-            <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-              <h2 className="max-w-[18ch] text-balance font-display text-3xl font-bold leading-tight tracking-tight text-text sm:text-4xl">
-                The books it recommends exist
+        <section className="marketing-section">
+          <div className="mb-10 grid gap-6 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <p className="eyebrow mb-4">Get to know your own taste</p>
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                A profile built from evidence
               </h2>
-              <div className="flex flex-col gap-5">
-                <p className="max-w-[62ch] text-pretty leading-relaxed text-muted">
-                  Ask a chatbot for book recommendations and some of what comes back will not exist.
-                  The title is plausible, the author is plausible, and there is no such book. You do
-                  not find out until you go looking for it.
-                </p>
-                <p className="max-w-[62ch] text-pretty leading-relaxed text-muted">
-                  ShelfSprite is built so that cannot happen. Recommendations come out of two
-                  stages. The first is ordinary deterministic retrieval against a real catalog, and
-                  everything it returns provably exists. Only then does Claude see anything, and its
-                  job is narrow: put that set in order and say why. It cannot invent a title,
-                  because it is never asked for one.
-                </p>
-                <p className="max-w-[24ch] text-balance font-display text-2xl font-bold leading-snug tracking-tight text-text">
-                  The model is a critic here, not an author.
-                </p>
-              </div>
             </div>
-          </div>
-        </section>
-
-        {/* ── Taste profile ────────────────────────────────────────────────────*/}
-        <section className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
-          <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-            <h2 className="max-w-[18ch] text-balance font-display text-3xl font-bold leading-tight tracking-tight text-text sm:text-4xl">
-              A profile built from evidence
-            </h2>
-            <div className="flex flex-col gap-5">
-              <p className="max-w-[62ch] text-pretty leading-relaxed text-muted">
-                A five star rating tells you almost nothing on its own, because the person who reads
-                only airport thrillers and the person who reads only Woolf both hand out fives, and
-                never for the same reason.
+            <div className="space-y-4 text-sm leading-relaxed text-muted">
+              <p>
+                Your ratings reveal patterns. Your reviews explain why. ShelfSprite brings them
+                together into a profile you can recognize, question, and refine.
               </p>
-              <p className="max-w-[62ch] text-pretty leading-relaxed text-muted">
-                ShelfSprite sorts your ratings into tiers and looks for what the books in each tier
-                share once they have been enriched: subject, era, length, how far they sit from the
-                middle of the catalog. Every claim it makes carries the books it is based on, so you
-                can disagree with it in one click.
-              </p>
-              <p className="max-w-[62ch] text-pretty leading-relaxed text-muted">
-                Reviews outrank all of it. Once you write down why a book landed, that sentence is
-                better evidence than any amount of pattern matching over metadata, and the profile
-                weights it accordingly.
+              <p>
+                Each trait points back to your books. Confirm what fits, reject what doesn&apos;t,
+                and let your profile grow with your reading.
               </p>
             </div>
           </div>
-
-          <figure className="mx-auto mt-14 max-w-[850px]">
+          <figure className="mx-auto max-w-[1000px]">
             <Image
-              src="/marketing/taste-profile.png"
-              alt="A ShelfSprite taste profile: each trait states a claim about the reader, with the books offered as evidence and as contrast"
-              width={1700}
-              height={1270}
-              sizes="(max-width: 850px) 100vw, 850px"
+              src="/marketing/taste-profile-reading-room.png"
+              alt="A ShelfSprite taste profile showing the reader archetype and traits grounded in their books"
+              width={2400}
+              height={2100}
+              sizes="(max-width: 1000px) 100vw, 1000px"
               className="h-auto w-full rounded-xl border border-border"
             />
-            <figcaption className="mt-3 font-mono text-xs text-faint">
-              Every claim shows its evidence, and can be confirmed, rejected or downweighted.
+            <figcaption className="mt-3 text-xs text-muted">
+              An example profile. Every reader brings a different story.
             </figcaption>
           </figure>
         </section>
 
-        {/* ── Waitlist ─────────────────────────────────────────────────────────*/}
-        <section className="border-t border-border">
-          <div className="mx-auto w-full max-w-6xl px-5 py-20 sm:px-8 sm:py-28">
-            <div className="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-              <h2 className="max-w-[14ch] text-balance font-display text-3xl font-bold leading-tight tracking-tight text-text sm:text-4xl">
+        <section id="join" className="scroll-mt-6 border-t border-border bg-surface/50">
+          <div className="marketing-section grid gap-10 lg:grid-cols-2 lg:gap-16">
+            <div>
+              <ShelfSprite variant="success" sizes="96px" className="mb-5 h-24 w-24" />
+              <p className="eyebrow mb-4">There is room on the shelf</p>
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
                 Ask for an invite
               </h2>
-              <div className="flex flex-col gap-6">
-                <p className="max-w-[62ch] text-pretty leading-relaxed text-muted">
-                  ShelfSprite is invite only. It started as a personal project, and it is still
-                  small enough that I hand out every account myself, so the waitlist is an actual
-                  list rather than a marketing device. Leave your email and I will get to it.
-                </p>
-                <div className="max-w-md">
-                  <WaitlistForm />
-                </div>
-                <p className="max-w-[62ch] text-pretty text-sm leading-relaxed text-faint">
-                  You do not need a Goodreads account. A StoryGraph export works, so does a blank
-                  template you fill in yourself, and you can skip the file entirely and add books by
-                  hand.
-                </p>
-              </div>
+            </div>
+            <div className="space-y-6">
+              <p className="text-sm leading-relaxed text-muted">
+                ShelfSprite is a personal project, and accounts are opened by hand. Leave your email
+                and I will be in touch when there is a spot.
+              </p>
+              <WaitlistForm />
+              <p className="text-xs leading-relaxed text-muted">
+                You do not need a Goodreads account. You can start by adding books yourself or
+                filling in the provided CSV template. ShelfSprite uses your own Anthropic API key
+                for its AI features.
+              </p>
             </div>
           </div>
         </section>
       </main>
-
-      {/* Outside <main> on purpose: a <footer> nested inside main/section/article does NOT map
-          to the contentinfo landmark, so screen-reader users lose the footer landmark entirely. */}
       <footer className="border-t border-border">
-        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-5 py-10 font-mono text-xs leading-relaxed text-faint sm:px-8">
-          <p>
-            Built by Chase Malcom.{' '}
-            <a
-              href="https://github.com/ccmalcom/shelfsprite"
-              className="rounded text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-              rel="noreferrer"
-            >
-              Source on GitHub
-            </a>
-            . Have an invite?{' '}
-            <a
-              href="/login"
-              className="rounded text-accent underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Sign in
-            </a>
-            .
-          </p>
-          <p className="max-w-[70ch]">
+        <div className="mx-auto max-w-6xl space-y-4 px-5 py-8 text-xs leading-relaxed text-muted sm:px-8">
+          <div className="flex flex-wrap justify-between gap-4">
+            <p>Built by Chase Malcom. Made for readers.</p>
+            <div className="flex gap-6">
+              <a
+                href="https://github.com/ccmalcom/shelfsprite"
+                className="hover:text-text"
+                rel="noreferrer"
+              >
+                Source on GitHub
+              </a>
+              <a href="/login" className="text-accent">
+                Sign in
+              </a>
+            </div>
+          </div>
+          <p className="max-w-3xl">
             ShelfSprite is an independent project. It is not affiliated with, endorsed by, or
             sponsored by Goodreads or Amazon. Goodreads is a trademark of Amazon.com, Inc. Catalog
             metadata comes from Open Library and Google Books.

@@ -1,5 +1,6 @@
 'use client';
 
+import EntryFrame from '@/components/EntryFrame';
 import { useEffect, useState } from 'react';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import { parseAuthCallbackHash } from '@/lib/authCallback';
@@ -110,14 +111,10 @@ export default function AuthCallbackPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-base px-4">
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-2xl">
-        <p className="mb-1 text-center font-mono text-xs font-semibold uppercase tracking-widest text-faint">
-          ShelfSprite
-        </p>
-        <h1 className="mb-6 text-center font-display text-2xl font-extrabold tracking-tight text-text">
-          Welcome
-        </h1>
+    <EntryFrame>
+      <div>
+        <p className="eyebrow mb-3">Your first chapter</p>
+        <h1 className="mb-6 font-display text-3xl font-bold tracking-tight text-text">Welcome</h1>
 
         {phase === 'loading' && (
           <div className="flex justify-center py-8">
@@ -177,6 +174,6 @@ export default function AuthCallbackPage() {
           </form>
         )}
       </div>
-    </div>
+    </EntryFrame>
   );
 }

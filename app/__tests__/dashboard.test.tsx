@@ -6,13 +6,15 @@ import HomePage from '@/app/(main)/page';
 import { ToastProvider } from '@/components/ui';
 import { api } from '@/lib/api';
 
-jest.mock('@/components/TasteHero', () => ({
-  TasteHero: () => <div data-testid="taste-hero" />,
-}));
 const mutate = jest.fn();
+let mockProfileStatus: unknown;
 jest.mock('swr', () => ({
   __esModule: true,
-  default: () => ({ data: undefined, isLoading: false, error: undefined }),
+  default: (key: string) => ({
+    data: key === 'profile-status' ? mockProfileStatus : undefined,
+    isLoading: false,
+    error: undefined,
+  }),
   mutate: (...args: unknown[]) => mutate(...args),
 }));
 const push = jest.fn();
@@ -35,21 +37,28 @@ function renderDashboard() {
 
 describe('dashboard', () => {
   beforeEach(() => {
+    mockProfileStatus = { last_profiled_at: '2026-09-01', dirty: false };
     push.mockClear();
     mutate.mockClear();
     runRecommend.mockReset();
   });
 
-  it('renders the taste hero', () => {
-    renderDashboard();
-    expect(screen.getByTestId('taste-hero')).toBeInTheDocument();
+  it('puts reading actions above the compact identity', () => {
+    const { container } = renderDashboard();
+    expect(container.innerHTML.indexOf('Find my next books')).toBeLessThan(
+      container.innerHTML.indexOf('Your reader type')
+    );
+    expect(screen.getByRole('heading', { name: 'Currently reading' })).toBeInTheDocument();
   });
 
-  it('places the hero above the quiet utility tier', () => {
-    const { container } = renderDashboard();
-    const html = container.innerHTML;
-    expect(html.indexOf('taste-hero')).toBeGreaterThan(-1);
-    expect(html.indexOf('taste-hero')).toBeLessThan(html.indexOf('Ready for new picks?'));
+  it.each([
+    undefined,
+    { last_profiled_at: null, dirty: false },
+    { last_profiled_at: '2026-09-01', dirty: true },
+  ])('blocks recommendations until a current profile is known: %p', (status) => {
+    mockProfileStatus = status;
+    renderDashboard();
+    expect(screen.getByRole('button', { name: /find my next books/i })).toBeDisabled();
   });
 
   it('sends the reader to the swipe deck once a run actually served picks', async () => {

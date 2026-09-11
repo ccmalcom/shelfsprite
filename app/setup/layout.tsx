@@ -4,8 +4,8 @@
  */
 export default function SetupLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#0f1117] text-slate-200 antialiased">
-      <main className="mx-auto max-w-lg px-4 pb-16 pt-8">{children}</main>
+    <div className="min-h-screen bg-base text-text antialiased">
+      <main className="mx-auto max-w-3xl px-4 pb-16 pt-8">{children}</main>
     </div>
   );
 }

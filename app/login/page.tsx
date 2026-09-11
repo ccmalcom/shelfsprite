@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { getSupabaseClient } from '@/utils/supabase/client';
 import { Field, Input, Button } from '@/components/ui';
-import BrandLogo from '@/components/BrandLogo';
+import EntryFrame from '@/components/EntryFrame';
 import InviteHashRedirect from '@/components/InviteHashRedirect';
 
 export default function LoginPage() {
@@ -31,11 +31,11 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-base px-4">
+    <EntryFrame>
       <InviteHashRedirect />
-      <div className="w-full max-w-sm rounded-2xl border border-border bg-surface p-8 shadow-2xl">
-        <BrandLogo priority sizes="208px" className="mx-auto mb-5 h-auto w-52" />
-        <h1 className="mb-6 text-center font-display text-2xl font-extrabold tracking-tight text-text">
+      <div>
+        <p className="eyebrow mb-3">Your reading room</p>
+        <h1 className="mb-6 font-display text-3xl font-bold tracking-tight text-text">
           Welcome back
         </h1>
 
@@ -67,7 +67,11 @@ export default function LoginPage() {
             )}
           </Field>
 
-          {error && <p className="text-sm text-danger">{error}</p>}
+          {error && (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          )}
 
           <Button type="submit" size="lg" loading={loading} className="w-full">
             {loading ? 'Signing in\u2026' : 'Sign in'}
@@ -75,9 +79,13 @@ export default function LoginPage() {
         </form>
 
         <p className="mt-4 text-center font-mono text-xs text-muted">
-          Invite-only. Ask the admin for an account.
+          Invite-only.{' '}
+          <a href="/welcome#join" className="text-accent underline underline-offset-4">
+            Ask for an invite
+          </a>
+          .
         </p>
       </div>
-    </div>
+    </EntryFrame>
   );
 }

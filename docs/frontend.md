@@ -66,19 +66,19 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
   `'/'` so crawlers reaching `/welcome` attribute the page to the shared URL.
   `WaitlistForm` calls `fetch('/api/invite-requests')` directly rather than going through
   `lib/api.ts`, because that client attaches a Supabase token and would pull the Supabase browser
-  client into a bundle whose entire audience is signed out. `ResolveArtifact` is the hero: a
-  drawn CSV-row-to-catalog-record composition, not a screenshot.
-  The two real screenshots (`public/marketing/library.png`, `taste-profile.png`) are captured at
-  **2x** — a 1700px-wide asset of an 850px layout — and the `next/image` `width`/`height` props
-  carry that intrinsic size while the `<figure>` stays capped at `max-w-[850px]`. Keep both halves
-  of that: dropping the cap renders the app UI inside at half scale, and capturing at 1x is what
-  made the first pair look soft. Neither shot is a real account; they come from a throwaway
-  Postgres seeded under `user_id = 'local'` with hand-authored traits, so recapturing spends
-  nothing on Claude.
+  client into a bundle whose entire audience is signed out. The hero is an explicitly illustrative shelf of three real books;
+  `ResolveArtifact` explains catalog matching further down the page. The public header provides
+  sign-in and a link to the import/enrichment/recommendation walkthrough. The two invite forms
+  retain the same endpoint and honeypot behavior.
+  The screenshots (`public/marketing/library-reading-room.png`, `taste-profile-reading-room.png`) show the redesigned
+  Library and Profile, captured at **2x** from a 1200px desktop viewport (2400px-wide assets).
+  Their `next/image` dimensions match the assets and figures are capped at 1000px. Both use
+  fictional browser-intercepted API fixtures in an isolated local copy: no real account data,
+  database writes, or paid Claude calls. Captions identify the examples.
   **Never write `text-base` on this page** — `base` is a registered color token, so Tailwind
   resolves `text-base` to `color: var(--bg)` and paints the copy in the background (see
   `docs/conventions.md`).
-- `/` — dashboard: greeting "Hey, {displayName}." with `text-user`; compact archetype callout badge+name linking to `/profile`; stats strip with numbers in `text-user`; ratings bars in `bg-user`; run-recommend CTA. `--user-accent` is set on the outer wrapper so all `text-user`/`bg-user` tokens pick up the archetype color.
+- `/` — reading-first Home: recommendation action, an actual to-read shelf preview, `CurrentReads` with finish/review, a compact reader-type link, and `YearCard compact`. The full `TasteHero` stays on Profile. Home reads the same shelf keys and 500-book limits as Library. Recommendations remain disabled until a current profile status is known; loading/errors and absent/stale profiles are explicit.
   The CTA **must check `served` before pushing to `/swipe`**: a run can finish 200 without persisting a row (empty retrieval pool, or a rerank whose every citation was dropped), and `GET /recommendations` serves the latest run that HAS rows — so navigating on a zero-served run shows the previous, fully-swiped batch and tells the reader they have seen everything (issue #64). A zero-served run surfaces `note` as a toast and stays put. `runRecommend` holds up its end by returning `run_id: null` rather than minting a run id nothing was written under.
 - `/swipe` — rec swiping. `already_read` lands the book on the read shelf then prompts a review.
 - `/discover` — natural-language discovery ("find me a book like X"). A search box posts
@@ -86,9 +86,10 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
   catalog matches with a per-result rationale, and "Add to to-read" per result (routes through
   the existing `POST /books`). **Ephemeral** — results are not persisted and never touch the
   recommendations feed / swipe deck. Reachable from a NavBar "Discover" link, a home-page CTA, and
-  the mobile `BottomNav` (`primary: true` in `NAV_ROUTES`).
-- `/to-read` — per-book: start reading / mark finished → review / remove.
-- `/library` — rated books; click a row to re-rate/review; each tab's sort dropdown is sticky per tab via `useStickySort` under `shelfsprite:library-sort:<tab>` (issue #63), so the hardcoded default only applies to a browser that has never chosen one — search text and the star-band filter stay transient by design; "N books waiting on a rating" button steps through unrated read books; **+ Add book** button opens `AddBookModal`; "N books need a match check" button (shown whenever any book across all four shelves has `confidence_label === 'LOW'`) steps through `EnrichmentCorrectionModal`.
+  the mobile `BottomNav` (`primary: true` in `NAV_ROUTES`). Suggested prompts fill the input;
+  the reader still submits Search. Results use the same divided list rhythm as Library.
+- `/to-read` — legacy redirect to `/library?tab=to-read`; it has no independent page UI.
+- `/library` — Read includes unrated books directly in its list, not only via the review queue; click a row to re-rate/review; each tab's sort dropdown is sticky per tab via `useStickySort` under `shelfsprite:library-sort:<tab>` (issue #63), so the hardcoded default only applies to a browser that has never chosen one — search text and the star-band filter stay transient by design; "N books waiting on a rating" button steps through unrated read books; **+ Add book** button opens `AddBookModal`; "N books need a match check" button (shown whenever any book across all four shelves has `confidence_label === 'LOW'`) steps through `EnrichmentCorrectionModal`.
 - `/profile` — `TasteHero` archetype card at top; taste traits with inline editing, `CustomInstructions` editor, rating distribution, genre breakdown. Also carries the **mobile escape-hatch row** (`sm:hidden`, top-right): links to `/settings` and — gated on `me?.is_admin` — `/admin`. Both routes are unreachable on a phone otherwise, since the `NavBar` link row is `hidden sm:flex` and the `BottomNav` is capped at 5 items (issue #80).
 - `/setup` — CSV import wizard plus a no-CSV "add books manually" branch (`ManualStep`). Now a thin wrapper around `components/SetupWizard.tsx`. `UploadStep` also links a downloadable blank template (`public/shelfsprite-template.csv`, headers = the `canonical` import format) for testers with no Goodreads/StoryGraph export — fills through the same upload/`detect_format` path, no separate code path.
 - `/settings` — API key management, **Claude usage this month** panel, + Danger Zone.
@@ -99,7 +100,17 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 - `/admin` — admin console, tabs `users` / `requests` / `usage` / `feedback` / `system`. Only reachable by users in the `ADMIN_EMAILS` allowlist; in local mode all users can access it. The `requests` tab (`components/admin/InviteRequestsTab.tsx`) triages the waitlist: filter by status, then approve (sends the real invite and stamps the row) or decline. It is deliberately unpaginated and carries no count badge on the tab button — volume is expected to be small and no other admin tab has one.
 - `/auth/callback` — public (middleware's `PUBLIC_PREFIXES` includes `/auth`) landing page for Supabase invite links. Client-only: parses the session tokens Supabase puts in the URL hash (`lib/authCallback.ts`) and establishes the session via `supabase.auth.setSession(...)`, then prompts the invited user (no password yet) to set one before hard-reloading into `/`. **It must call `setSession` itself and cannot rely on the client auto-detecting the hash:** `@supabase/ssr` hardcodes `flowType: 'pkce'`, and invite/recovery links use the implicit grant (tokens in the hash), which auth-js refuses to auto-consume under PKCE (`_getSessionFromURL` throws "Not a valid PKCE flow url"). `setSession` ignores `flowType` and persists to the same cookie storage so middleware sees the session. `/login` forwards any invite/recovery hash here as a fallback (see Auth section).
 
-`layout.tsx` mounts `NavBar` + `ReprofileBanner` + `UsageWarningBanner` + `FeedbackLauncher` + `BottomNav` above/below all pages and wraps `children` in **`LibraryGate`**. The root `app/layout.tsx` `<body>` carries `suppressHydrationWarning` (browser extensions mutate `<body>` pre-hydration — silences benign attribute mismatches only).
+`(main)/layout.tsx` mounts `NavBar` + `ReprofileBanner` + `UsageWarningBanner` + `BottomNav` around all application pages and wraps `children` in **`LibraryGate`**. The root `app/layout.tsx` `<body>` carries `suppressHydrationWarning` (browser extensions mutate `<body>` pre-hydration — silences benign attribute mismatches only).
+
+## Shared page design
+
+The Ember & Ivory palette now lives at `:root` in `app/globals.css`, including both hex values
+and RGB channels. Public entry pages, setup, app pages, and portaled dialogs share it.
+`PageHeading` supplies the editorial title, introductory copy, and divider on Discover,
+Profile, Settings, Admin, and the active recommendation deck. Settings uses two columns from
+1200px and a single column below; Admin tabs scroll within their own strip on narrow screens.
+`EntryFrame` gives login and invite acceptance a shared branded layout without authenticated
+navigation. Auth token consumption and full-document navigation remain unchanged.
 
 ## Components
 
@@ -118,8 +129,12 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 - **`EnrichmentCorrectionModal`** — Wave 3c "fix match" queue: reuses `AddBookModal`'s debounced `/catalog/search` pick pattern (title/author/cover/subjects/description only — no shelf/rating/review) to re-point a mis-resolved book's enrichment via `PATCH /books/{id}/enrichment`. Supports the same `queuePosition`/`onFinishQueue` step-through convention as `BookEditModal`'s review queue. Orchestrated at the `/library` page level (not per-tab) because a LOW-confidence book can be on any shelf.
 - **`ReprofileBanner`** — app-wide; shows only when `/profile/status` reports `dirty`, runs `/profile/update`.
 - **`UsageWarningBanner`** — app-wide, mounted in `(main)/layout.tsx` above the page content. Reads `GET /settings/usage` (`getUsage` / `USAGE_KEY`); renders nothing until `usage.warn` is true. Shows spend-vs-cap copy + a "Details" link to `/settings` and a **Dismiss** button (local `useState`, no persistence — reappears on next page load while `warn` stays true). Purely informational; never blocks any action.
-- **`NavBar`** — on mobile shows only logo + LogOut icon; full link row is `hidden sm:flex`. Conditionally renders an "Admin" link when `me?.is_admin` is true (fetched via `adminMe` SWR call). `/admin` cannot live in `NAV_ROUTES` because it is conditional, so its mobile counterpart is the `/profile` escape-hatch link, which reads the same `ADMIN_ME_KEY` SWR entry.
-- **`BottomNav`** — fixed bottom nav for mobile (`sm:hidden`); renders the `primary: true` entries of `NAV_ROUTES` — Home/Swipe/Discover/Library/Profile; accent color on active route. The budget of 5 is deliberate (thumb reach), so any further mobile-reachable route needs an escape-hatch link rather than a sixth tab.
+- **`NavBar`** — a 220px rail at 1024px and wider; below that, logo + Account header. Settings, conditional Admin, Help & feedback, and sign-out live in the rail or Account dialog. Sign-out retains the full document load. Feedback replaces the Account dialog rather than nesting focus traps.
+- **`BottomNav`** — opaque fixed mobile/tablet navigation below 1024px, with safe-area padding and five primary destinations. The application content reserves bottom space so the last control can scroll above it.
+- **`CurrentReads`** — Home’s first two current reads, with an explicit link to the full shelf. Finish uses the existing shelf API, merges the returned date/rating summary into the review book, and refreshes shelf/stats/profile/goals caches. Review modal lifetime is independent of the list becoming empty.
+- **`BookCover`** — shared Home/Library cover with an icon fallback for absent or failed image URLs. Existing logo and reader sprites are reused unchanged.
+- **Library toolbar** — search and sticky sort remain scoped to the active shelf. Read includes unrated books in its list; rating-band and favorites filters plus the unrated review queue live under Filters. Match correction remains at page level under Library care. Shelf tabs scroll horizontally within their own strip on phones, with no document overflow; titles wrap and numeric half ratings sit beneath author on phones.
+- **Application palette** — `.app-shell` scopes Ember & Ivory’s refined warm colors; the shell/layout follows Ink & Paper. Static color tokens carry matching hex and RGB channel variables, and Tailwind uses channel variables for opacity modifiers. Keep both representations synchronized when editing tokens. Reader accent variables remain local to identity components. See [implementation notes](design-concepts/home-library/implementation.md).
 - **`SwipeCard`** — `useReducedMotion()` disables rotation/spring.
 - **`CustomInstructions`** (`components/CustomInstructions.tsx`) — the custom-instructions editor mounted on `/profile`. A `Textarea` bound to the directive `nl_text` (source of truth), derived constraint `Badge` chips, Save (`putDirective`) and Clear (`deleteDirective`) actions, all keyed on `DIRECTIVE_KEY`. A "Help me write this" button opens `DirectiveChat`; applying a draft seeds the local textarea + constraint state (nothing is saved until Save). The textarea works standalone with zero chat use.
 - **`DirectiveChat`** (`components/DirectiveChat.tsx`) — bounded elicitation drawer (a `Modal`). One stateless turn: the reader types prose, `draftDirective` (`POST /directive/draft`) returns a `{proposed_text, constraints, conflicts, assistant_message}` proposal, conflicts render in a warning box, and "Use this" calls `onApply(proposedText, constraints)` back into `CustomInstructions`. No persisted transcript; the draft is ephemeral until the parent saves.

@@ -15,9 +15,9 @@ export default function BottomNav() {
   return (
     <nav
       aria-label="Main navigation"
-      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-base/90 backdrop-blur-sm sm:hidden"
+      className="fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-base lg:hidden"
     >
-      <div className="flex items-stretch pb-4">
+      <div className="flex items-stretch pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         {links.map(({ href, label, Icon }) => {
           const active = pathname === href;
           return (
@@ -26,13 +26,13 @@ export default function BottomNav() {
               href={href}
               aria-current={active ? 'page' : undefined}
               className={[
-                'flex flex-1 flex-col items-center gap-0.5 px-1 py-2 text-center transition-colors',
+                'flex flex-1 flex-col items-center gap-1 px-1 py-3 text-center transition-colors',
                 focusRing,
                 active ? 'text-accent' : 'text-muted hover:text-text',
               ].join(' ')}
             >
               <Icon size={20} aria-hidden="true" />
-              <span className="font-mono text-[10px] uppercase tracking-wider">{label}</span>
+              <span className="text-[11px] font-medium">{label}</span>
             </Link>
           );
         })}

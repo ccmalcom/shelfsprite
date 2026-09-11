@@ -140,4 +140,52 @@ describe('YearCard', () => {
     render(<YearCard />);
     expect(screen.getByText(/no goals for 2026/i)).toBeInTheDocument();
   });
+
+  describe('compact', () => {
+    it('renders goal progress and a done state', () => {
+      withData({
+        goals: [
+          {
+            id: 1,
+            year: 2026,
+            kind: 'books',
+            subject: null,
+            target: 100,
+            progress: 42,
+            unknown: 0,
+            done: false,
+          },
+          {
+            id: 2,
+            year: 2026,
+            kind: 'new_authors',
+            subject: null,
+            target: 2,
+            progress: 9,
+            unknown: 0,
+            done: true,
+          },
+        ],
+      });
+      render(<YearCard compact />);
+      expect(screen.getByText('Your 2026')).toBeInTheDocument();
+      expect(screen.getByText(/42 books read this year/i)).toBeInTheDocument();
+      expect(screen.getByText(/42 \/ 100/)).toBeInTheDocument();
+      expect(screen.getByText(/9 \/ 2/)).toBeInTheDocument();
+      expect(screen.getByText(/9 \/ 2/).parentElement).toHaveTextContent('Done');
+      expect(screen.getByText(/42 \/ 100/).parentElement).not.toHaveTextContent('Done');
+    });
+
+    it('names the undated backlog', () => {
+      withData({ stats: { ...base.stats, undated: 12 } });
+      render(<YearCard compact />);
+      expect(screen.getByText(/12 undated, not counted/i)).toBeInTheDocument();
+    });
+
+    it('invites a first goal when there are none', () => {
+      withData({});
+      render(<YearCard compact />);
+      expect(screen.getByText(/set a reading goal in settings/i)).toBeInTheDocument();
+    });
+  });
 });

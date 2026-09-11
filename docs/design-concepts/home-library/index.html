@@ -1,0 +1,621 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Two reading rooms · ShelfSprite design exploration</title>
+    <style>
+      @font-face {
+        font-family: Bricolage;
+        src: url('assets/bricolage-latin.woff2');
+      }
+      @font-face {
+        font-family: Inter;
+        src: url('assets/inter-latin.woff2');
+        font-weight: 100 900;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #101820;
+        color: #f3f0e8;
+        font:
+          15px/1.6 Inter,
+          Arial,
+          sans-serif;
+      }
+      main {
+        max-width: 1440px;
+        margin: auto;
+        padding: 40px 48px 64px;
+      }
+      h1,
+      h2,
+      h3 {
+        font-family: Bricolage, Arial, sans-serif;
+        line-height: 1.1;
+        letter-spacing: -0.035em;
+      }
+      h1 {
+        font-size: 64px;
+        margin: 18px 0;
+      }
+      h2 {
+        font-size: 30px;
+        margin: 6px 0 10px;
+      }
+      h3 {
+        font-size: 23px;
+        margin: 0 0 8px;
+      }
+      p {
+        margin: 0;
+      }
+      a {
+        color: inherit;
+      }
+      button,
+      select {
+        font: inherit;
+        color: inherit;
+        cursor: pointer;
+      }
+      .eyebrow {
+        font-size: 11px;
+        letter-spacing: 0.15em;
+        text-transform: uppercase;
+        color: #aabac6;
+      }
+      .intro {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 80px;
+        align-items: end;
+        padding: 18px 0 32px;
+      }
+      .intro p {
+        color: #b8c5ce;
+        max-width: 510px;
+      }
+      .brand {
+        width: 170px;
+      }
+      .badge {
+        display: inline-block;
+        border: 1px solid #526775;
+        border-radius: 30px;
+        padding: 4px 11px;
+        font-size: 11px;
+        color: #c9d9e1;
+        margin-bottom: 15px;
+      }
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        border-top: 1px solid #364653;
+        border-bottom: 1px solid #364653;
+        padding: 18px 0;
+        margin: 20px 0 28px;
+        flex-wrap: wrap;
+      }
+      .segmented {
+        display: flex;
+        padding: 4px;
+        border-radius: 8px;
+        background: #1e2c38;
+        gap: 4px;
+      }
+      .segmented button {
+        border: 0;
+        background: none;
+        border-radius: 5px;
+        padding: 8px 18px;
+        min-height: 44px;
+        font-size: 13px;
+        color: #bcc8d1;
+      }
+      .segmented button[aria-pressed='true'] {
+        background: #b3cddc;
+        color: #142531;
+        font-weight: 650;
+      }
+      .controls > p {
+        font-size: 12px;
+        color: #b8c5ce;
+        margin-left: auto;
+      }
+      .concepts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 28px;
+      }
+      .concept-head {
+        display: flex;
+        justify-content: space-between;
+        gap: 20px;
+        align-items: start;
+      }
+      .concept-head h2 {
+        margin-bottom: 6px;
+      }
+      .concept-head p {
+        font-size: 13px;
+        color: #b8c5ce;
+        max-width: 480px;
+        min-height: 48px;
+      }
+      .letter {
+        width: 36px;
+        height: 36px;
+        display: grid;
+        place-items: center;
+        border-radius: 50%;
+        background: #263744;
+        color: #c4d8e4;
+        flex-shrink: 0;
+        font-size: 13px;
+      }
+      .warm .letter {
+        background: #3f3027;
+        color: #ff997e;
+      }
+      .swatches {
+        display: flex;
+        gap: 8px;
+        margin: 17px 0 22px;
+      }
+      .swatches span {
+        display: flex;
+        gap: 7px;
+        align-items: center;
+        font: 10px monospace;
+        color: #b9c5cc;
+      }
+      .swatches i {
+        width: 17px;
+        height: 17px;
+        border: 1px solid #ffffff50;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .screen-link {
+        display: block;
+        background: #17212a;
+        border: 1px solid #40515d;
+        border-radius: 8px;
+        overflow: hidden;
+        line-height: 0;
+      }
+      .screen-link img {
+        width: 100%;
+        display: block;
+      }
+      .phone .screen-link {
+        max-width: 390px;
+        margin: 0 auto;
+      }
+      .screen-meta {
+        display: flex;
+        justify-content: space-between;
+        font-size: 11px;
+        color: #bac7d0;
+        margin: 10px 0 16px;
+      }
+      .open {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        border: 1px solid #748896;
+        border-radius: 6px;
+        padding: 10px 16px;
+        text-decoration: none;
+        min-height: 44px;
+        font-size: 13px;
+      }
+      .open:hover {
+        background: #263744;
+      }
+      a:focus-visible,
+      button:focus-visible {
+        outline: 2px solid #b3cddc;
+        outline-offset: 4px;
+      }
+      .concept-note {
+        font-size: 13px;
+        color: #b8c5ce;
+        margin-top: 17px;
+        max-width: 570px;
+      }
+      .comparison {
+        border-top: 1px solid #364653;
+        margin-top: 42px;
+        padding-top: 32px;
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 38px;
+      }
+      .comparison p {
+        color: #b8c5ce;
+        font-size: 14px;
+      }
+      .comparison strong {
+        color: #f3f0e8;
+      }
+      .recommendation {
+        margin-top: 32px;
+        padding: 24px 28px;
+        background: #1b2936;
+        border-left: 3px solid #b3cddc;
+      }
+      .recommendation p {
+        color: #b8c5ce;
+        font-size: 14px;
+        max-width: 1000px;
+      }
+      .artifact-note {
+        margin-top: 28px;
+        font-size: 12px;
+        color: #aabac6;
+        max-width: 1050px;
+      }
+      .artifact-note a {
+        color: #d0e0e9;
+      }
+      .all-screens {
+        margin-top: 24px;
+        font-size: 13px;
+      }
+      details summary {
+        cursor: pointer;
+        min-height: 44px;
+        padding: 8px 0;
+      }
+      details ul {
+        padding-left: 20px;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      footer {
+        margin-top: 32px;
+        border-top: 1px solid #364653;
+        padding-top: 18px;
+        color: #aabac6;
+        font-size: 11px;
+      }
+      dialog {
+        width: min(450px, calc(100vw - 16px));
+        border: 1px solid #748896;
+        border-radius: 12px;
+        padding: 14px;
+        background: #101820;
+        color: #f3f0e8;
+      }
+      dialog::backdrop {
+        background: #000c;
+      }
+      .preview-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 14px;
+        margin-bottom: 10px;
+        font-size: 12px;
+      }
+      dialog button {
+        border: 1px solid #748896;
+        background: transparent;
+        border-radius: 5px;
+        padding: 8px 14px;
+      }
+      iframe {
+        display: block;
+        border: 0;
+        width: 390px;
+        max-width: 100%;
+        height: min(844px, calc(100dvh - 110px));
+        margin: auto;
+        background: #121c26;
+      }
+      .preview-phone {
+        border: 0;
+        background: transparent;
+        text-decoration: underline;
+        font-size: 12px;
+        padding: 10px;
+        min-height: 44px;
+      }
+      body:not(.phone) .preview-phone {
+        display: none;
+      }
+      @media (max-width: 850px) {
+        main {
+          padding: 24px 20px 40px;
+        }
+        h1 {
+          font-size: 45px;
+        }
+        .intro {
+          grid-template-columns: 1fr;
+          gap: 8px;
+        }
+        .concepts {
+          grid-template-columns: 1fr;
+          gap: 38px;
+        }
+        .comparison {
+          grid-template-columns: 1fr;
+          gap: 25px;
+        }
+        .controls {
+          gap: 12px;
+        }
+        .controls > p {
+          margin-left: 0;
+        }
+        .concept-head p {
+          min-height: 0;
+        }
+        .swatches {
+          flex-wrap: wrap;
+        }
+        .screen-link {
+          max-width: 600px;
+          margin: auto;
+        }
+        .screen-meta {
+          max-width: 600px;
+        }
+        .comparison {
+          margin-top: 30px;
+        }
+        .recommendation {
+          padding: 20px;
+        }
+        .segmented button {
+          padding: 7px 13px;
+        }
+        details ul {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img
+        class="brand"
+        src="../../../public/shelfsprite-logo-kit/shelfsprite-logo-dark.svg"
+        alt="ShelfSprite"
+      />
+      <header class="intro">
+        <div>
+          <span class="eyebrow">Design exploration · September 11, 2026</span>
+          <h1>Two reading rooms.<br />One little sprite.</h1>
+        </div>
+        <div>
+          <span class="badge">For review · no application changes</span>
+          <p>
+            A quieter home for your next book. Compare the same Home and Library content in a
+            refined warm palette and a cooler direction, using the existing logo and reader artwork.
+          </p>
+        </div>
+      </header>
+      <div class="controls" aria-label="Compare screen designs">
+        <div class="segmented" aria-label="Page">
+          <button data-page="home" aria-pressed="true">Home</button
+          ><button data-page="library" aria-pressed="false">Library</button>
+        </div>
+        <div class="segmented" aria-label="Viewport">
+          <button data-size="1440" aria-pressed="true">Desktop</button
+          ><button data-size="390" aria-pressed="false">Phone</button>
+        </div>
+        <p id="dimensions" role="status">1440 × 1000 · click a screen for full size</p>
+      </div>
+      <div class="concepts">
+        <article class="warm">
+          <div class="concept-head">
+            <div>
+              <h2>Ember & Ivory</h2>
+              <p>
+                Warm charcoal, cream, and a single coral invitation. Familiar navigation with a more
+                deliberate hierarchy.
+              </p>
+            </div>
+            <span class="letter">A</span>
+          </div>
+          <div class="swatches">
+            <span><i style="background: #191613"></i>#191613</span
+            ><span><i style="background: #24201c"></i>#24201c</span
+            ><span><i style="background: #f5f0e8"></i>#f5f0e8</span
+            ><span><i style="background: #ff7959"></i>#ff7959</span>
+          </div>
+          <a
+            class="screen-link"
+            id="image-link-warm"
+            href="screens/warm-home-1440.png"
+            target="_blank"
+            rel="noopener"
+            ><img
+              id="image-warm"
+              src="screens/warm-home-1440.png"
+              alt="Ember and Ivory Home desktop concept"
+          /></a>
+          <div class="screen-meta">
+            <span class="screen-title">Home · desktop</span><span>Actual viewport capture ↗</span>
+          </div>
+          <a
+            class="open"
+            id="launch-warm"
+            href="prototype.html?concept=warm&page=home"
+            target="_blank"
+            rel="noopener"
+            >Explore concept A ↗</a
+          ><button class="preview-phone" data-phone="warm">Try at phone width</button>
+          <p class="concept-note">
+            Strongest continuity. Orange stays on the logo and reading actions; ratings use ivory
+            and reader identity keeps its own small pocket of color.
+          </p>
+        </article>
+        <article>
+          <div class="concept-head">
+            <div>
+              <h2>Ink & Paper</h2>
+              <p>
+                Deep slate, soft ivory, and pale blue actions. A compact desktop rail frames a
+                calmer reading space.
+              </p>
+            </div>
+            <span class="letter">B</span>
+          </div>
+          <div class="swatches">
+            <span><i style="background: #121c26"></i>#121c26</span
+            ><span><i style="background: #1b2936"></i>#1b2936</span
+            ><span><i style="background: #f3f0e8"></i>#f3f0e8</span
+            ><span><i style="background: #b3cddc"></i>#b3cddc</span>
+          </div>
+          <a
+            class="screen-link"
+            id="image-link-cool"
+            href="screens/cool-home-1440.png"
+            target="_blank"
+            rel="noopener"
+            ><img
+              id="image-cool"
+              src="screens/cool-home-1440.png"
+              alt="Ink and Paper Home desktop concept"
+          /></a>
+          <div class="screen-meta">
+            <span class="screen-title">Home · desktop</span><span>Actual viewport capture ↗</span>
+          </div>
+          <a
+            class="open"
+            id="launch-cool"
+            href="prototype.html?concept=cool&page=home"
+            target="_blank"
+            rel="noopener"
+            >Explore concept B ↗</a
+          ><button class="preview-phone" data-phone="cool">Try at phone width</button>
+          <p class="concept-note">
+            Recommended palette. The orange logo feels like a signature, while cool controls leave
+            room for colorful books and the pink reader sprite.
+          </p>
+        </article>
+      </div>
+      <section class="comparison" aria-label="Shared design decisions">
+        <div>
+          <h3>Reading comes first.</h3>
+          <p>
+            The primary action, a saved book, and a current read appear on the first phone screen.
+            Reader identity becomes a small link; goals support the page further down.
+          </p>
+        </div>
+        <div>
+          <h3>A library you can scan.</h3>
+          <p>
+            A list stays the default. Search, shelf switching, sorting, rating filters, and
+            favorites remain close. Long titles wrap; mobile ratings sit beneath the author.
+          </p>
+        </div>
+        <div>
+          <h3>Feedback has a home.</h3>
+          <p>
+            Desktop Help and the phone account menu lead to feedback. The navigation has an opaque
+            background and five destinations, with space reserved beneath scrollable content.
+          </p>
+        </div>
+      </section>
+      <section class="recommendation">
+        <h3>My recommendation: start with B.</h3>
+        <p>
+          Ink & Paper better matches your cooler-palette preference while keeping ShelfSprite
+          recognizable. Its rail trades some horizontal room for persistent navigation. If Library
+          width matters more, B's palette can pair with A's top navigation; palette and shell are
+          separate choices. Neither direction is approved yet.
+        </p>
+      </section>
+      <p class="artifact-note">
+        These are local, interactive design fixtures. Search, sorting, filters, shelves, favorites,
+        and Help work on sample data. Book actions show handoff previews; no account, database, or
+        AI calls occur. All titles are real, but shelves, ratings, goals, and the reader persona are
+        synthetic. Piranesi uses the existing repository cover. Other jackets are typographic
+        placeholders, including an explicit missing-cover example. This is the “no recommendation
+        preview loaded” Home state; personalized recommendations are not invented.
+      </p>
+      <details class="all-screens">
+        <summary>All eight full-size screens</summary>
+        <ul>
+          <li><a href="screens/warm-home-1440.png">A · Home · desktop</a></li>
+          <li><a href="screens/cool-home-1440.png">B · Home · desktop</a></li>
+          <li><a href="screens/warm-home-390.png">A · Home · phone</a></li>
+          <li><a href="screens/cool-home-390.png">B · Home · phone</a></li>
+          <li><a href="screens/warm-library-1440.png">A · Library · desktop</a></li>
+          <li><a href="screens/cool-library-1440.png">B · Library · desktop</a></li>
+          <li><a href="screens/warm-library-390.png">A · Library · phone</a></li>
+          <li><a href="screens/cool-library-390.png">B · Library · phone</a></li>
+        </ul>
+      </details>
+      <footer>
+        Source: <a href="../../superpowers/specs/design-review.md">design review</a> ·
+        <a href="README.md">Design decisions, verification, and handoff</a> · Bricolage Grotesque +
+        Inter · Existing brand assets unchanged
+      </footer>
+    </main>
+    <dialog id="phone-dialog" aria-label="Interactive phone concept">
+      <div class="preview-heading">
+        <span id="phone-title">Phone preview</span><button id="close-phone">Close</button>
+      </div>
+      <iframe id="phone-frame" title="Interactive ShelfSprite phone concept"></iframe>
+    </dialog>
+    <script>
+      let page = 'home',
+        size = '1440';
+      function refresh() {
+        document.body.classList.toggle('phone', size === '390');
+        document
+          .querySelectorAll('[data-page]')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.page === page)));
+        document
+          .querySelectorAll('[data-size]')
+          .forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.size === size)));
+        const label =
+          (page === 'home' ? 'Home' : 'Library') + ' · ' + (size === '390' ? 'phone' : 'desktop');
+        for (const c of ['warm', 'cool']) {
+          const src = `screens/${c}-${page}-${size}.png`;
+          document.getElementById('image-' + c).src = src;
+          document.getElementById('image-' + c).alt =
+            `${c === 'warm' ? 'Ember and Ivory' : 'Ink and Paper'} ${label} concept`;
+          document.getElementById('image-link-' + c).href = src;
+          document.getElementById('launch-' + c).href = `prototype.html?concept=${c}&page=${page}`;
+        }
+        document.querySelectorAll('.screen-title').forEach((e) => (e.textContent = label));
+        document.getElementById('dimensions').textContent =
+          (size === '390' ? '390 × 844' : '1440 × 1000') + ' · click a screen for full size';
+      }
+      document.addEventListener('click', (e) => {
+        const b = e.target.closest('button');
+        if (!b) return;
+        if (b.dataset.page) {
+          page = b.dataset.page;
+          refresh();
+        }
+        if (b.dataset.size) {
+          size = b.dataset.size;
+          refresh();
+        }
+        if (b.dataset.phone) {
+          document.getElementById('phone-title').textContent =
+            (b.dataset.phone === 'warm' ? 'Ember & Ivory' : 'Ink & Paper') + ' · ' + page;
+          document.getElementById('phone-frame').src =
+            `prototype.html?concept=${b.dataset.phone}&page=${page}`;
+          document.getElementById('phone-dialog').showModal();
+        }
+        if (b.id === 'close-phone') document.getElementById('phone-dialog').close();
+      });
+    </script>
+  </body>
+</html>

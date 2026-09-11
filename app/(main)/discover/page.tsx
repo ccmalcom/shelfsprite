@@ -1,5 +1,7 @@
 'use client';
 
+import PageHeading from '@/components/PageHeading';
+
 import { useState } from 'react';
 import { BookOpen, Plus, Check, Search, Sparkles } from 'lucide-react';
 import { Spinner, useToast } from '@/components/ui';
@@ -61,25 +63,21 @@ export default function DiscoverPage() {
   }
 
   return (
-    <div className="fade-in space-y-6 py-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight text-text">
-            Discover
-          </h1>
-          <p className="mt-1 text-sm text-muted">
-            Ask for anything and get real books off the live catalog, explained.
-          </p>
-        </div>
+    <div className="editorial-page fade-in space-y-6">
+      <PageHeading
+        eyebrow="Follow your curiosity"
+        title="Discover"
+        description="A mood, a favorite book, a world you want to get lost in. Start anywhere."
+      >
         <ShelfSprite
           variant="discover"
           priority
-          sizes="(max-width: 640px) 96px, 112px"
-          className="h-24 w-24 shrink-0 sm:h-28 sm:w-28"
+          sizes="96px"
+          className="hidden h-24 w-24 shrink-0 sm:block"
         />
-      </div>
+      </PageHeading>
 
-      <form onSubmit={runSearch} className="flex gap-2">
+      <form onSubmit={runSearch} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-faint"
@@ -94,7 +92,7 @@ export default function DiscoverPage() {
             }
             aria-label="Describe the book you want"
             className={[
-              'w-full min-w-0 rounded-full border border-border bg-surface py-2 pl-9 pr-4 text-sm text-text',
+              'w-full min-w-0 rounded-xl border border-border-strong bg-surface py-4 pl-9 pr-4 text-sm text-text',
               'placeholder:text-faint focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
             ].join(' ')}
           />
@@ -103,7 +101,7 @@ export default function DiscoverPage() {
           type="submit"
           disabled={loading || !query.trim()}
           className={[
-            'inline-flex items-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-semibold text-base',
+            'inline-flex items-center gap-1.5 justify-center rounded-xl bg-accent px-6 py-4 text-sm font-semibold text-base',
             'transition hover:opacity-90 disabled:opacity-50',
             'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
           ].join(' ')}
@@ -112,6 +110,31 @@ export default function DiscoverPage() {
           Search
         </button>
       </form>
+
+      {!loading && !results && !error && (
+        <div className="border-b border-border pb-8">
+          <p className="eyebrow mb-3">A few places to begin</p>
+          <div className="flex flex-wrap gap-2">
+            {[
+              'Something like Piranesi',
+              'A quiet story about starting over',
+              'Science fiction with complicated characters',
+            ].map((example) => (
+              <button
+                key={example}
+                type="button"
+                onClick={() => setQuery(example)}
+                className="rounded-lg border border-border bg-surface px-4 py-3 text-left text-sm text-muted hover:border-border-strong hover:text-text"
+              >
+                {example}
+              </button>
+            ))}
+          </div>
+          <p className="mt-4 text-xs text-muted">
+            Every result comes from a real book catalog, with a reason to read it.
+          </p>
+        </div>
+      )}
 
       {loading && (
         <div className="flex flex-col items-center gap-3 py-12">
@@ -140,11 +163,11 @@ export default function DiscoverPage() {
           <p className="font-mono text-xs uppercase tracking-widest text-faint">
             Closest matches on the live catalog
           </p>
-          <ul className="space-y-4">
+          <ul className="divide-y divide-border border-t border-border">
             {results.map((rec) => {
               const isAdded = added.has(rec.rank);
               return (
-                <li key={rec.rank} className="flex gap-3">
+                <li key={rec.rank} className="flex gap-4 py-6 sm:gap-6">
                   <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-md bg-elevated">
                     {rec.cover_url ? (
                       // eslint-disable-next-line @next/next/no-img-element

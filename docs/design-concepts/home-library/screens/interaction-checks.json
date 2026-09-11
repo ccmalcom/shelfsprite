@@ -1,0 +1,182 @@
+[
+  {
+    "name": "warm initial six read books",
+    "passed": true
+  },
+  {
+    "name": "warm search author",
+    "passed": true
+  },
+  {
+    "name": "warm favorites filter",
+    "passed": true
+  },
+  {
+    "name": "warm half-star filter",
+    "passed": true
+  },
+  {
+    "name": "warm title sorting",
+    "passed": true
+  },
+  {
+    "name": "warm local favorite toggle",
+    "passed": true
+  },
+  {
+    "name": "warm reading shelf",
+    "passed": true
+  },
+  {
+    "name": "warm finish handoff",
+    "passed": true
+  },
+  {
+    "name": "warm Escape closes dialog",
+    "passed": true
+  },
+  {
+    "name": "warm rejected empty state",
+    "passed": true
+  },
+  {
+    "name": "warm feedback through account",
+    "passed": true
+  },
+  {
+    "name": "warm home 320 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "warm home 320 images loaded",
+    "passed": true
+  },
+  {
+    "name": "warm library 320 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "warm library 320 images loaded",
+    "passed": true
+  },
+  {
+    "name": "warm home 768 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "warm home 768 images loaded",
+    "passed": true
+  },
+  {
+    "name": "warm library 768 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "warm library 768 images loaded",
+    "passed": true
+  },
+  {
+    "name": "warm recommendation handoff",
+    "passed": true
+  },
+  {
+    "name": "warm Home to reading library navigation",
+    "passed": true
+  },
+  {
+    "name": "cool initial six read books",
+    "passed": true
+  },
+  {
+    "name": "cool search author",
+    "passed": true
+  },
+  {
+    "name": "cool favorites filter",
+    "passed": true
+  },
+  {
+    "name": "cool half-star filter",
+    "passed": true
+  },
+  {
+    "name": "cool title sorting",
+    "passed": true
+  },
+  {
+    "name": "cool local favorite toggle",
+    "passed": true
+  },
+  {
+    "name": "cool reading shelf",
+    "passed": true
+  },
+  {
+    "name": "cool finish handoff",
+    "passed": true
+  },
+  {
+    "name": "cool Escape closes dialog",
+    "passed": true
+  },
+  {
+    "name": "cool rejected empty state",
+    "passed": true
+  },
+  {
+    "name": "cool feedback through account",
+    "passed": true
+  },
+  {
+    "name": "cool home 320 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "cool home 320 images loaded",
+    "passed": true
+  },
+  {
+    "name": "cool library 320 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "cool library 320 images loaded",
+    "passed": true
+  },
+  {
+    "name": "cool home 768 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "cool home 768 images loaded",
+    "passed": true
+  },
+  {
+    "name": "cool library 768 no document overflow",
+    "passed": true
+  },
+  {
+    "name": "cool library 768 images loaded",
+    "passed": true
+  },
+  {
+    "name": "cool recommendation handoff",
+    "passed": true
+  },
+  {
+    "name": "cool Home to reading library navigation",
+    "passed": true
+  },
+  {
+    "name": "comparison initial images",
+    "passed": true
+  },
+  {
+    "name": "comparison selectors",
+    "passed": true
+  },
+  {
+    "name": "interactive phone preview",
+    "passed": true
+  }
+]

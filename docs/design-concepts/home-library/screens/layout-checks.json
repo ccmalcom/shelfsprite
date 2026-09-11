@@ -1,0 +1,186 @@
+[
+  {
+    "name": "warm-home-1440",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "cta": {
+      "x": 166.5,
+      "y": 448.03125,
+      "width": 186.953125,
+      "height": 44,
+      "bottom": 492.03125
+    },
+    "reading": {
+      "x": 136.5,
+      "y": 643.25,
+      "width": 396,
+      "height": 147,
+      "bottom": 790.25
+    },
+    "firstBook": null,
+    "identity": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0
+    },
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "warm-home-390",
+    "width": 390,
+    "scrollWidth": 390,
+    "cta": {
+      "x": 40,
+      "y": 424.65625,
+      "width": 154.53125,
+      "height": 44,
+      "bottom": 468.65625
+    },
+    "reading": {
+      "x": 20,
+      "y": 573.65625,
+      "width": 350,
+      "height": 124.265625,
+      "bottom": 697.921875
+    },
+    "firstBook": null,
+    "identity": {
+      "x": 20,
+      "y": 166.1875,
+      "width": 344.046875,
+      "height": 40,
+      "bottom": 206.1875
+    },
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "warm-library-1440",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "cta": null,
+    "reading": null,
+    "firstBook": {
+      "x": 136.5,
+      "y": 381.265625,
+      "width": 1152,
+      "height": 105,
+      "bottom": 486.265625
+    },
+    "identity": null,
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "warm-library-390",
+    "width": 390,
+    "scrollWidth": 390,
+    "cta": null,
+    "reading": null,
+    "firstBook": {
+      "x": 20,
+      "y": 323,
+      "width": 350,
+      "height": 111.390625,
+      "bottom": 434.390625
+    },
+    "identity": null,
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "cool-home-1440",
+    "width": 1440,
+    "scrollWidth": 1440,
+    "cta": {
+      "x": 274,
+      "y": 378.96875,
+      "width": 186.953125,
+      "height": 44,
+      "bottom": 422.96875
+    },
+    "reading": {
+      "x": 274,
+      "y": 577.5,
+      "width": 393,
+      "height": 151,
+      "bottom": 728.5
+    },
+    "firstBook": null,
+    "identity": {
+      "x": 0,
+      "y": 0,
+      "width": 0,
+      "height": 0,
+      "bottom": 0
+    },
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "cool-home-390",
+    "width": 390,
+    "scrollWidth": 390,
+    "cta": {
+      "x": 20,
+      "y": 431.53125,
+      "width": 154.53125,
+      "height": 44,
+      "bottom": 475.53125
+    },
+    "reading": {
+      "x": 20,
+      "y": 580.6875,
+      "width": 350,
+      "height": 124.265625,
+      "bottom": 704.953125
+    },
+    "firstBook": null,
+    "identity": {
+      "x": 20,
+      "y": 166.1875,
+      "width": 344.046875,
+      "height": 40,
+      "bottom": 206.1875
+    },
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "cool-library-1440",
+    "width": 1440,
+    "scrollWidth": 1425,
+    "cta": null,
+    "reading": null,
+    "firstBook": {
+      "x": 274,
+      "y": 297.265625,
+      "width": 1097,
+      "height": 105,
+      "bottom": 402.265625
+    },
+    "identity": null,
+    "fonts": true,
+    "brokenImages": []
+  },
+  {
+    "name": "cool-library-390",
+    "width": 390,
+    "scrollWidth": 390,
+    "cta": null,
+    "reading": null,
+    "firstBook": {
+      "x": 20,
+      "y": 323,
+      "width": 350,
+      "height": 111.390625,
+      "bottom": 434.390625
+    },
+    "identity": null,
+    "fonts": true,
+    "brokenImages": []
+  }
+]

@@ -780,10 +780,13 @@ export default function SetupWizard({ onComplete }: { onComplete?: () => void })
       <div className="w-full max-w-lg">
         <div className="mb-8 text-center">
           <BrandLogo alt="" priority sizes="208px" className="mx-auto h-auto w-52" />
-          <h1 className="sr-only">Welcome to ShelfSprite</h1>
+          <p className="eyebrow mt-6 mb-3">Make yourself at home</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+            Welcome to ShelfSprite
+          </h1>
           <p className="mt-3 text-sm text-muted">
             {step === 'name' || step === 'api-key'
-              ? 'Five minutes, and it starts knowing your taste.'
+              ? 'Start with your books. Build a profile that feels like you.'
               : path === 'manual'
                 ? "Let's build your starter library."
                 : "Let's get your reading history imported."}

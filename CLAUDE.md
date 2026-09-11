@@ -173,6 +173,13 @@ workflow.
 
 ## Product decisions
 
+The approved application design combines Ink & Paper’s desktop rail and reading-first layout
+with Ember & Ivory’s warm palette. See `docs/design-concepts/home-library/implementation.md`
+and `docs/frontend.md` before extending it. The warm palette is shared globally, including
+public entry pages and setup. Reuse `PageHeading` for editorial app-page headings and
+`EntryFrame` for authentication entry screens. Marketing screenshots use labeled fictional
+fixtures; refresh them when their pictured UI changes.
+
 1. Goodreads CSV export is the only ingest path. Never scrape Goodreads or call its API.
 2. Goodreads import is import-once cold-start seeding. Later imports must never overwrite
    ShelfSprite-owned `app_rating` or `app_review` values.

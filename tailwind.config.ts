@@ -10,23 +10,29 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        base: 'var(--bg)',
-        surface: 'var(--surface)',
-        elevated: 'var(--elevated)',
-        border: 'var(--border)',
-        'border-strong': 'var(--border-strong)',
-        hairline: 'var(--hairline)',
-        text: 'var(--text)',
-        muted: 'var(--muted)',
-        faint: 'var(--faint)',
+        base: 'rgb(var(--bg-rgb) / <alpha-value>)',
+        surface: 'rgb(var(--surface-rgb) / <alpha-value>)',
+        elevated: 'rgb(var(--elevated-rgb) / <alpha-value>)',
+        border: 'rgb(var(--border-rgb) / <alpha-value>)',
+        'border-strong': 'rgb(var(--border-strong-rgb) / <alpha-value>)',
+        hairline: 'rgb(var(--hairline-rgb) / <alpha-value>)',
+        text: 'rgb(var(--text-rgb) / <alpha-value>)',
+        muted: 'rgb(var(--muted-rgb) / <alpha-value>)',
+        faint: 'rgb(var(--faint-rgb) / <alpha-value>)',
         accent: {
-          DEFAULT: 'var(--accent)',
-          hover: 'var(--accent-hover)',
+          DEFAULT: 'rgb(var(--accent-rgb) / <alpha-value>)',
+          hover: 'rgb(var(--accent-hover-rgb) / <alpha-value>)',
           quiet: 'var(--accent-quiet)',
         },
-        success: { DEFAULT: 'var(--success)', quiet: 'var(--success-quiet)' },
-        danger: { DEFAULT: 'var(--danger)', quiet: 'var(--danger-quiet)' },
-        warning: { DEFAULT: 'var(--warning)', quiet: 'var(--warning-quiet)' },
+        success: {
+          DEFAULT: 'rgb(var(--success-rgb) / <alpha-value>)',
+          quiet: 'var(--success-quiet)',
+        },
+        danger: { DEFAULT: 'rgb(var(--danger-rgb) / <alpha-value>)', quiet: 'var(--danger-quiet)' },
+        warning: {
+          DEFAULT: 'rgb(var(--warning-rgb) / <alpha-value>)',
+          quiet: 'var(--warning-quiet)',
+        },
         user: {
           DEFAULT: 'var(--user-accent)',
           surface: 'var(--user-surface)',
