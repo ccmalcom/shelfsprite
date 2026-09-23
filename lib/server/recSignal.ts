@@ -93,6 +93,58 @@ export function isColdStart(signal: Pick<RecSignal, 'loved' | 'rated_count'>): b
   );
 }
 
+/**
+ * Every non-rejected trait with its weight and status, confidence desc then id. Shared by
+ * buildSignal and the screen signal (screenSignal.ts, spec §6.2), which must read traits
+ * exactly as the book recommender does.
+ */
+export async function loadTraitPayloads(db: Db, userId: string): Promise<TraitPayload[]> {
+  const traitRows = await db
+    .select()
+    .from(schema.tasteTraits)
+    .where(eq(schema.tasteTraits.userId, userId))
+    .orderBy(desc(schema.tasteTraits.inferenceConfidence), asc(schema.tasteTraits.id));
+
+  // Rejected traits are dead to the reranker -- excluded entirely. Each survivor
+  // carries its user_weight + status so stage 2 can weight its influence.
+  return traitRows
+    .filter((t) => (t.status || 'proposed') !== REJECTED_STATUS)
+    .map((t) => ({
+      id: t.id,
+      claim: t.claim,
+      polarity: t.polarity,
+      // pyFloat so json.dumps parity holds: Python renders 1.0, JSON.stringify renders 1.
+      confidence: pyFloat(round2(t.inferenceConfidence)),
+      user_weight: pyFloat(t.userWeight ?? 1.0),
+      status: t.status || 'proposed',
+    }));
+}
+
+export interface DirectiveSignal {
+  directive_text: string | null;
+  directive_constraints: Record<string, unknown>;
+}
+
+/** The reader's standing directive, shared by buildSignal and the screen signal. */
+export async function loadDirective(db: Db, userId: string): Promise<DirectiveSignal> {
+  const directiveRows = await db
+    .select()
+    .from(schema.userDirective)
+    .where(eq(schema.userDirective.userId, userId));
+  const directive = directiveRows[0];
+  const storedConstraints = (directive?.constraints as Record<string, unknown> | null) ?? null;
+  // Python: `if directive is not None and (directive.nl_text or directive.constraints)`.
+  // `{}` is FALSY in Python, so a row with no text and empty constraints is ignored
+  // entirely -- `!storedConstraints` would not reproduce that in JS.
+  if (
+    directive &&
+    (directive.nlText || (storedConstraints && Object.keys(storedConstraints).length > 0))
+  ) {
+    return { directive_text: directive.nlText, directive_constraints: storedConstraints ?? {} };
+  }
+  return { directive_text: null, directive_constraints: {} };
+}
+
 export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
   const rows = await db
     .select({ b: schema.books, enr: schema.enrichment })
@@ -179,25 +231,7 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
   // Array.prototype.sort is stable in V8, so returning 0 on a full tie matches.
   loved.sort((x, y) => y.rating - x.rating || (y.read_year ?? 0) - (x.read_year ?? 0));
 
-  const traitRows = await db
-    .select()
-    .from(schema.tasteTraits)
-    .where(eq(schema.tasteTraits.userId, userId))
-    .orderBy(desc(schema.tasteTraits.inferenceConfidence), asc(schema.tasteTraits.id));
-
-  // Rejected traits are dead to the reranker -- excluded entirely. Each survivor
-  // carries its user_weight + status so stage 2 can weight its influence.
-  const traits: TraitPayload[] = traitRows
-    .filter((t) => (t.status || 'proposed') !== REJECTED_STATUS)
-    .map((t) => ({
-      id: t.id,
-      claim: t.claim,
-      polarity: t.polarity,
-      // pyFloat so json.dumps parity holds: Python renders 1.0, JSON.stringify renders 1.
-      confidence: pyFloat(round2(t.inferenceConfidence)),
-      user_weight: pyFloat(t.userWeight ?? 1.0),
-      status: t.status || 'proposed',
-    }));
+  const traits = await loadTraitPayloads(db, userId);
 
   // more/less-like book labels, same join as profile._feedback_context.
   const bookById = new Map(rows.map(({ b }) => [b.id, b]));
@@ -239,24 +273,7 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
     }
   }
 
-  const directiveRows = await db
-    .select()
-    .from(schema.userDirective)
-    .where(eq(schema.userDirective.userId, userId));
-  const directive = directiveRows[0];
-  const storedConstraints = (directive?.constraints as Record<string, unknown> | null) ?? null;
-  let directive_text: string | null = null;
-  let directive_constraints: Record<string, unknown> = {};
-  // Python: `if directive is not None and (directive.nl_text or directive.constraints)`.
-  // `{}` is FALSY in Python, so a row with no text and empty constraints is ignored
-  // entirely -- `!storedConstraints` would not reproduce that in JS.
-  if (
-    directive &&
-    (directive.nlText || (storedConstraints && Object.keys(storedConstraints).length > 0))
-  ) {
-    directive_text = directive.nlText;
-    directive_constraints = storedConstraints ?? {};
-  }
+  const { directive_text, directive_constraints } = await loadDirective(db, userId);
 
   return {
     library_keys,

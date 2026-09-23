@@ -1,7 +1,14 @@
 import { describe, test, expect } from 'vitest';
 import { makeTestDb, loadSeed } from './helpers/pglite';
 import seedJson from './fixtures/seed.json';
-import { buildSignal, isColdStart, mostCommon } from '../recSignal';
+import {
+  buildSignal,
+  isColdStart,
+  loadDirective,
+  loadTraitPayloads,
+  mostCommon,
+} from '../recSignal';
+import { schema } from '../db';
 import { isPyFloat } from '../serialize';
 
 describe('mostCommon', () => {
@@ -81,5 +88,76 @@ describe('isColdStart', () => {
     expect(isColdStart(mk(8, 12))).toBe(false);
     expect(isColdStart(mk(7, 12))).toBe(true);
     expect(isColdStart(mk(8, 11))).toBe(true);
+  });
+});
+
+describe('loadTraitPayloads / loadDirective', () => {
+  test('returns only this user, drops rejected traits, orders by confidence then id', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await db.insert(schema.tasteTraits).values([
+        {
+          userId: 'local',
+          claim: 'low',
+          polarity: 'reward',
+          inferenceConfidence: 0.2,
+          status: 'proposed',
+        },
+        {
+          userId: 'local',
+          claim: 'high',
+          polarity: 'aversion',
+          inferenceConfidence: 0.9,
+          status: 'confirmed',
+          userWeight: 0.5,
+        },
+        {
+          userId: 'local',
+          claim: 'dead',
+          polarity: 'reward',
+          inferenceConfidence: 0.95,
+          status: 'rejected',
+        },
+        {
+          userId: 'other',
+          claim: 'theirs',
+          polarity: 'reward',
+          inferenceConfidence: 0.99,
+          status: 'proposed',
+        },
+      ]);
+      const traits = await loadTraitPayloads(db, 'local');
+      expect(traits.map((t) => t.claim)).toEqual(['high', 'low']);
+      expect(traits[0]).toMatchObject({ polarity: 'aversion', status: 'confirmed' });
+      expect(isPyFloat(traits[0].user_weight)).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+
+  test('ignores an empty directive row and reads a populated one', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await db
+        .insert(schema.userDirective)
+        .values({ userId: 'local', nlText: null, constraints: {} });
+      expect(await loadDirective(db, 'local')).toEqual({
+        directive_text: null,
+        directive_constraints: {},
+      });
+      await db
+        .update(schema.userDirective)
+        .set({ nlText: 'No horror.', constraints: { exclude_subjects: ['horror'] } });
+      expect(await loadDirective(db, 'local')).toEqual({
+        directive_text: 'No horror.',
+        directive_constraints: { exclude_subjects: ['horror'] },
+      });
+      expect(await loadDirective(db, 'other')).toEqual({
+        directive_text: null,
+        directive_constraints: {},
+      });
+    } finally {
+      await close();
+    }
   });
 });
