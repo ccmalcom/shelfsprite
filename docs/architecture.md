@@ -100,11 +100,25 @@ User-facing name ScreenSprite; code, routes and tables say `screen`. Opt-in per 
 - `enrichmentJobs.ts` jobs carry a `kind` (`books` | `screen`); one active job per user per kind.
   The screen chunk runs batches of up to 50 titles under the same time budget, recount and stall
   rules as the book chunk.
+- `screenSignal.ts` — the screen recommender's signal: unified traits, loved books and titles,
+  favorites, owned identity sets, rejected screen recs, title more/less-like, and the directive.
+- `screenSparql.ts` — pure SPARQL builders and row readers for the Stage 1 pools. Every user
+  string goes through `sparqlString`; every label read uses `en` then `mul`.
+- `screenAssemble.ts` — `ScreenCatalogPort` (the only code touching wave 5's clients), the
+  metadata, adaptation and seed pools, then merge (popularity floor, owned exclusion), cap,
+  hydrate, directive filter and a two-per-person cap.
+- `screenRecPrompts.ts` — the seed (`propose_screen_comparables`) and rerank
+  (`rank_screen_recommendations`) tools and prompts.
+- `screenRecommendRun.ts` — `runScreenRecommend`: gate, the §6.4 time budget (seeds aborted at
+  45 s, retrieval until 180 s, rerank gets the rest minus a 20 s persistence reserve), citation
+  validation, and one-transaction persistence. A rerank with no surviving picks mints no run.
+- `screenRecs.ts` — `titleRecOut`, `SCREEN_REJECT_REASONS`, and `ensureScreenTitle`.
 
 Routes: `POST /api/screen/import`, `GET|PUT /api/settings/screen`, `GET /api/screen/titles`,
 `GET|PATCH|DELETE /api/screen/titles/{id}`, `DELETE /api/screen/library`, `POST /api/screen/enrich/start`,
 `GET /api/screen/enrich/active`, `GET /api/screen/search`, `POST /api/screen/titles`,
-`POST /api/screen/titles/{id}/correct`.
+`POST /api/screen/titles/{id}/correct`, `POST /api/screen/recommend`,
+`GET /api/screen/recommendations`, `POST /api/screen/recommendations/{id}/feedback`.
 
 ### Catalog and enrichment
 

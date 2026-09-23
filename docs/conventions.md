@@ -73,6 +73,13 @@
   a later job, forced or not.
 - **Screen cache retention.** Rows with `source like 'screen:%'` are pruned by the janitor at 90
   days and beyond the newest 50,000. Book cache rows never expire.
+- **Screen recommendations follow the book two-stage rule.** Every candidate comes from a
+  Wikidata or TVmaze lookup; Claude's seeds are lookup inputs, never candidates. Each pool
+  requires an English Wikipedia article and at least 10 sitelinks, and a series without a TVmaze
+  id never enters the pool.
+- **Acting on a screen recommendation never overwrites the library.** An existing title (matched
+  by QID, TVmaze id, or normalized title plus year) is returned unchanged. A new one is created
+  with `feedback_updated_at` null, so accepting a recommendation never forces a re-profile.
 
 ## Search and recommender
 
