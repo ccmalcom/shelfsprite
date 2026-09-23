@@ -192,3 +192,277 @@ export async function screenFetchJson(
   }
   return { kind: 'retryable', reason };
 }
+
+// --- Wikidata ---------------------------------------------------------------------
+
+export const WIKIDATA_API = 'https://www.wikidata.org/w/api.php';
+export const WDQS_ENDPOINT = 'https://query.wikidata.org/sparql';
+export const ENTITIES_PER_CALL = 50;
+
+export interface WikidataClaim {
+  mainsnak?: { datavalue?: { value?: unknown } };
+  rank?: string;
+}
+
+export interface WikidataEntity {
+  id: string;
+  labels?: Record<string, { value: string }>;
+  aliases?: Record<string, Array<{ value: string }>>;
+  claims?: Record<string, WikidataClaim[]>;
+  sitelinks?: Record<string, { title: string }>;
+}
+
+export type EntityProps = 'labels|aliases|claims|sitelinks' | 'labels|claims' | 'labels';
+export const FULL_ENTITY_PROPS: EntityProps = 'labels|aliases|claims|sitelinks';
+
+export type SparqlBinding = Record<string, { type: string; value: string; 'xml:lang'?: string }>;
+
+export interface WikipediaSummary {
+  type?: string;
+  title?: string;
+  extract?: string;
+  thumbnail?: { source?: string };
+  content_urls?: { desktop?: { page?: string } };
+}
+
+export interface TvmazeShow {
+  id: number;
+  name: string;
+  url?: string;
+  premiered?: string | null;
+  summary?: string | null;
+  genres?: string[];
+  language?: string | null;
+  image?: { medium?: string; original?: string } | null;
+}
+
+export const screenUrls = {
+  wikidataSearch: (term: string, limit: number) =>
+    `${WIKIDATA_API}?${new URLSearchParams({
+      action: 'wbsearchentities',
+      search: term,
+      language: 'en',
+      uselang: 'en',
+      type: 'item',
+      limit: String(limit),
+      format: 'json',
+    })}`,
+  wikidataEntities: (ids: readonly string[], props: EntityProps) =>
+    `${WIKIDATA_API}?${new URLSearchParams({
+      action: 'wbgetentities',
+      ids: ids.join('|'),
+      props,
+      languages: 'en|mul',
+      format: 'json',
+    })}`,
+  wikipediaSummary: (pageTitle: string) =>
+    `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(
+      pageTitle.replace(/ /g, '_')
+    )}`,
+  tvmazeSingleSearch: (q: string) =>
+    `https://api.tvmaze.com/singlesearch/shows?${new URLSearchParams({ q })}`,
+  tvmazeSearch: (q: string) => `https://api.tvmaze.com/search/shows?${new URLSearchParams({ q })}`,
+  tvmazeShow: (id: number) => `https://api.tvmaze.com/shows/${id}`,
+  sparqlBody: (query: string) => new URLSearchParams({ query }).toString(),
+};
+
+const QID_PATTERN = /^Q\d+$/;
+
+export function isQid(value: unknown): value is string {
+  return typeof value === 'string' && QID_PATTERN.test(value);
+}
+
+export function compareQids(a: string, b: string): number {
+  return Number(a.slice(1)) - Number(b.slice(1));
+}
+
+/** `http://www.wikidata.org/entity/Q42` -> `Q42`. */
+export function qidFromUri(uri: string): string | null {
+  const id = uri.slice(uri.lastIndexOf('/') + 1);
+  return isQid(id) ? id : null;
+}
+
+/** A SPARQL string literal (the caller appends @en / @mul). */
+export function sparqlString(s: string): string {
+  const escaped = s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+  return `"${escaped}"`;
+}
+
+export async function wikidataSearch(
+  db: Db,
+  term: string,
+  limit: number,
+  deadline: Deadline
+): Promise<CatalogResult<string[]>> {
+  const out = await screenFetchJson(
+    db,
+    { url: screenUrls.wikidataSearch(term, limit), source: SCREEN_SOURCES.wikidata },
+    deadline
+  );
+  if (out.kind === 'retryable') return out;
+  if (out.kind === 'empty') return { kind: 'ok', value: [] };
+  const hits = (out.value as { search?: Array<{ id?: unknown }> }).search ?? [];
+  return { kind: 'ok', value: hits.map((hit) => hit.id).filter(isQid) };
+}
+
+export async function wikidataEntities(
+  db: Db,
+  qids: readonly string[],
+  props: EntityProps,
+  deadline: Deadline
+): Promise<CatalogResult<Map<string, WikidataEntity>>> {
+  const ids = [...new Set(qids)].filter(isQid).sort(compareQids);
+  const found = new Map<string, WikidataEntity>();
+  for (let i = 0; i < ids.length; i += ENTITIES_PER_CALL) {
+    const batch = ids.slice(i, i + ENTITIES_PER_CALL);
+    const out = await screenFetchJson(
+      db,
+      { url: screenUrls.wikidataEntities(batch, props), source: SCREEN_SOURCES.wikidata },
+      deadline
+    );
+    if (out.kind === 'retryable') return out;
+    if (out.kind === 'empty') continue;
+    const entities = (out.value as { entities?: Record<string, WikidataEntity> }).entities ?? {};
+    for (const [id, entity] of Object.entries(entities)) {
+      if (entity && !('missing' in entity) && isQid(id)) found.set(id, entity);
+    }
+  }
+  return { kind: 'ok', value: found };
+}
+
+export async function wikidataSparql(
+  db: Db,
+  query: string,
+  deadline: Deadline
+): Promise<CatalogResult<SparqlBinding[]>> {
+  const out = await screenFetchJson(
+    db,
+    { url: WDQS_ENDPOINT, source: SCREEN_SOURCES.wdqs, body: screenUrls.sparqlBody(query) },
+    deadline
+  );
+  if (out.kind === 'retryable') return out;
+  if (out.kind === 'empty') return { kind: 'ok', value: [] };
+  const bindings = (out.value as { results?: { bindings?: SparqlBinding[] } }).results?.bindings;
+  return { kind: 'ok', value: Array.isArray(bindings) ? bindings : [] };
+}
+
+// --- Wikipedia ----------------------------------------------------------------------
+
+export async function wikipediaSummary(
+  db: Db,
+  pageTitle: string,
+  deadline: Deadline
+): Promise<CatalogResult<WikipediaSummary>> {
+  const out = await screenFetchJson(
+    db,
+    { url: screenUrls.wikipediaSummary(pageTitle), source: SCREEN_SOURCES.wikipedia },
+    deadline
+  );
+  if (out.kind !== 'ok') return out;
+  return { kind: 'ok', value: out.value as WikipediaSummary };
+}
+
+// --- TVmaze -------------------------------------------------------------------------
+
+function isTvmazeShow(value: unknown): value is TvmazeShow {
+  const show = value as TvmazeShow | null;
+  return (
+    !!show &&
+    typeof show === 'object' &&
+    typeof show.id === 'number' &&
+    typeof show.name === 'string'
+  );
+}
+
+async function tvmazeOne(
+  db: Db,
+  url: string,
+  deadline: Deadline
+): Promise<CatalogResult<TvmazeShow>> {
+  const out = await screenFetchJson(db, { url, source: SCREEN_SOURCES.tvmaze }, deadline);
+  if (out.kind !== 'ok') return out;
+  return isTvmazeShow(out.value) ? { kind: 'ok', value: out.value } : { kind: 'empty' };
+}
+
+export function tvmazeSingleSearch(db: Db, q: string, deadline: Deadline) {
+  return tvmazeOne(db, screenUrls.tvmazeSingleSearch(q), deadline);
+}
+
+export function tvmazeShow(db: Db, id: number, deadline: Deadline) {
+  return tvmazeOne(db, screenUrls.tvmazeShow(id), deadline);
+}
+
+export async function tvmazeSearch(
+  db: Db,
+  q: string,
+  deadline: Deadline
+): Promise<CatalogResult<TvmazeShow[]>> {
+  const out = await screenFetchJson(
+    db,
+    { url: screenUrls.tvmazeSearch(q), source: SCREEN_SOURCES.tvmaze },
+    deadline
+  );
+  if (out.kind === 'retryable') return out;
+  if (out.kind === 'empty') return { kind: 'ok', value: [] };
+  const hits = Array.isArray(out.value) ? (out.value as Array<{ show?: unknown }>) : [];
+  return { kind: 'ok', value: hits.map((hit) => hit.show).filter(isTvmazeShow) };
+}
+
+// --- Entity helpers (spike wd.py#claim_ids / #claim_years) -------------------------
+
+function claimValues(entity: WikidataEntity, property: string): unknown[] {
+  return (entity.claims?.[property] ?? [])
+    .map((claim) => claim.mainsnak?.datavalue?.value)
+    .filter((value) => value !== undefined && value !== null);
+}
+
+export function claimIds(entity: WikidataEntity, property: string): string[] {
+  return claimValues(entity, property)
+    .map((value) => (value as { id?: unknown }).id)
+    .filter(isQid);
+}
+
+export function claimStrings(entity: WikidataEntity, property: string): string[] {
+  return claimValues(entity, property).filter(
+    (value): value is string => typeof value === 'string'
+  );
+}
+
+/** Every distinct year among a time property's values, ascending. Any P577 year counts (§2.1 finding 3). */
+export function claimYears(entity: WikidataEntity, property = 'P577'): number[] {
+  const years = new Set<number>();
+  for (const value of claimValues(entity, property)) {
+    const time = (value as { time?: unknown }).time;
+    if (typeof time !== 'string') continue;
+    const match = /^([+-])(\d+)-/.exec(time);
+    if (match) years.add((match[1] === '-' ? -1 : 1) * Number(match[2]));
+  }
+  return [...years].sort((a, b) => a - b);
+}
+
+/** en first, then mul: famous items often carry only a mul label (§2.1 finding 2a). */
+export function entityLabel(entity: WikidataEntity): string | null {
+  return entity.labels?.en?.value ?? entity.labels?.mul?.value ?? null;
+}
+
+export function entityNames(entity: WikidataEntity): string[] {
+  return [
+    entity.labels?.en?.value,
+    entity.labels?.mul?.value,
+    ...(entity.aliases?.en ?? []).map((alias) => alias.value),
+    ...(entity.aliases?.mul ?? []).map((alias) => alias.value),
+  ].filter((name): name is string => typeof name === 'string' && name.length > 0);
+}
+
+export function sitelinkCount(entity: WikidataEntity): number {
+  return Object.keys(entity.sitelinks ?? {}).length;
+}
+
+export function enwikiTitle(entity: WikidataEntity): string | null {
+  return entity.sitelinks?.enwiki?.title ?? null;
+}
