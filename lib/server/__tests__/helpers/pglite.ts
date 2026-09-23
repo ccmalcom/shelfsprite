@@ -12,8 +12,29 @@ import type { Db } from '../../db';
  * wave-1 route-port tests seed via `loadSeed`. Extend as later waves need more.
  */
 export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void> }> {
-  const pg = new PGlite();
-  await pg.exec(`
+  const pg = new PGlite({ loadDataDir: await schemaDataDir() });
+  const db = drizzle(pg, { schema }) as unknown as Db;
+  return { db, close: () => pg.close() };
+}
+
+/**
+ * Booting PGlite costs about a second; restoring a saved data directory costs a fifth of that.
+ * So the schema is built once per test file (Vitest re-evaluates this module for each file) and
+ * every makeTestDb restores a fresh, independent copy of it. Nothing is shared between tests.
+ */
+let schemaDir: Promise<File | Blob> | undefined;
+function schemaDataDir(): Promise<File | Blob> {
+  schemaDir ??= (async () => {
+    const pg = new PGlite();
+    await pg.exec(SCHEMA_SQL);
+    const dir = await pg.dumpDataDir('none');
+    await pg.close();
+    return dir;
+  })();
+  return schemaDir;
+}
+
+const SCHEMA_SQL = `
     create table catalog_cache (
       cache_key text primary key,
       source text not null,
@@ -366,10 +387,7 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
     );
     create index ix_title_recommendations_user_id on title_recommendations (user_id);
     create index ix_title_recommendations_run_id on title_recommendations (run_id);
-  `);
-  const db = drizzle(pg, { schema }) as unknown as Db;
-  return { db, close: () => pg.close() };
-}
+  `;
 
 type SeedTimestamp = string | { $hoursAgo: number } | null;
 
