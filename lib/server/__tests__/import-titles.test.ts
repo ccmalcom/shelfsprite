@@ -175,15 +175,13 @@ describe('importLetterboxdFilms — re-import', () => {
   });
 
   test('a later rating change bumps feedback_updated_at; a URI-only link does not', async () => {
-    await db
-      .insert(schema.titles)
-      .values({
-        userId: 'local',
-        mediaType: 'movie',
-        title: 'The Lantern Keeper',
-        year: 2019,
-        status: 'watched',
-      });
+    await db.insert(schema.titles).values({
+      userId: 'local',
+      mediaType: 'movie',
+      title: 'The Lantern Keeper',
+      year: 2019,
+      status: 'watched',
+    });
     expect(await importLetterboxdFilms(db, 'local', [film()])).toEqual({
       inserted: 0,
       updated: 1,
@@ -230,15 +228,13 @@ describe('importLetterboxdFilms — matching', () => {
   });
 
   test('two export films never both claim one manual title', async () => {
-    await db
-      .insert(schema.titles)
-      .values({
-        userId: 'local',
-        mediaType: 'movie',
-        title: 'Salt Static',
-        year: 2021,
-        status: 'want',
-      });
+    await db.insert(schema.titles).values({
+      userId: 'local',
+      mediaType: 'movie',
+      title: 'Salt Static',
+      year: 2021,
+      status: 'want',
+    });
     const counts = await importLetterboxdFilms(db, 'local', [
       film({ uri: 'https://boxd.it/s1', name: 'Salt & Static', year: 2021 }),
       film({ uri: 'https://boxd.it/s2', name: 'Salt, Static', year: 2021 }),

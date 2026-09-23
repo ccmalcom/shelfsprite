@@ -74,14 +74,12 @@ describe('GET /api/screen/titles', () => {
     const a = await title({ title: 'A', status: 'want' });
     const b = await title({ title: 'B', mediaType: 'tv', status: 'watching', letterboxdRating: 4 });
     await title({ userId: 'other', title: 'Secret' });
-    await db
-      .insert(schema.titleEnrichment)
-      .values({
-        titleId: b.id,
-        resolutionConfidence: 0.95,
-        confidenceLabel: 'HIGH',
-        genres: ['drama'],
-      });
+    await db.insert(schema.titleEnrichment).values({
+      titleId: b.id,
+      resolutionConfidence: 0.95,
+      confidenceLabel: 'HIGH',
+      genres: ['drama'],
+    });
     const all = await (await listTitles(new Request('http://test/api/screen/titles'))).json();
     expect(all.map((t: { title: string }) => t.title)).toEqual(['A', 'B']);
     expect(all[0].enrichment).toBeNull();
