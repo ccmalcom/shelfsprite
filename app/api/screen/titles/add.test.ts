@@ -231,6 +231,36 @@ describe('POST /api/screen/titles (manual add)', () => {
     expect(await db.select().from(schema.titleEnrichment)).toHaveLength(1);
   });
 
+  it('stores an optional last_watched_on and returns it', async () => {
+    await enable();
+    const response = await add({
+      candidate: candidate(),
+      status: 'watched',
+      last_watched_on: '2025-06-14',
+    });
+    expect(response.status).toBe(201);
+    expect((await response.json()).last_watched_on).toBe('2025-06-14');
+    const [row] = await db.select().from(schema.titles);
+    expect(row.lastWatchedOn).toBe('2025-06-14');
+  });
+
+  it.each(['2025-02-29', '0000-01-01'])(
+    'rejects an impossible last_watched_on %j before inserting anything',
+    async (value) => {
+      await enable();
+      const response = await add({
+        candidate: candidate(),
+        status: 'watched',
+        last_watched_on: value,
+      });
+      expect({ status: response.status, body: await response.json() }).toEqual({
+        status: 422,
+        body: { detail: 'last_watched_on must be a real date as YYYY-MM-DD.' },
+      });
+      expect(await db.select().from(schema.titles)).toHaveLength(0);
+    }
+  );
+
   it("does not treat another user's copy of the film as a clash", async () => {
     await enable();
     await db.insert(schema.titles).values({

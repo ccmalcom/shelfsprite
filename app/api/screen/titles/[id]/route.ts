@@ -9,10 +9,12 @@ import { parseIdParam, utcnowTs } from '@/lib/server/serialize';
 import {
   effectiveTitleRating,
   effectiveTitleReview,
+  isCalendarDate,
   isTitleProfileEvidence,
   TITLE_STATUSES,
   titleOut,
   type TitleRow,
+  WATCH_DATE_MESSAGE,
 } from '@/lib/server/titles';
 
 // Permissive z.number() on purpose: the manual isValidRating guard owns the 422 (CLAUDE.md).
@@ -22,6 +24,8 @@ const Body = z.object({
   status: z.enum(TITLE_STATUSES).nullish(),
   is_favorite: z.boolean().nullish(),
   exclude_from_profile: z.boolean().nullish(),
+  // A string, not a regex, on purpose: isCalendarDate owns the 422 message, as for ratings.
+  last_watched_on: z.string().nullish(),
 });
 
 async function loadOwned(db: Db, userId: string, id: number) {
@@ -59,16 +63,20 @@ export const PATCH = withApi('/api/screen/titles/[id]', async (req, ctx) => {
   if (b.rating != null && b.rating !== 0 && !isValidRating(b.rating)) {
     throw new ApiError(422, 'rating must be 0.5 to 5 in half-star steps (or 0 to clear).');
   }
+  if (b.last_watched_on != null && !isCalendarDate(b.last_watched_on)) {
+    throw new ApiError(422, WATCH_DATE_MESSAGE);
+  }
   if (
     b.rating == null &&
     b.review == null &&
     b.status == null &&
     b.is_favorite == null &&
-    b.exclude_from_profile == null
+    b.exclude_from_profile == null &&
+    b.last_watched_on == null
   ) {
     throw new ApiError(
       422,
-      'Nothing to update: pass a rating, review, status, favorite, and/or exclude flag.'
+      'Nothing to update: pass a rating, review, status, favorite, exclude flag, and/or watch date.'
     );
   }
 
@@ -82,6 +90,7 @@ export const PATCH = withApi('/api/screen/titles/[id]', async (req, ctx) => {
   if (b.status != null) next.status = b.status;
   if (b.is_favorite != null) next.isFavorite = b.is_favorite;
   if (b.exclude_from_profile != null) next.excludeFromProfile = b.exclude_from_profile;
+  if (b.last_watched_on != null) next.lastWatchedOn = b.last_watched_on;
 
   // After applying, like the book route: a review needs an effective rating unless dropped.
   if (
@@ -106,6 +115,8 @@ export const PATCH = withApi('/api/screen/titles/[id]', async (req, ctx) => {
       status: next.status,
       isFavorite: next.isFavorite,
       excludeFromProfile: next.excludeFromProfile,
+      // Only when sent: a Letterboxd re-import may have moved the date since loadOwned read it.
+      ...(b.last_watched_on != null ? { lastWatchedOn: b.last_watched_on } : {}),
       feedbackUpdatedAt: now,
       updatedAt: now,
     })

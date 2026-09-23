@@ -1254,6 +1254,8 @@ export interface TitleUpdate {
   status?: TitleStatus;
   is_favorite?: boolean;
   exclude_from_profile?: boolean;
+  /** YYYY-MM-DD. There is no clear: a watch date, once set, is only ever replaced. */
+  last_watched_on?: string;
 }
 
 export interface AddTitleRequest {
@@ -1261,6 +1263,7 @@ export interface AddTitleRequest {
   status: TitleStatus;
   rating: number | null;
   review: string | null;
+  last_watched_on?: string | null;
 }
 
 export type ScreenRecDecision = 'accepted' | 'already_watched' | 'rejected';

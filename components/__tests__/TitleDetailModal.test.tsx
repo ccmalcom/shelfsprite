@@ -64,6 +64,40 @@ describe('TitleDetailModal', () => {
     expect(updateTitle).not.toHaveBeenCalled();
   });
 
+  it('prefills the watch date and sends only a changed one', async () => {
+    renderModal(makeTitle({ last_watched_on: '2026-08-01' }));
+    const input = screen.getByLabelText('Date watched') as HTMLInputElement;
+    expect(input.value).toBe('2026-08-01');
+    fireEvent.change(input, { target: { value: '2026-07-04' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(updateTitle).toHaveBeenCalledWith(1, { last_watched_on: '2026-07-04' })
+    );
+  });
+
+  it('treats an emptied watch date as no change, since a date cannot be cleared', async () => {
+    const { onClose } = renderModal(makeTitle({ last_watched_on: '2026-08-01' }));
+    fireEvent.change(screen.getByLabelText('Date watched'), { target: { value: '' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+    expect(updateTitle).not.toHaveBeenCalled();
+  });
+
+  it('refuses a future watch date without a request', async () => {
+    renderModal(makeTitle({ last_watched_on: '2026-08-01' }));
+    fireEvent.change(screen.getByLabelText('Date watched'), { target: { value: '2999-01-01' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The date watched cannot be in the future.'
+    );
+    expect(updateTitle).not.toHaveBeenCalled();
+  });
+
+  it('hides the watch date for a want-to-watch title', () => {
+    renderModal(makeTitle({ status: 'want', last_watched_on: null }));
+    expect(screen.queryByLabelText('Date watched')).toBeNull();
+  });
+
   it('sends a new rating', async () => {
     renderModal(makeTitle({ rating: null, letterboxd_rating: null }));
     fireEvent.click(screen.getByRole('radio', { name: '3 stars' }));

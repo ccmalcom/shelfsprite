@@ -100,6 +100,12 @@ copy says ScreenSprite; code, routes and keys say `screen`.
   and TVmaze spellings share a bar. The mean is rounded half-to-even like the server's `round2`, so
   the two profiles never disagree on a tie. A failed title fetch shows a retry line rather than an
   empty section. Both sections draw their charts with `components/profile/StatSections.tsx`.
+- **Watch date.** `titles.last_watched_on` is editable as "Date watched" in `TitleDetailModal`
+  and `AddTitleModal`, shown for every status except `want` (`lib/screen.ts#hasWatchDate`).
+  Like a book's date read it can be set or replaced but never cleared, so an emptied input sends
+  nothing. The routes check it with `lib/server/titles.ts#isCalendarDate`, which owns the 422
+  message the way `isValidRating` does. A Letterboxd re-import still replaces it with a later
+  watch date. It drives the "Recently watched" sort and the profile's `watched_year`.
 - **Reject picker.** `components/RejectReasonPicker.tsx` is shared by `/swipe` (book vocabulary)
   and `/screen` (`SCREEN_REJECT_REASONS`). An empty reason list is sent as a bare
   `{status: 'rejected'}` to the screen route, which refuses an empty list.
