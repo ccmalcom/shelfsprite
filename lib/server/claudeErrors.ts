@@ -41,3 +41,14 @@ export const SIMILAR_NOT_ENOUGH_METADATA_MESSAGE =
 
 /** discover()'s empty-query guard, surfaced by api.py as a 400. */
 export const DISCOVER_EMPTY_QUERY_MESSAGE = 'Enter something to search for.';
+
+/** The screen-variant profile guard (spec 2026-09-22 §5.2): either medium counts. */
+export const NO_RATED_EVIDENCE_MESSAGE = 'No rated books or titles found. Rate something first.';
+
+/**
+ * A profile, archetype or reveal run whose screen_toggled_at changed mid-run (spec §5.7)
+ * writes nothing and answers 409 with this message.
+ */
+export const PROFILE_RUN_SUPERSEDED_MESSAGE =
+  'ScreenSprite was turned on or off while this was running, so nothing was saved. ' +
+  'Run it again.';
