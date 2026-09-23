@@ -8,8 +8,9 @@
  * export. Departures from the spike are deliberate and named where they occur:
  * film-beats-TV runs first (the spec added it), and scoring names include mul aliases.
  */
+import { and, asc, eq, ne, or } from 'drizzle-orm';
 import { z } from 'zod';
-import type { Db } from './db';
+import type { Db, DbTx } from './db';
 import { classifyP31, isTvSeries, type ScreenKind } from './screenClasses';
 import {
   FULL_ENTITY_PROPS,
@@ -38,7 +39,8 @@ import {
   type WikipediaSummary,
 } from './screenCatalog';
 import { screenNormalize, screenRatio, titleVariants } from './screenMatch';
-import { round4 } from './serialize';
+import { titleEnrichment, titles } from './schema';
+import { round4, serializeResolutionConfidence, utcnowTs } from './serialize';
 
 // --- Scoring (spec §4.3) --------------------------------------------------------------
 
@@ -971,4 +973,202 @@ export async function searchShows(
       return mergeTvmaze(show, qid ? (meta.value.get(qid) ?? null) : null);
     }),
   };
+}
+
+// --- Persistence (spec §4.4) ------------------------------------------------------------
+
+/** The title_enrichment metadata columns for a candidate: no label, identity or timestamp. */
+export function candidateEnrichmentValues(candidate: ScreenCandidate) {
+  return {
+    wikidataQid: candidate.wikidata_qid,
+    tvmazeId: candidate.tvmaze_id,
+    wikipediaPage: candidate.wikipedia_page,
+    genres: candidate.genres,
+    directors: candidate.directors,
+    creators: candidate.creators,
+    writers: candidate.writers,
+    countries: candidate.countries,
+    originalLanguage: candidate.original_language,
+    basedOn: candidate.based_on,
+    mainSubjects: candidate.main_subjects,
+    series: candidate.series,
+    productionCompanies: candidate.production_companies,
+    sitelinks: candidate.sitelinks,
+    description: candidate.description,
+    descriptionSource: candidate.description_source,
+    descriptionUrl: candidate.description_url,
+    imageUrl: candidate.image_url,
+  };
+}
+
+const EMPTY_METADATA: ReturnType<typeof candidateEnrichmentValues> = {
+  wikidataQid: null,
+  tvmazeId: null,
+  wikipediaPage: null,
+  genres: [],
+  directors: [],
+  creators: [],
+  writers: [],
+  countries: [],
+  originalLanguage: null,
+  basedOn: [],
+  mainSubjects: [],
+  series: [],
+  productionCompanies: [],
+  sitelinks: 0,
+  description: null,
+  descriptionSource: null,
+  descriptionUrl: null,
+  imageUrl: null,
+};
+
+type EnrichmentWrite = Omit<typeof titleEnrichment.$inferInsert, 'id' | 'titleId'>;
+
+async function upsertTitleEnrichment(
+  tx: Db | DbTx,
+  titleId: number,
+  values: EnrichmentWrite
+): Promise<void> {
+  await tx
+    .insert(titleEnrichment)
+    .values({ titleId, ...values })
+    .onConflictDoUpdate({ target: titleEnrichment.titleId, set: values });
+}
+
+/** Another title of the same user already holding this QID or TVmaze id, lowest id first. */
+export async function findIdentityClash(
+  tx: Db | DbTx,
+  userId: string,
+  titleId: number,
+  qid: string | null,
+  tvmazeId: number | null
+): Promise<{ id: number; title: string } | null> {
+  const matches = [];
+  if (qid) matches.push(eq(titles.wikidataQid, qid));
+  if (tvmazeId !== null) matches.push(eq(titles.tvmazeId, tvmazeId));
+  if (matches.length === 0) return null;
+  const rows = await tx
+    .select({ id: titles.id, title: titles.title })
+    .from(titles)
+    .where(and(eq(titles.userId, userId), ne(titles.id, titleId), or(...matches)))
+    .orderBy(asc(titles.id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+export async function persistTitleResolution(
+  tx: Db | DbTx,
+  titleId: number,
+  resolution: TitleResolution
+): Promise<void> {
+  if (resolution.kind === 'deferred') {
+    throw new Error(`a deferred resolution must never be persisted (title ${titleId})`);
+  }
+  const [title] = await tx.select().from(titles).where(eq(titles.id, titleId));
+  if (!title) return; // deleted after its batch was read
+  const [existing] = await tx
+    .select()
+    .from(titleEnrichment)
+    .where(eq(titleEnrichment.titleId, titleId));
+  const now = utcnowTs();
+
+  if (resolution.kind === 'refreshed') {
+    if (!existing) {
+      await upsertTitleEnrichment(tx, titleId, {
+        ...(resolution.candidate
+          ? candidateEnrichmentValues(resolution.candidate)
+          : EMPTY_METADATA),
+        resolutionConfidence: serializeResolutionConfidence(resolution.candidate ? 'HIGH' : 'NONE'),
+        confidenceLabel: resolution.candidate ? 'HIGH' : 'LOW',
+        matchMethod: 'refresh',
+        identitySource: 'auto',
+        duplicateOfTitleId: null,
+        rawResponse: null,
+        resolvedAt: now,
+      });
+      return;
+    }
+    await tx
+      .update(titleEnrichment)
+      .set(
+        resolution.candidate
+          ? { ...candidateEnrichmentValues(resolution.candidate), resolvedAt: now }
+          : { resolvedAt: now }
+      )
+      .where(eq(titleEnrichment.titleId, titleId));
+    return;
+  }
+
+  // Forced re-runs never change a manual or corrected identity (§4.4). A correction
+  // stamps resolved_at itself, so the running job already counts this title as done.
+  if (
+    existing &&
+    (existing.identitySource === 'manual' || existing.identitySource === 'corrected')
+  ) {
+    return;
+  }
+
+  const clearAutoIdentity = async () => {
+    if (title.wikidataQid !== null) {
+      await tx
+        .update(titles)
+        .set({ wikidataQid: null, updatedAt: now })
+        .where(eq(titles.id, titleId));
+    }
+  };
+
+  if (resolution.kind === 'unresolved') {
+    await clearAutoIdentity();
+    await upsertTitleEnrichment(tx, titleId, {
+      ...EMPTY_METADATA,
+      resolutionConfidence: serializeResolutionConfidence('NONE'),
+      confidenceLabel: 'LOW',
+      matchMethod: 'unresolved',
+      identitySource: 'auto',
+      duplicateOfTitleId: null,
+      rawResponse: resolution.raw,
+      resolvedAt: now,
+    });
+    return;
+  }
+
+  const { candidate, label } = resolution;
+  let duplicateOf: number | null = null;
+  if (label === 'HIGH' || label === 'MEDIUM') {
+    const tvmazeId = candidate.media_type === 'tv' ? candidate.tvmaze_id : null;
+    const clash = await findIdentityClash(
+      tx,
+      title.userId,
+      titleId,
+      candidate.wikidata_qid,
+      tvmazeId
+    );
+    if (clash) {
+      duplicateOf = clash.id; // nothing merges silently; the unique indexes hold
+      await clearAutoIdentity();
+    } else {
+      await tx
+        .update(titles)
+        .set({
+          mediaType: candidate.media_type,
+          wikidataQid: candidate.wikidata_qid,
+          tvmazeId,
+          updatedAt: now,
+        })
+        .where(eq(titles.id, titleId));
+    }
+  } else {
+    await clearAutoIdentity();
+  }
+
+  await upsertTitleEnrichment(tx, titleId, {
+    ...candidateEnrichmentValues(candidate),
+    resolutionConfidence: serializeResolutionConfidence(label),
+    confidenceLabel: label,
+    matchMethod: resolution.method,
+    identitySource: 'auto',
+    duplicateOfTitleId: duplicateOf,
+    rawResponse: resolution.raw,
+    resolvedAt: now,
+  });
 }
