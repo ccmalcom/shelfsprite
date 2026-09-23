@@ -2,6 +2,8 @@ import { and, asc, eq, gt, isNotNull, sql } from 'drizzle-orm';
 import { withApi } from '@/lib/server/http';
 import { getDb, schema } from '@/lib/server/db';
 import { effectiveRating, tsToIso } from '@/lib/server/serialize';
+import { isScreenEnabled } from '@/lib/server/screenSettings';
+import { titlesChangedSince } from '@/lib/server/screenProfile';
 
 /** Port of library.py::profile_status (read-only — see Interfaces note). */
 export const GET = withApi('/api/profile/status', async (_req, ctx) => {
@@ -34,6 +36,13 @@ export const GET = withApi('/api/profile/status', async (_req, ctx) => {
       b.isFavorite
   );
 
+  // Spec 2026-09-22 §5.5 / §7.7: every title rating, review, status, favourite, exclusion or
+  // re-resolved enrichment since the last build dirties the profile, but only while ScreenSprite
+  // is enabled (a disabled user's titles never enter a build). updateTasteProfile applies the
+  // same rule, so a dirty status always has an update that clears it.
+  const screenEnabled = await isScreenEnabled(db, userId);
+  const changedTitles = screenEnabled ? await titlesChangedSince(db, since, userId) : [];
+
   const verdictWhere = since
     ? and(
         eq(schema.tasteTraits.userId, userId),
@@ -59,12 +68,15 @@ export const GET = withApi('/api/profile/status', async (_req, ctx) => {
   return Response.json({
     dirty:
       changed.length > 0 ||
+      changedTitles.length > 0 ||
       traitVerdictDirty ||
       recRejectDirty ||
       enrichmentCorrectedDirty ||
       rebuildReason !== null,
     changed_books: changed.length,
     changed_book_ids: changed.map((b) => b.id),
+    changed_titles: changedTitles.length,
+    changed_title_ids: changedTitles.map((t) => t.id),
     last_profiled_at: tsToIso(since),
     last_profile_kind: meta?.lastProfileKind ?? null,
     rebuild_reason: rebuildReason,
