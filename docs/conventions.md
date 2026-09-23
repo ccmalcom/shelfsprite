@@ -54,6 +54,13 @@
   change can require a full rebuild because an incremental prompt cannot retract missing metadata.
 - Ratings use half-star steps. Database columns remain `numeric(2,1)` with drizzle
   `mode: 'number'`; `0` is a clear/unrated sentinel, not a rating.
+- **`titles` is never dropped or recreated by a migration**, for the same reason as `books`. Its
+  rating columns reject `0`: unlike `books.goodreads_rating`, screen storage has no unrated
+  sentinel, only null. A Letterboxd re-import writes only `LETTERBOXD_OWNED_FIELDS`
+  (`lib/server/importTitles.ts`).
+- **Screen purge scope follows the spec §7.6 table.** Profile reset and book-library reset also
+  clear `title_recommendations`; account deletion clears every screen table. Book purge responses
+  do not report screen counts; `DELETE /api/screen/library` does.
 
 ## Search and recommender
 

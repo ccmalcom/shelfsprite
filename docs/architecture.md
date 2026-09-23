@@ -67,6 +67,26 @@ applied with drizzle-kit from `drizzle/`.
 - `recs.ts` — recommendation response shaping, the rejection-reason vocabulary, and creation or
   matching of library books from accepted recommendations.
 
+### ScreenSprite (movies & TV)
+
+User-facing name ScreenSprite; code, routes and tables say `screen`. Opt-in per user
+(`user_settings.screen_enabled`); design in `docs/superpowers/specs/2026-09-22-screen-media-design.md`.
+
+- `screenSettings.ts` — the opt-in flag (`isScreenEnabled`, `requireScreenEnabled`,
+  `setScreenEnabled`). Toggling stamps `screen_toggled_at` and sets a profile rebuild reason.
+- `titles.ts` — title row types, effective rating/review (`app_* ?? letterboxd_*`; null means
+  unrated, there is no 0 sentinel in storage), profile eligibility, `titleOut`, and
+  `normalizeTitleKey` (Unicode-safe; not `dedup.normalizeTitle`).
+- `letterboxd.ts` — the Letterboxd ZIP reader: declared sizes checked before inflating, allowlisted
+  root entries only, diary/review rows joined to films by exact (Name, Year) because their URIs
+  point at entries, and only the `Favorite Films` column of `profile.csv`.
+- `importTitles.ts` — ownership-allowlisted upsert (`LETTERBOXD_OWNED_FIELDS`); a first import
+  enables screen in the same transaction.
+- `screenPurge.ts` — screen row deletion used by the profile, account and screen-library purges.
+
+Routes: `POST /api/screen/import`, `GET|PUT /api/settings/screen`, `GET /api/screen/titles`,
+`GET|PATCH|DELETE /api/screen/titles/{id}`, `DELETE /api/screen/library`.
+
 ### Catalog and enrichment
 
 - `catalogCache.ts` — Postgres-backed catalog response cache keyed by request URL.
