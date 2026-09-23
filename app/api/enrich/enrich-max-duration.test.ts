@@ -13,7 +13,7 @@ import { FUNCTION_CEILING_SECONDS } from '@/lib/server/enrichmentJobs';
 // Importing would still observe 300 if someone reintroduced the imported binding, so only a
 // source-level check catches the shape that actually breaks the build.
 
-const ROUTES = ['./start/route.ts', './tick/route.ts'] as const;
+const ROUTES = ['./start/route.ts', './tick/route.ts', '../screen/enrich/start/route.ts'] as const;
 
 describe('enrich route maxDuration segment config', () => {
   it.each(ROUTES)('%s exports maxDuration as a numeric literal', (rel) => {

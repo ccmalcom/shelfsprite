@@ -18,6 +18,12 @@ export const RATE_LIMITS = {
   discover: { limit: 30, windowSeconds: 60 },
   screenImport: { limit: 5, windowSeconds: 60 },
   /**
+   * No Python ancestor (like inviteRequest): the screen routes answer a blocked request with
+   * ApiError(429, …) and the normal {"detail": …} shape, never rateLimitExceededResponse.
+   */
+  screenEnrichStart: { limit: 5, windowSeconds: 60 },
+  screenSearch: { limit: 30, windowSeconds: 60 },
+  /**
    * No Python ancestor: the public waitlist endpoint. Unlike every entry above it, its bucket
    * key is IP-derived rather than per-user, because the route has no authenticated caller
    * (see inviteRequestRateKey in inviteRequests.ts). It also does NOT use

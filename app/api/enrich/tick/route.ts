@@ -1,7 +1,13 @@
 import { z } from 'zod';
 import { getDb } from '@/lib/server/db';
 import { isValidCronSecret, rearmAfterResponse } from '@/lib/server/enrichmentDispatch';
-import { claimJob, oneBookEnrichmentRunner, runClaimedChunk } from '@/lib/server/enrichmentJobs';
+import {
+  claimJob,
+  oneBookEnrichmentRunner,
+  runClaimedChunk,
+  runClaimedScreenChunk,
+  screenEnrichmentRunner,
+} from '@/lib/server/enrichmentJobs';
 import { ApiError, withApi } from '@/lib/server/http';
 
 const EnrichTickBody = z
@@ -38,13 +44,22 @@ export const POST = withApi(
     const claimedRow = await claimJob(db, parsed.data.job_id, new Date());
     if (!claimedRow) return Response.json({ claimed: false });
 
-    const result = await runClaimedChunk(db, claimedRow, {
-      nowMs: () => Date.now(),
-      runOne: oneBookEnrichmentRunner(claimedRow.userId),
-      dispatch: async (jobId) => {
-        rearmAfterResponse(request, jobId);
-      },
-    });
+    const dispatch = async (jobId: string) => {
+      rearmAfterResponse(request, jobId);
+    };
+    // Shared by both kinds (spec §4.6): the claimed row says which chunk to run.
+    const result =
+      claimedRow.kind === 'screen'
+        ? await runClaimedScreenChunk(db, claimedRow, {
+            nowMs: () => Date.now(),
+            runBatch: screenEnrichmentRunner(claimedRow.userId),
+            dispatch,
+          })
+        : await runClaimedChunk(db, claimedRow, {
+            nowMs: () => Date.now(),
+            runOne: oneBookEnrichmentRunner(claimedRow.userId),
+            dispatch,
+          });
     return Response.json({ claimed: true, outcome: result.outcome });
   },
   { requireAuth: false }

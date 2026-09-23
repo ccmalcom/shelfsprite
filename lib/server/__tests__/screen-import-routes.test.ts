@@ -1,18 +1,25 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { POST as importRoute } from '../../../app/api/screen/import/route';
 import { GET as getScreen, PUT as putScreen } from '../../../app/api/settings/screen/route';
 import { _setDbForTests, schema, type Db } from '../db';
+import { _setDispatchForTests } from '../enrichmentDispatch';
 import { letterboxdZip } from './fixtures/letterboxd';
 import { makeTestDb } from './helpers/pglite';
 
 let db: Db;
 let close: () => Promise<void>;
+let scheduled: number;
 beforeEach(async () => {
   ({ db, close } = await makeTestDb());
   _setDbForTests(db);
+  scheduled = 0;
+  _setDispatchForTests({ schedule: () => void (scheduled += 1) });
+  vi.stubEnv('CRON_SECRET', 'test-cron-secret');
 });
 afterEach(async () => {
+  _setDispatchForTests(null);
+  vi.unstubAllEnvs();
   _setDbForTests(null);
   await close();
 });
@@ -35,11 +42,27 @@ describe('POST /api/screen/import', () => {
   test('imports the synthetic export, enables screen, and reports counts', async () => {
     const res = await importRoute(upload('letterboxd-export.ZIP', letterboxdZip()));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ inserted: 6, updated: 0, unchanged: 0 });
+    const first = await res.json();
+    expect(first).toEqual({
+      inserted: 6,
+      updated: 0,
+      unchanged: 0,
+      job: expect.objectContaining({ status: 'pending', progress: 0, total: 0 }),
+    });
     const state = await (await getScreen(new Request('http://test/api/settings/screen'))).json();
     expect(state).toEqual({ enabled: true, toggled_at: expect.any(String), title_count: 6 });
     const again = await importRoute(upload('letterboxd-export.zip', letterboxdZip()));
-    expect(await again.json()).toEqual({ inserted: 0, updated: 0, unchanged: 6 });
+    const second = await again.json();
+    expect(second).toEqual({
+      inserted: 0,
+      updated: 0,
+      unchanged: 6,
+      job: expect.objectContaining({ status: 'pending', progress: 0, total: 0 }),
+    });
+    expect(second.job.job_id).toBe(first.job.job_id); // the active screen job is reused
+    expect(scheduled).toBe(1);
+    const jobs = await db.select().from(schema.enrichJobs);
+    expect(jobs.map((j) => [j.kind, j.userId])).toEqual([['screen', 'local']]);
   });
 
   test('rejects a missing file, a non-zip name, an oversize body, and a non-Letterboxd zip', async () => {
@@ -73,6 +96,7 @@ describe('POST /api/screen/import', () => {
     expect(await db.select().from(schema.titles)).toEqual([]);
     const state = await (await getScreen(new Request('http://test/api/settings/screen'))).json();
     expect(state.enabled).toBe(false); // a failed import never enables screen
+    expect(await db.select().from(schema.enrichJobs)).toEqual([]); // a failed import queues nothing
   });
 
   test('is rate limited per user', async () => {
