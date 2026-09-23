@@ -135,4 +135,19 @@ describe('books-only profile requests are byte-identical (spec §5.1)', () => {
     expect(full[0]).toEqual(golden.full);
     expect(update[0]).toEqual(golden.update);
   });
+
+  it('escalate to the book-variant full build, byte-identical, when titles change but none is eligible', async () => {
+    const golden = readGolden();
+    const calls = await capture('update', async (db) => {
+      await setScreen(db, true);
+      await insertTitle(db, {
+        title: 'Tenet',
+        year: 2020,
+        status: 'want',
+        feedbackUpdatedAt: '2026-07-25 00:00:00',
+      });
+    });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toEqual(golden.full);
+  });
 });
