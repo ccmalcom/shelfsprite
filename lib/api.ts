@@ -325,6 +325,8 @@ export interface ProfileStatus {
   changed_book_ids: number[];
   last_profiled_at: string | null;
   last_profile_kind: string | null;
+  /** A pending full-rebuild reason (e.g. screen enabled); `dirty` is already true when set. */
+  rebuild_reason: string | null;
 }
 
 /** Added/dropped/reworded taste-trait claims from a profile refresh (POST /profile/update). */

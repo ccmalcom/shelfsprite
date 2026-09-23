@@ -164,3 +164,46 @@ describe('a full rebuild clears only the rebuild reason it read at its start', (
     }
   });
 });
+
+describe('updateTasteProfile with a pending rebuild reason', () => {
+  it('escalates to a full rebuild instead of revising, then clears the reason', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as Seed); // proposed traits + changed books: normally incremental
+      await setRebuildReason(db, 'local', 'screen_disabled');
+      const client = fakeClaude([tool('record_taste_traits')]);
+
+      const out = await updateTasteProfile(db, client, 'local');
+
+      expect(out.mode).toBe('full');
+      expect(client.calls[0].params.tool_choice).toEqual({
+        type: 'tool',
+        name: 'record_taste_traits',
+      });
+      expect(await readRebuildReason(db, 'local')).toBeNull();
+    } finally {
+      await close();
+    }
+  });
+
+  it('escalates even when nothing else changed', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as Seed);
+      // Move the cutoff past every seeded change and feedback timestamp.
+      await db
+        .update(schema.profileMeta)
+        .set({ lastProfiledAt: '2999-01-01 00:00:00', recFeedbackUpdatedAt: null })
+        .where(eq(schema.profileMeta.userId, 'local'));
+      await setRebuildReason(db, 'local', 'title_deleted');
+      const client = fakeClaude([tool('record_taste_traits')]);
+
+      const out = await updateTasteProfile(db, client, 'local');
+
+      expect(out.mode).toBe('full'); // not the "already up to date" early return
+      expect(client.calls).toHaveLength(1);
+    } finally {
+      await close();
+    }
+  });
+});

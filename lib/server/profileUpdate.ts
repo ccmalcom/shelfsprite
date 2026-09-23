@@ -200,6 +200,13 @@ export async function updateTasteProfile(
     return extractTasteProfile(db, client, userId, maxTokens);
   }
 
+  // A pending rebuild reason (screen enabled/disabled, a title deleted — spec §5.6) is a change
+  // the incremental prompt cannot express or retract. Only a full rebuild clears it, and it
+  // takes precedence over the "already up to date" early return below.
+  if (meta.rebuildReason !== null) {
+    return extractTasteProfile(db, client, userId, maxTokens);
+  }
+
   const changed = await booksChangedSince(db, since, userId);
   const changedIds = changed.filter((b) => !b.excludeFromProfile).map((b) => b.id);
 

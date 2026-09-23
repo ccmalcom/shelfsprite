@@ -52,12 +52,21 @@ export const GET = withApi('/api/profile/status', async (_req, ctx) => {
     meta?.recFeedbackUpdatedAt != null && (since === null || meta.recFeedbackUpdatedAt > since);
   const enrichmentCorrectedDirty =
     meta?.enrichmentCorrectedAt != null && (since === null || meta.enrichmentCorrectedAt > since);
+  // Spec §5.6: a pending full-rebuild reason keeps the profile dirty until a full rebuild
+  // clears it. meta is read-only here; status never creates the profile_meta row.
+  const rebuildReason = meta?.rebuildReason ?? null;
 
   return Response.json({
-    dirty: changed.length > 0 || traitVerdictDirty || recRejectDirty || enrichmentCorrectedDirty,
+    dirty:
+      changed.length > 0 ||
+      traitVerdictDirty ||
+      recRejectDirty ||
+      enrichmentCorrectedDirty ||
+      rebuildReason !== null,
     changed_books: changed.length,
     changed_book_ids: changed.map((b) => b.id),
     last_profiled_at: tsToIso(since),
     last_profile_kind: meta?.lastProfileKind ?? null,
+    rebuild_reason: rebuildReason,
   });
 });
