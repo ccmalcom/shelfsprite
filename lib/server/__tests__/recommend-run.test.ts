@@ -236,4 +236,21 @@ describe('runRecommend happy path', () => {
       await close();
     }
   });
+
+  test('sends the seed and rerank overrides without touching the snapshot defaults', async () => {
+    process.env.MYLIBRARY_MODEL_SEED = 'model-seed';
+    process.env.MYLIBRARY_MODEL_RERANK = 'model-rerank';
+    const { db, close } = await seeded();
+    const restore = installHttpReplay(httpFixtures as any);
+    const client = fakeClaude([seedResponse, rerankResponse([0, 1, 2])] as any);
+    try {
+      const out = (await runRecommend(db, client, 'local', opts())) as any;
+      expect(client.calls[0].params.model).toBe('model-seed');
+      expect(client.calls[1].params.model).toBe('model-rerank');
+      expect(out.model).toBe('model-rerank');
+    } finally {
+      restore();
+      await close();
+    }
+  });
 });

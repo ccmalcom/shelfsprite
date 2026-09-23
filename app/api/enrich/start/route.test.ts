@@ -3,6 +3,7 @@ import { _resetJwksCache } from '@/lib/server/auth';
 import { exportJWK, generateKeyPair, SignJWT, type KeyLike } from 'jose';
 import { eq } from 'drizzle-orm';
 import { makeTestDb } from '@/lib/server/__tests__/helpers/pglite';
+import { freezeInsideRateWindow } from '@/lib/server/__tests__/helpers/rateWindow';
 import { _resetDebugCache } from '@/lib/server/config';
 import { _setDbForTests, type Db } from '@/lib/server/db';
 import { enrichJobs } from '@/lib/server/schema';
@@ -264,6 +265,7 @@ describe('POST /api/enrich/start', () => {
   });
 
   it('enforces RATE_LIMITS.enrichStart as five per minute per authenticated user', async () => {
+    freezeInsideRateWindow();
     const responses: Response[] = [];
     for (let i = 0; i < 6; i++) responses.push(await post(JSON.stringify({})));
     expect({

@@ -101,7 +101,9 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       created_at timestamp not null default current_timestamp,
       user_weight double precision not null default 1,
       verdict_updated_at timestamp,
-      reveal_line text
+      reveal_line text,
+      exhibit_title_ids json,
+      contrast_title_ids json
     );
     create table recommendations (
       id serial primary key,
@@ -134,7 +136,9 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       last_profiled_at timestamp,
       last_profile_kind text,
       rec_feedback_updated_at timestamp,
-      enrichment_corrected_at timestamp
+      enrichment_corrected_at timestamp,
+      rebuild_reason text,
+      rebuild_requested_at timestamp
     );
     create table user_settings (
       id serial primary key,
@@ -142,7 +146,9 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       anthropic_api_key_encrypted text,
       created_at timestamp not null default current_timestamp,
       updated_at timestamp,
-      display_name text
+      display_name text,
+      screen_enabled boolean not null default false,
+      screen_toggled_at timestamp
     );
     create table reader_archetypes (
       id serial primary key,
@@ -174,6 +180,7 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       direction text not null,
       target_kind text not null,
       target_book_id integer,
+      target_title_id integer,
       snapshot json,
       created_at timestamp not null default current_timestamp
     );
@@ -190,6 +197,7 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       -- values explicitly -- see the note in schema.ts and the guard in
       -- __tests__/enrich-job-insert.test.ts.
       status text not null,
+      kind text not null default 'books',
       progress integer not null default 0,
       total integer not null default 0,
       started_at timestamp,
@@ -201,8 +209,8 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       run_limit integer,
       created_at timestamp not null default current_timestamp
     );
-    create unique index uq_enrich_jobs_active_user
-    on enrich_jobs (user_id)
+    create unique index uq_enrich_jobs_active_user_kind
+    on enrich_jobs (user_id, kind)
     where status in ('pending', 'running');
     create table feedback (
       id serial primary key,
@@ -263,6 +271,101 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       where subject is not null;
     create unique index uq_reading_goal_no_subject on reading_goals (user_id, year, kind)
       where subject is null;
+    create table titles (
+      id serial primary key,
+      user_id text not null default 'local',
+      media_type text not null,
+      title text not null,
+      year integer,
+      status text not null,
+      letterboxd_rating numeric(2,1),
+      app_rating numeric(2,1),
+      letterboxd_review text,
+      app_review text,
+      last_watched_on date,
+      letterboxd_uri text,
+      wikidata_qid text,
+      tvmaze_id integer,
+      is_favorite boolean not null default false,
+      exclude_from_profile boolean not null default false,
+      feedback_updated_at timestamp,
+      created_at timestamp not null default current_timestamp,
+      updated_at timestamp,
+      constraint ck_titles_media_type check (media_type in ('movie', 'tv')),
+      constraint ck_titles_status check (status in ('watched', 'watching', 'dropped', 'want')),
+      constraint ck_titles_letterboxd_rating_half_step check (
+        letterboxd_rating is null or (letterboxd_rating >= 0.5 and letterboxd_rating <= 5.0 and (letterboxd_rating * 2) % 1 = 0)
+      ),
+      constraint ck_titles_app_rating_half_step check (
+        app_rating is null or (app_rating >= 0.5 and app_rating <= 5.0 and (app_rating * 2) % 1 = 0)
+      )
+    );
+    create index ix_titles_user_id on titles (user_id);
+    create unique index uq_titles_user_letterboxd_uri on titles (user_id, letterboxd_uri)
+      where letterboxd_uri is not null;
+    create unique index uq_titles_user_wikidata_qid on titles (user_id, wikidata_qid)
+      where wikidata_qid is not null;
+    create unique index uq_titles_user_tvmaze_id on titles (user_id, tvmaze_id)
+      where tvmaze_id is not null;
+    create table title_enrichment (
+      id serial primary key,
+      title_id integer not null,
+      wikidata_qid text,
+      tvmaze_id integer,
+      wikipedia_page text,
+      genres json,
+      directors json,
+      creators json,
+      writers json,
+      countries json,
+      original_language text,
+      based_on json,
+      main_subjects json,
+      series json,
+      production_companies json,
+      sitelinks integer,
+      description text,
+      description_source text,
+      description_url text,
+      image_url text,
+      resolution_confidence double precision not null,
+      confidence_label text,
+      match_method text,
+      identity_source text not null default 'auto',
+      duplicate_of_title_id integer,
+      raw_response json,
+      resolved_at timestamp not null default current_timestamp,
+      constraint title_enrichment_title_id_fkey foreign key (title_id) references titles(id)
+    );
+    create unique index ix_title_enrichment_title_id on title_enrichment (title_id);
+    create table title_recommendations (
+      id serial primary key,
+      user_id text not null default 'local',
+      run_id text not null,
+      rank integer not null,
+      media_type text not null,
+      media_filter text not null,
+      title text not null,
+      year integer,
+      wikidata_qid text,
+      tvmaze_id integer,
+      image_url text,
+      genres json,
+      description text,
+      retrieval_pool text,
+      seed_reason text,
+      score double precision not null,
+      rationale text,
+      grounded_trait_ids json,
+      grounded_book_ids json,
+      grounded_title_ids json,
+      status text not null,
+      user_note text,
+      reject_reasons json,
+      created_at timestamp not null default current_timestamp
+    );
+    create index ix_title_recommendations_user_id on title_recommendations (user_id);
+    create index ix_title_recommendations_run_id on title_recommendations (run_id);
   `);
   const db = drizzle(pg, { schema }) as unknown as Db;
   return { db, close: () => pg.close() };
@@ -287,6 +390,9 @@ export interface Seed {
   taste_signals?: Record<string, unknown>[];
   feedback?: Record<string, unknown>[];
   feedback_prompt_state?: Record<string, unknown>[];
+  titles?: Record<string, unknown>[];
+  title_enrichment?: Record<string, unknown>[];
+  title_recommendations?: Record<string, unknown>[];
 }
 
 function resolveTs(v: SeedTimestamp): string | null {
@@ -316,6 +422,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
     'revoked_at',
     'accepted_at',
     'reviewed_at',
+    'screen_toggled_at',
   ]);
   const JSON_COLS = new Set([
     'subjects',
@@ -327,16 +434,35 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
     'raw_response',
     'constraints',
     'snapshot',
+    'exhibit_title_ids',
+    'contrast_title_ids',
+    'grounded_title_ids',
+    'genres',
+    'directors',
+    'creators',
+    'writers',
+    'countries',
+    'based_on',
+    'main_subjects',
+    'production_companies',
   ]);
+  // Column names that are JSON only on one table. enrichment.series is TEXT; title_enrichment.series
+  // is JSON -- a global entry would JSON-quote every book seed's series string.
+  const TABLE_JSON_COLS: Record<string, Set<string>> = {
+    title_enrichment: new Set(['series']),
+  };
   const order = [
     'catalog_cache',
     'books',
+    'titles',
     'reading_goals',
     'invites',
     'invite_requests',
     'enrichment',
+    'title_enrichment',
     'taste_traits',
     'recommendations',
+    'title_recommendations',
     'profile_meta',
     'user_settings',
     'reader_archetypes',
@@ -355,7 +481,7 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
         const v = (row as Record<string, unknown>)[c];
         if (v === null || v === undefined) return null;
         if (TS_COLS.has(c)) return resolveTs(v as SeedTimestamp);
-        if (JSON_COLS.has(c)) return JSON.stringify(v);
+        if (JSON_COLS.has(c) || TABLE_JSON_COLS[table]?.has(c)) return JSON.stringify(v);
         return v;
       });
       const placeholders = cols.map((_, i) => `$${i + 1}`).join(', ');
@@ -385,6 +511,9 @@ export async function loadSeed(db: Db, seed: Seed): Promise<void> {
     'taste_signal',
     'feedback',
     'feedback_prompt_state',
+    'titles',
+    'title_enrichment',
+    'title_recommendations',
   ];
   for (const t of SEQ_TABLES) {
     // is_called=false + (max+1) — NOT the two-arg setval(seq, greatest(max,1)) idiom,

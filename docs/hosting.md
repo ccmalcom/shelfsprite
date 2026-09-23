@@ -18,32 +18,38 @@ code-only change.
 
 Current source readers under `lib`, `app`, and `utils` use:
 
-| Variable                               | Purpose                                                                         |
-| -------------------------------------- | ------------------------------------------------------------------------------- |
-| `DATABASE_URL`                         | Supabase Postgres connection used by `getDb`; required for data access.         |
-| `NEXT_PUBLIC_SUPABASE_URL`             | Browser Supabase client and server-side fallback for the project URL.           |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser/session middleware key. Required whenever any Supabase variable is set. |
-| `SUPABASE_URL`                         | Preferred server-side Supabase URL for JWKS and admin calls.                    |
-| `SUPABASE_JWKS_URL`                    | Optional explicit JWKS endpoint override.                                       |
-| `SUPABASE_JWT_ISSUER`                  | Optional expected `iss` override; defaults to `<project URL>/auth/v1`.          |
-| `ALLOW_LOCAL_AUTH`                     | Opt-in for local unauthenticated mode. Never honoured in production.            |
-| `SUPABASE_SECRET_KEY`                  | Server-only GoTrue admin credential for invite/list/delete calls.               |
-| `ADMIN_EMAILS`                         | Comma-separated, case-insensitive admin allowlist.                              |
-| `FRONTEND_URL`                         | Public app origin used to build invite `redirect_to`; no trailing slash.        |
-| `ENCRYPTION_KEY`                       | AES-256-GCM key for stored per-user Anthropic credentials.                      |
-| `ANTHROPIC_API_KEY`                    | Server fallback when a user has no stored key.                                  |
-| `GOOGLE_BOOKS_API_KEY`                 | Optional Google Books credential.                                               |
-| `MYLIBRARY_MODEL`                      | Claude model override; defaults to `claude-sonnet-5`.                           |
-| `MYLIBRARY_REQ_PER_SEC`                | Catalog request-rate override.                                                  |
-| `MYLIBRARY_MONTHLY_SOFT_CAP_USD`       | Per-user monthly visibility cap; warn-only.                                     |
-| `MYLIBRARY_USAGE_WARN_THRESHOLD`       | Fraction of the soft cap at which the warning appears.                          |
-| `FEEDBACK_PROMPTS_ENABLED`             | Global targeted-feedback prompt switch; defaults to `true`.                     |
-| `FEEDBACK_SNOOZE_HOURS`                | Prompt snooze period; defaults to 72 hours.                                     |
-| `GITHUB_TOKEN`                         | Fine-grained token used to create feedback issues.                              |
-| `GITHUB_REPO`                          | Target `owner/name`; defaults to `ccmalcom/shelfsprite`.                        |
-| `GITHUB_WEBHOOK_SECRET`                | Shared secret used to verify GitHub webhook signatures.                         |
-| `GITHUB_IN_PROGRESS_LABEL`             | Issue label mapped to active work; defaults to `in progress`.                   |
-| `CRON_SECRET`                          | Bearer secret for enrichment tick and janitor routes.                           |
+| Variable                               | Purpose                                                                                                  |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                         | Supabase Postgres connection used by `getDb`; required for data access.                                  |
+| `NEXT_PUBLIC_SUPABASE_URL`             | Browser Supabase client and server-side fallback for the project URL.                                    |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Browser/session middleware key. Required whenever any Supabase variable is set.                          |
+| `SUPABASE_URL`                         | Preferred server-side Supabase URL for JWKS and admin calls.                                             |
+| `SUPABASE_JWKS_URL`                    | Optional explicit JWKS endpoint override.                                                                |
+| `SUPABASE_JWT_ISSUER`                  | Optional expected `iss` override; defaults to `<project URL>/auth/v1`.                                   |
+| `ALLOW_LOCAL_AUTH`                     | Opt-in for local unauthenticated mode. Never honoured in production.                                     |
+| `SUPABASE_SECRET_KEY`                  | Server-only GoTrue admin credential for invite/list/delete calls.                                        |
+| `ADMIN_EMAILS`                         | Comma-separated, case-insensitive admin allowlist.                                                       |
+| `FRONTEND_URL`                         | Public app origin used to build invite `redirect_to`; no trailing slash.                                 |
+| `ENCRYPTION_KEY`                       | AES-256-GCM key for stored per-user Anthropic credentials.                                               |
+| `ANTHROPIC_API_KEY`                    | Server fallback when a user has no stored key.                                                           |
+| `GOOGLE_BOOKS_API_KEY`                 | Optional Google Books credential.                                                                        |
+| `MYLIBRARY_MODEL`                      | Profile and rerank model override; defaults to `claude-sonnet-5`. Never applies to the Haiku operations. |
+| `MYLIBRARY_MODEL_PROFILE`              | Profile build/update model; falls back to `MYLIBRARY_MODEL`.                                             |
+| `MYLIBRARY_MODEL_RERANK`               | Rerank model (recommend, similar, discover); falls back to `MYLIBRARY_MODEL`.                            |
+| `MYLIBRARY_MODEL_SEED`                 | Seed/interpret model; defaults to `claude-haiku-4-5-20251001`.                                           |
+| `MYLIBRARY_MODEL_ARCHETYPE`            | Archetype model; defaults to `claude-haiku-4-5-20251001`.                                                |
+| `MYLIBRARY_MODEL_DISTILL`              | Directive-distill model; defaults to `claude-haiku-4-5-20251001`.                                        |
+| `MYLIBRARY_MODEL_REVEAL`               | Reveal-line model; defaults to `claude-haiku-4-5-20251001`.                                              |
+| `MYLIBRARY_REQ_PER_SEC`                | Catalog request-rate override.                                                                           |
+| `MYLIBRARY_MONTHLY_SOFT_CAP_USD`       | Per-user monthly visibility cap; warn-only.                                                              |
+| `MYLIBRARY_USAGE_WARN_THRESHOLD`       | Fraction of the soft cap at which the warning appears.                                                   |
+| `FEEDBACK_PROMPTS_ENABLED`             | Global targeted-feedback prompt switch; defaults to `true`.                                              |
+| `FEEDBACK_SNOOZE_HOURS`                | Prompt snooze period; defaults to 72 hours.                                                              |
+| `GITHUB_TOKEN`                         | Fine-grained token used to create feedback issues.                                                       |
+| `GITHUB_REPO`                          | Target `owner/name`; defaults to `ccmalcom/shelfsprite`.                                                 |
+| `GITHUB_WEBHOOK_SECRET`                | Shared secret used to verify GitHub webhook signatures.                                                  |
+| `GITHUB_IN_PROGRESS_LABEL`             | Issue label mapped to active work; defaults to `in progress`.                                            |
+| `CRON_SECRET`                          | Bearer secret for enrichment tick and janitor routes.                                                    |
 
 `getDb` requires Postgres even when auth is disabled.
 

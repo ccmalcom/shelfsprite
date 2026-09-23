@@ -3,7 +3,7 @@
  * _build_prompt, extract_taste_profile). Strings are copied verbatim from Python —
  * prompt parity is asserted byte-for-byte in parity-prompts.test.ts.
  */
-import { eq, and } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import { trackedCreate } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
@@ -16,11 +16,21 @@ import {
   removeRejectedClaims,
   type FeedbackContext,
 } from './profileFeedback';
-import { NO_RATED_BOOKS_MESSAGE } from './claudeErrors';
+import { NO_RATED_BOOKS_MESSAGE, NO_RATED_EVIDENCE_MESSAGE } from './claudeErrors';
+import { modelFor } from './models';
+import { readRebuildReason } from './profileMeta';
+import { readScreenToggledAt } from './screenSettings';
+import { assertScreenToggleUnchanged, screenVariantActive } from './screenProfile';
+import { buildScreenTiersWithCounts, sentTitleIds, type ScreenTierBuild } from './screenTiers';
+import {
+  buildScreenProfilePrompt,
+  SCREEN_PROFILE_SYSTEM,
+  SCREEN_PROFILE_TOOL,
+} from './screenProfilePrompts';
 
-/** Twin of config.get_settings().model — read at call time, as Python does. */
+/** The profile builder's model (lib/server/models.ts). Read at call time, as Python did. */
 export function profileModel(): string {
-  return process.env.MYLIBRARY_MODEL || 'claude-sonnet-5';
+  return modelFor('profile');
 }
 
 export const PROFILE_MAX_TOKENS = 3000;
@@ -158,17 +168,52 @@ export function buildProfilePrompt(tiers: Tiers, feedback: FeedbackContext | nul
   );
 }
 
-/** Twin of profile.mark_profiled — clears the 'dirty' state. Must run inside a tx. */
-export async function markProfiled(tx: Db, kind: string, userId: string): Promise<void> {
+/**
+ * Twin of profile.mark_profiled — clears the 'dirty' state. Must run inside a tx.
+ *
+ * Stamps `runStartedAt`, the moment the builder began reading, NOT the completion time
+ * (spec 2026-09-22 §5.6). A rating edited while Claude was thinking was not in the prompt,
+ * so it must stay newer than last_profiled_at and keep the profile dirty. Stamping completion
+ * silently marked such edits as profiled.
+ *
+ * A 'full' build clears `rebuild_reason`, but only if it still holds the value the build read
+ * at its start (`observedRebuildReason`) AND no request arrived after the run started
+ * (`rebuild_requested_at < runStartedAt`; profileMeta.ts#setRebuildReason stamps it on every
+ * call). A request made mid-run describes a change this build may not have seen, so it must
+ * survive to force the next rebuild, even when it repeats the reason already pending. A null
+ * stamp (a reason written by hand, as in the real-flow check) counts as old.
+ */
+export async function markProfiled(
+  tx: Db,
+  kind: string,
+  userId: string,
+  runStartedAt: string,
+  observedRebuildReason: string | null = null
+): Promise<void> {
   const rows = await tx
     .select({ id: schema.profileMeta.id })
     .from(schema.profileMeta)
     .where(eq(schema.profileMeta.userId, userId));
-  const stamp = { lastProfiledAt: utcnowTs(), lastProfileKind: kind };
+  const stamp = { lastProfiledAt: runStartedAt, lastProfileKind: kind };
   if (rows[0]) {
     await tx.update(schema.profileMeta).set(stamp).where(eq(schema.profileMeta.id, rows[0].id));
   } else {
     await tx.insert(schema.profileMeta).values({ userId, ...stamp });
+  }
+  if (kind === 'full' && observedRebuildReason !== null) {
+    await tx
+      .update(schema.profileMeta)
+      .set({ rebuildReason: null })
+      .where(
+        and(
+          eq(schema.profileMeta.userId, userId),
+          eq(schema.profileMeta.rebuildReason, observedRebuildReason),
+          or(
+            isNull(schema.profileMeta.rebuildRequestedAt),
+            lt(schema.profileMeta.rebuildRequestedAt, runStartedAt)
+          )
+        )
+      );
   }
 }
 
@@ -188,6 +233,22 @@ export async function extractTasteProfile(
   userId: string,
   maxTokens: number = PROFILE_MAX_TOKENS
 ): Promise<Record<string, unknown>> {
+  // Captured before the first read (spec §5.6): anything edited after this instant is not in
+  // the prompt and must stay pending. The reason read here is the only one this build clears.
+  const runStartedAt = utcnowTs();
+  const observedRebuildReason = await readRebuildReason(db, userId);
+  // [wave 6] Read at run start: a ScreenSprite toggle after this supersedes the run (§5.7).
+  const screenToggledAt = await readScreenToggledAt(db, userId);
+  // [wave 6] Screen variant when enabled with eligible titles; otherwise the book variant,
+  // byte-identical to before (spec §5.1, pinned by profile-books-golden.test.ts).
+  if (await screenVariantActive(db, userId)) {
+    return extractScreenTasteProfile(db, client, userId, maxTokens, {
+      runStartedAt,
+      observedRebuildReason,
+      screenToggledAt,
+    });
+  }
+
   const tiers = await buildTiers(db, userId);
   let totalRated = 0;
   for (const [k, v] of tiers) if (k !== 'rejected') totalRated += v.length;
@@ -225,7 +286,16 @@ export async function extractTasteProfile(
     }
   }
 
-  const saved = await persistProposedTraits(db, userId, traits, validIds, 'full');
+  const saved = await persistProposedTraits(
+    db,
+    userId,
+    traits,
+    validIds,
+    'full',
+    runStartedAt,
+    observedRebuildReason,
+    { expectedScreenToggledAt: screenToggledAt } // [wave 6]
+  );
 
   // Deliberately a plain object, not a Map: this becomes the `tiers` field of the
   // HTTP response body via JSON.stringify, and V8 emits key order 3,4,5,<=2,dnf,
@@ -245,6 +315,112 @@ export async function extractTasteProfile(
   };
 }
 
+interface ScreenRunContext {
+  runStartedAt: string;
+  observedRebuildReason: string | null;
+  screenToggledAt: string | null;
+}
+
+function screenCountsOut(build: ScreenTierBuild): Record<string, Record<string, number>> {
+  const out: Record<string, Record<string, number>> = {};
+  for (const [medium, tiers] of build.tiers) {
+    out[medium] = {};
+    for (const [k, v] of tiers) out[medium][k] = v.length;
+  }
+  return out;
+}
+
+/**
+ * The screen variant of the full build (spec 2026-09-22 §5.2–§5.4). Same shape as the book
+ * build: reads first, one Claude call with no transaction open, then one guarded write
+ * transaction. Title ids are valid only if this prompt actually sent them.
+ */
+async function extractScreenTasteProfile(
+  db: Db,
+  client: ClaudeClient,
+  userId: string,
+  maxTokens: number,
+  run: ScreenRunContext
+): Promise<Record<string, unknown>> {
+  const tiers = await buildTiers(db, userId);
+  const screen = await buildScreenTiersWithCounts(db, userId);
+
+  let ratedBooks = 0;
+  for (const [k, v] of tiers) if (k !== 'rejected') ratedBooks += v.length;
+  let ratedTitles = 0;
+  for (const medium of screen.tiers.values()) {
+    for (const [k, v] of medium) if (k !== 'rejected') ratedTitles += v.length;
+  }
+  if (ratedBooks + ratedTitles === 0) throw new ApiError(400, NO_RATED_EVIDENCE_MESSAGE);
+
+  const feedback = await feedbackContext(db, userId, { titles: true });
+  const prompt = buildScreenProfilePrompt(tiers, screen, feedback);
+  const model = profileModel();
+
+  const message = await trackedCreate(
+    client,
+    db,
+    { userId, operation: 'profile_full' },
+    {
+      model,
+      max_tokens: maxTokens,
+      system: SCREEN_PROFILE_SYSTEM,
+      tools: [SCREEN_PROFILE_TOOL],
+      tool_choice: { type: 'tool', name: 'record_taste_traits' },
+      messages: [{ role: 'user', content: prompt }],
+    }
+  );
+
+  const input = toolInput(message, '');
+  let traits = (Array.isArray(input?.traits) ? input.traits : []) as Record<string, unknown>[];
+  traits = removeRejectedClaims(traits, feedback.rejected);
+  traits = removeRejectedClaims(traits, [...feedback.confirmed, ...feedback.edited]);
+
+  const validIds = new Set<number>();
+  for (const [, list] of tiers) {
+    for (const b of list) if (typeof b.id === 'number') validIds.add(b.id);
+  }
+
+  const saved = await persistProposedTraits(
+    db,
+    userId,
+    traits,
+    validIds,
+    'full',
+    run.runStartedAt,
+    run.observedRebuildReason,
+    { validTitleIds: sentTitleIds(screen.tiers), expectedScreenToggledAt: run.screenToggledAt }
+  );
+
+  const tierCounts: Record<string, number> = {};
+  for (const [k, v] of tiers) tierCounts[k] = v.length;
+
+  return {
+    mode: 'full',
+    variant: 'screen',
+    rated_books: ratedBooks,
+    rated_titles: ratedTitles,
+    tiers: tierCounts,
+    screen_tiers: screenCountsOut(screen),
+    traits_saved: saved,
+    model,
+  };
+}
+
+export interface PersistOptions {
+  /**
+   * Screen variant only (spec 2026-09-22 §5.4): validate exhibit_titles/contrast_titles against
+   * the titles this prompt actually carried, and drop a trait with no valid exhibit in either
+   * medium. Absent for the book variant, whose persistence rules are untouched.
+   */
+  validTitleIds?: Set<number>;
+  /**
+   * screen_toggled_at as read at run start. When provided, the persisting transaction
+   * re-reads it first and writes nothing (409) if it changed (spec §5.7).
+   */
+  expectedScreenToggledAt?: string | null;
+}
+
 /**
  * Shared persistence tail of profile.extract_taste_profile and
  * profile.update_taste_profile: replace the user's prior 'proposed' traits with the
@@ -252,22 +428,44 @@ export async function extractTasteProfile(
  * hold a single Python-style session across the Claude call (db.ts uses max: 1, so
  * touching `db` inside an open transaction deadlocks) — both callers run this only
  * AFTER their Claude call has already resolved, matching Python's own write-nothing-
- * before-the-call behavior. Returns the number of traits saved.
+ * before-the-call behavior. Returns the number of traits saved. `runStartedAt` is the
+ * caller's pre-read timestamp (see markProfiled).
  */
 export async function persistProposedTraits(
   db: Db,
   userId: string,
   traits: Record<string, unknown>[],
   validIds: Set<number>,
-  kind: 'full' | 'update'
+  kind: 'full' | 'update',
+  runStartedAt: string,
+  observedRebuildReason: string | null = null,
+  opts: PersistOptions = {}
 ): Promise<number> {
   return db.transaction(async (tx) => {
+    // Spec §5.7: a ScreenSprite toggle after this run began supersedes it. Checked first,
+    // inside the transaction, so the throw rolls back every write below.
+    if (opts.expectedScreenToggledAt !== undefined) {
+      await assertScreenToggleUnchanged(tx, userId, opts.expectedScreenToggledAt);
+    }
+
     await tx
       .delete(schema.tasteTraits)
       .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')));
 
     let n = 0;
     for (const t of traits) {
+      const exhibits = asIdList(t.exhibits, validIds);
+      const contrasts = asIdList(t.contrasts, validIds);
+      const titleEvidence = opts.validTitleIds
+        ? {
+            exhibitTitleIds: asIdList(t.exhibit_titles, opts.validTitleIds),
+            contrastTitleIds: asIdList(t.contrast_titles, opts.validTitleIds),
+          }
+        : null;
+      // Screen variant only: a trait with no valid exhibit in either medium is dropped.
+      if (titleEvidence && exhibits.length === 0 && titleEvidence.exhibitTitleIds.length === 0) {
+        continue;
+      }
       await tx.insert(schema.tasteTraits).values({
         userId,
         claim: String(t.claim ?? '').trim(),
@@ -275,14 +473,15 @@ export async function persistProposedTraits(
         // polarity, which would violate the NOT NULL column — Node's `?? 'reward'`
         // falls back instead. Deliberately safer, not a bug to reconcile with Python.
         polarity: String(t.polarity ?? 'reward'),
-        exhibits: asIdList(t.exhibits, validIds),
-        contrasts: asIdList(t.contrasts, validIds),
+        exhibits,
+        contrasts,
+        ...(titleEvidence ?? {}),
         inferenceConfidence: Number(t.inference_confidence ?? 0.0),
         status: 'proposed',
       });
       n++;
     }
-    await markProfiled(tx, kind, userId);
+    await markProfiled(tx, kind, userId, runStartedAt, observedRebuildReason);
     return n;
   });
 }

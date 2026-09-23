@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python '/home/chase/Documents/Code/shelfsprite/.codex/hooks/pre_bash.py'"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python '/home/chase/Documents/Code/shelfsprite/.codex/hooks/post_edit.py'"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python '/home/chase/Documents/Code/shelfsprite/.codex/hooks/on_stop.py'"
+          }
+        ]
+      }
+    ]
+  }
+}

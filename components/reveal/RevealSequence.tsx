@@ -14,8 +14,12 @@ import {
   type ProfileHighlights,
   type Book,
   type Directive,
+  REVEAL_TITLES_KEY,
+  screenApi,
+  type TitleOut,
 } from '@/lib/api';
-import { buildBeats, type Beat } from '@/lib/revealBeats';
+import { buildBeats, titlesSettled, type Beat } from '@/lib/revealBeats';
+import { useScreenSettings } from '@/lib/useScreenSettings';
 import { tasteAccent } from '@/lib/tasteAccent';
 import { RevealFrame, RevealButton } from './revealFrame';
 import { RewardTraitBeat, AversionsBeat } from './TraitBeats';
@@ -65,13 +69,34 @@ export default function RevealSequence({
   const { data: books } = useSWR<Book[]>('reveal-books', () => api.books({ limit: 500 }));
   // Not part of the `ready` gate: a reader may legitimately have no directive yet.
   const { data: directive } = useSWR<Directive>(DIRECTIVE_KEY, () => getDirective());
+  // Title evidence only while ScreenSprite is on (spec §7.5); see titlesSettled.
+  const { settings: screenSettings, error: screenError } = useScreenSettings();
+  const screenEnabled = screenSettings?.enabled;
+  const { data: titles, error: titlesErr } = useSWR<TitleOut[]>(
+    screenEnabled ? REVEAL_TITLES_KEY : null,
+    () => screenApi.titles()
+  );
+  const titlesReady = titlesSettled({
+    screenEnabled,
+    settingsFailed: screenError !== undefined,
+    titlesLoaded: titles !== undefined,
+    titlesFailed: titlesErr !== undefined,
+  });
 
-  const ready = stats && traits && archetype && highlights && books;
+  const ready = stats && traits && archetype && highlights && books && titlesReady;
 
   const beats: Beat[] = useMemo(() => {
     if (!ready) return [];
-    return buildBeats({ stats, traits, archetype, highlights, books, directive });
-  }, [ready, stats, traits, archetype, highlights, books, directive]);
+    return buildBeats({
+      stats,
+      traits,
+      archetype,
+      highlights,
+      books,
+      directive,
+      titles: screenEnabled ? titles : undefined,
+    });
+  }, [ready, stats, traits, archetype, highlights, books, directive, screenEnabled, titles]);
 
   // RevealFrame feeds this straight into --user-accent, which is the small
   // saturated-accent role (text, bars, dots) on the neutral base — .vivid, not

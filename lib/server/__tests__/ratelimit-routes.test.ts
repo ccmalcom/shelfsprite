@@ -9,6 +9,7 @@ import { POST as booksSimilar } from '../../../app/api/books/[id]/similar/route'
 import { POST as discoverRoute } from '../../../app/api/discover/route';
 import { POST as enrichStart } from '../../../app/api/enrich/start/route';
 import { enrichJobs } from '../schema';
+import { freezeInsideRateWindow } from './helpers/rateWindow';
 
 // Cross-cutting: finding 2 of the wave-3a final review. Both routes hand-build the
 // same corrected 429 shape by calling the shared rateLimitExceededResponse helper
@@ -35,6 +36,7 @@ describe('429 rate-limit response shape, driven through the real routes', () => 
   }
 
   it('GET /api/catalog/search returns the corrected body once the 30/minute limit is exceeded', async () => {
+    freezeInsideRateWindow();
     silenceLogs();
     const { db, close } = await makeTestDb();
     try {
@@ -56,6 +58,7 @@ describe('429 rate-limit response shape, driven through the real routes', () => 
   });
 
   it('POST /api/directive/draft returns the corrected body once the 30/minute limit is exceeded', async () => {
+    freezeInsideRateWindow();
     silenceLogs();
     const { db, close } = await makeTestDb();
     try {
@@ -85,6 +88,7 @@ describe('429 rate-limit response shape, driven through the real routes', () => 
   });
 
   it('POST /api/books/[id]/similar returns the corrected body once the 15/minute limit is exceeded', async () => {
+    freezeInsideRateWindow();
     silenceLogs();
     const { db, close } = await makeTestDb();
     try {
@@ -116,6 +120,7 @@ describe('429 rate-limit response shape, driven through the real routes', () => 
   });
 
   it('POST /api/discover returns the corrected body once the 30/minute limit is exceeded', async () => {
+    freezeInsideRateWindow();
     silenceLogs();
     const { db, close } = await makeTestDb();
     try {
@@ -145,6 +150,7 @@ describe('429 rate-limit response shape, driven through the real routes', () => 
   });
 
   it('POST /api/enrich/start enforces RATE_LIMITS.enrichStart as five per minute per authenticated user', async () => {
+    freezeInsideRateWindow();
     silenceLogs();
     const { db, close } = await makeTestDb();
     try {

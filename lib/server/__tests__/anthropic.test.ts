@@ -50,6 +50,18 @@ describe('costUsd', () => {
   it('treats missing token fields as zero', () => {
     expect(costUsd('claude-haiku-4-5-20251001', {})).toBe(0);
   });
+
+  it('prices opus-5-5 at $4/$20 with its published cache rates', () => {
+    // 1M of each = 4 + 20 + 5.00 (1.25x write) + 0.20 (0.05x read: Opus 5.5's cache hits are
+    // half the usual 0.1x, per the published pricing table, verified 2026-09-23)
+    const usage = {
+      input_tokens: 1_000_000,
+      output_tokens: 1_000_000,
+      cache_creation_input_tokens: 1_000_000,
+      cache_read_input_tokens: 1_000_000,
+    };
+    expect(costUsd('claude-opus-5-5', usage)).toBeCloseTo(29.2, 6);
+  });
 });
 
 describe('recordUsage', () => {
@@ -104,5 +116,34 @@ describe('trackedCreate', () => {
       operation: 'recommend_rerank',
       model: 'claude-sonnet-4-6',
     });
+  });
+
+  it('forwards request options only when given, so existing callers still pass one argument', async () => {
+    const calls: unknown[][] = [];
+    const client = {
+      messages: {
+        create: async (...args: unknown[]) => {
+          calls.push(args);
+          return { content: [], usage: null };
+        },
+      },
+    };
+    const controller = new AbortController();
+    await trackedCreate(
+      client,
+      db,
+      { userId: 'u3', operation: 'screen_rec_seed' },
+      { model: 'claude-haiku-4-5-20251001' },
+      { signal: controller.signal }
+    );
+    await trackedCreate(
+      client,
+      db,
+      { userId: 'u3', operation: 'screen_rec_seed' },
+      { model: 'claude-haiku-4-5-20251001' }
+    );
+    expect(calls[0]).toHaveLength(2);
+    expect((calls[0][1] as { signal: AbortSignal }).signal).toBe(controller.signal);
+    expect(calls[1]).toHaveLength(1);
   });
 });

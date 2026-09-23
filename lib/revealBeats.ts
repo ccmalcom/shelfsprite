@@ -1,4 +1,12 @@
-import type { Trait, ArchetypeOut, ProfileHighlights, Stats, Book, Directive } from './api';
+import type {
+  Trait,
+  ArchetypeOut,
+  ProfileHighlights,
+  Stats,
+  Book,
+  Directive,
+  TitleOut,
+} from './api';
 import { POLE_LINES, ratingQuip, FORMAT_LINES } from './revealCopy';
 
 const AXIS_ORDER = ['lens', 'engine', 'range', 'resonance'] as const;
@@ -61,12 +69,18 @@ export interface BuildBeatsInput {
   highlights: ProfileHighlights;
   books: Book[];
   directive?: Directive | null;
+  /** The screen library, passed only while ScreenSprite is on (spec §7.5). */
+  titles?: TitleOut[];
 }
 
-function aversionEvidence(trait: Trait, byId: Map<number, Book>): string {
+function aversionEvidence(
+  trait: Trait,
+  byId: Map<number, Book>,
+  titleById: Map<number, TitleOut>
+): string {
   const bookId = (trait.exhibits ?? [])[0];
   const book = bookId != null ? byId.get(bookId) : undefined;
-  if (!book) return '';
+  if (!book) return titleAversionEvidence(trait, titleById);
   const title = book.title;
   if (book.exclusive_shelf === 'did-not-finish') {
     return `You never finished ${title}. We noticed.`;
@@ -78,10 +92,30 @@ function aversionEvidence(trait: Trait, byId: Map<number, Book>): string {
   return `${title}, ${stars} star${stars === 1 ? '' : 's'}, no review. The silence said plenty.`;
 }
 
+/** How a cited film or show reads inside a beat's plain strings. */
+function titleEvidenceLabel(t: TitleOut): string {
+  return `${t.title} (${t.media_type === 'tv' ? 'TV' : 'film'})`;
+}
+
+function titleAversionEvidence(trait: Trait, titleById: Map<number, TitleOut>): string {
+  const titleId = (trait.exhibit_title_ids ?? [])[0];
+  const t = titleId != null ? titleById.get(titleId) : undefined;
+  if (!t) return '';
+  const label = titleEvidenceLabel(t);
+  if (t.status === 'dropped') return `You never finished ${label}. We noticed.`;
+  const stars = t.rating ?? 1;
+  return `${label}, ${stars} star${stars === 1 ? '' : 's'}. It did not land.`;
+}
+
 export function buildBeats(input: BuildBeatsInput): Beat[] {
   const { stats, traits, archetype, highlights, books } = input;
   const byId = new Map(books.map((b) => [b.id, b]));
   const title = (id: number) => byId.get(id)?.title;
+  const titleById = new Map((input.titles ?? []).map((t) => [t.id, t]));
+  const screenTitle = (id: number) => {
+    const t = titleById.get(id);
+    return t ? titleEvidenceLabel(t) : undefined;
+  };
 
   const thin = highlights.thin;
   const beats: Beat[] = [];
@@ -110,8 +144,18 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
       kind: 'reward-trait',
       trait: t,
       lowConfidence: t.inference_confidence <= LOW_CONFIDENCE_MAX,
-      exhibitTitles: (t.exhibits ?? []).map(title).filter(Boolean).slice(0, 4) as string[],
-      contrastTitles: (t.contrasts ?? []).map(title).filter(Boolean).slice(0, 1) as string[],
+      exhibitTitles: [
+        ...(t.exhibits ?? []).map(title),
+        ...(t.exhibit_title_ids ?? []).map(screenTitle),
+      ]
+        .filter(Boolean)
+        .slice(0, 4) as string[],
+      contrastTitles: [
+        ...(t.contrasts ?? []).map(title),
+        ...(t.contrast_title_ids ?? []).map(screenTitle),
+      ]
+        .filter(Boolean)
+        .slice(0, 1) as string[],
     });
   }
 
@@ -121,7 +165,7 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
     if (aversions.length > 0) {
       beats.push({
         kind: 'aversions',
-        items: aversions.map((t) => ({ trait: t, evidence: aversionEvidence(t, byId) })),
+        items: aversions.map((t) => ({ trait: t, evidence: aversionEvidence(t, byId, titleById) })),
       });
     }
   }
@@ -168,4 +212,21 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
   beats.push({ kind: 'handoff' });
 
   return beats;
+}
+
+/**
+ * Whether the reveal may start as far as titles are concerned (spec §7.5): at once while
+ * ScreenSprite is off, once the titles load while it is on. A failed settings or titles read
+ * counts as settled, so a hiccup degrades to book-only evidence instead of a reveal that never
+ * opens.
+ */
+export function titlesSettled(s: {
+  screenEnabled: boolean | undefined;
+  settingsFailed: boolean;
+  titlesLoaded: boolean;
+  titlesFailed: boolean;
+}): boolean {
+  if (s.screenEnabled === undefined) return s.settingsFailed;
+  if (!s.screenEnabled) return true;
+  return s.titlesLoaded || s.titlesFailed;
 }

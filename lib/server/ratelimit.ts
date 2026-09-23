@@ -17,6 +17,15 @@ export const RATE_LIMITS = {
   booksSimilar: { limit: 15, windowSeconds: 60 },
   discover: { limit: 30, windowSeconds: 60 },
   /**
+   * No Python ancestor (like inviteRequest): the screen routes answer a blocked request with
+   * ApiError(429, …) and the normal {"detail": …} shape, never rateLimitExceededResponse.
+   */
+  screenImport: { limit: 5, windowSeconds: 60 },
+  screenEnrichStart: { limit: 5, windowSeconds: 60 },
+  screenSearch: { limit: 30, windowSeconds: 60 },
+  /** One run spends two Claude calls and up to ~20 Wikimedia queries (w7 decision 11). */
+  screenRecommend: { limit: 3, windowSeconds: 60 },
+  /**
    * No Python ancestor: the public waitlist endpoint. Unlike every entry above it, its bucket
    * key is IP-derived rather than per-user, because the route has no authenticated caller
    * (see inviteRequestRateKey in inviteRequests.ts). It also does NOT use

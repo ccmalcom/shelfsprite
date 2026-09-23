@@ -11,14 +11,27 @@ import { api, type Book, type Shelf } from '@/lib/api';
 interface Props {
   book: Book;
   onClose: () => void;
-  onMove: (book: Book, shelf: Shelf, thenReview?: boolean) => void;
-  onRemove: (book: Book) => void;
+  /** Required unless readOnly. */
+  onMove?: (book: Book, shelf: Shelf, thenReview?: boolean) => void;
+  onRemove?: (book: Book) => void;
   busy?: boolean;
+  /**
+   * Screen pages open a cited book with no shelf actions (spec §7.2), so no book page gains or
+   * loses a control.
+   */
+  readOnly?: boolean;
 }
 
 const LABEL_ID = 'book-detail-modal-title';
 
-export default function BookDetailModal({ book, onClose, onMove, onRemove, busy = false }: Props) {
+export default function BookDetailModal({
+  book,
+  onClose,
+  onMove,
+  onRemove,
+  busy = false,
+  readOnly = false,
+}: Props) {
   const [removeArmed, setRemoveArmed] = useState(false);
   const [showSimilar, setShowSimilar] = useState(false);
   // Books added before POST /books persisted a description have none, and no
@@ -55,12 +68,12 @@ export default function BookDetailModal({ book, onClose, onMove, onRemove, busy 
   if (book.page_count) meta.push(`${book.page_count} pages`);
 
   function handleMove(shelf: Shelf, thenReview = false) {
-    onMove(book, shelf, thenReview);
+    onMove?.(book, shelf, thenReview);
     onClose();
   }
 
   function handleRemove() {
-    onRemove(book);
+    onRemove?.(book);
     onClose();
   }
 
@@ -150,86 +163,90 @@ export default function BookDetailModal({ book, onClose, onMove, onRemove, busy 
               <ExternalLink className="h-3 w-3" />
             </a>
           ))}
-          <button
-            type="button"
-            onClick={() => setShowSimilar(true)}
-            className={[
-              'inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10',
-              'px-3 py-1 text-xs font-medium text-accent',
-              'transition hover:bg-accent/20',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-            ].join(' ')}
-          >
-            Find similar reads
-            <Sparkles className="h-3 w-3" />
-          </button>
-        </div>
-
-        {/* Shelf actions */}
-        <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-5">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleMove('currently-reading')}
-            className={[
-              'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted',
-              'transition hover:border-muted hover:text-text disabled:opacity-50',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-            ].join(' ')}
-          >
-            Start reading
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleMove('read', true)}
-            className={[
-              'rounded-md border border-success/40 bg-success/10 px-3 py-1.5 text-xs font-medium text-success',
-              'transition hover:bg-success/20 disabled:opacity-50',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success',
-            ].join(' ')}
-          >
-            Mark finished
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => handleMove('did-not-finish')}
-            className={[
-              'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-faint',
-              'transition hover:border-muted hover:text-text disabled:opacity-50',
-              'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-            ].join(' ')}
-          >
-            Did not finish
-          </button>
-          {removeArmed ? (
+          {!readOnly && (
             <button
               type="button"
-              disabled={busy}
-              onClick={handleRemove}
+              onClick={() => setShowSimilar(true)}
               className={[
-                'rounded-md border border-danger/60 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger',
-                'transition hover:bg-danger/20 disabled:opacity-50',
-              ].join(' ')}
-            >
-              {busy ? 'Removing\u2026' : 'Confirm remove'}
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setRemoveArmed(true)}
-              className={[
-                'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-faint',
-                'transition hover:border-danger/60 hover:text-danger disabled:opacity-50',
+                'inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10',
+                'px-3 py-1 text-xs font-medium text-accent',
+                'transition hover:bg-accent/20',
                 'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
               ].join(' ')}
             >
-              Remove
+              Find similar reads
+              <Sparkles className="h-3 w-3" />
             </button>
           )}
         </div>
+
+        {/* Shelf actions */}
+        {!readOnly && (
+          <div className="mt-6 flex flex-wrap gap-2 border-t border-border pt-5">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => handleMove('currently-reading')}
+              className={[
+                'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted',
+                'transition hover:border-muted hover:text-text disabled:opacity-50',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+              ].join(' ')}
+            >
+              Start reading
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => handleMove('read', true)}
+              className={[
+                'rounded-md border border-success/40 bg-success/10 px-3 py-1.5 text-xs font-medium text-success',
+                'transition hover:bg-success/20 disabled:opacity-50',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success',
+              ].join(' ')}
+            >
+              Mark finished
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => handleMove('did-not-finish')}
+              className={[
+                'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-faint',
+                'transition hover:border-muted hover:text-text disabled:opacity-50',
+                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+              ].join(' ')}
+            >
+              Did not finish
+            </button>
+            {removeArmed ? (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={handleRemove}
+                className={[
+                  'rounded-md border border-danger/60 bg-danger/10 px-3 py-1.5 text-xs font-semibold text-danger',
+                  'transition hover:bg-danger/20 disabled:opacity-50',
+                ].join(' ')}
+              >
+                {busy ? 'Removing\u2026' : 'Confirm remove'}
+              </button>
+            ) : (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setRemoveArmed(true)}
+                className={[
+                  'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-faint',
+                  'transition hover:border-danger/60 hover:text-danger disabled:opacity-50',
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                ].join(' ')}
+              >
+                Remove
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {showSimilar && <SimilarBooksModal book={book} onClose={() => setShowSimilar(false)} />}

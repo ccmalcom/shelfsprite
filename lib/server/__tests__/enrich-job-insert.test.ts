@@ -25,6 +25,7 @@ describe('enrich job insert', () => {
     const missing: NewJobValues = {
       jobId: 'job-1',
       userId: 'local',
+      kind: 'books',
       status: 'pending',
       force: false,
       runLimit: null,
@@ -34,6 +35,7 @@ describe('enrich job insert', () => {
     const complete: NewJobValues = {
       jobId: 'job-2',
       userId: 'local',
+      kind: 'books',
       status: 'pending',
       progress: 0,
       total: 0,

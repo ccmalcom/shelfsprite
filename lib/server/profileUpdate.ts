@@ -7,7 +7,7 @@
  */
 import { and, asc, eq, gt, inArray, isNotNull } from 'drizzle-orm';
 import { schema, type Db } from './db';
-import { effectiveRating, pyFloat, pyJsonDumps, pyRepr } from './serialize';
+import { effectiveRating, pyFloat, pyJsonDumps, pyRepr, utcnowTs } from './serialize';
 import { bookPayload, type BookRow, type EnrichmentRow } from './profileTiers';
 import {
   feedbackBlock,
@@ -25,6 +25,15 @@ import {
 import { ensureProfileMeta } from './profileMeta';
 import { trackedCreate } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
+import { readScreenToggledAt, isScreenEnabled } from './screenSettings';
+import { screenVariantActive, titlesChangedSince } from './screenProfile';
+import { titlePayload } from './screenTiers';
+import { effectiveTitleRating, isTitleProfileEvidence } from './titles';
+import {
+  buildScreenUpdatePrompt,
+  SCREEN_REVISE_SYSTEM,
+  SCREEN_REVISE_TOOL,
+} from './screenProfilePrompts';
 
 export const REVISE_TOOL = {
   name: 'revise_taste_traits',
@@ -171,6 +180,83 @@ export async function collectUpdateInputs(
   return { currentTraits, booksMeta, changedIds };
 }
 
+export interface ScreenUpdateInputs extends UpdateInputs {
+  titlesMeta: Map<string, Record<string, unknown>>;
+  changedTitleIds: number[];
+  /** Only these title ids may be cited: sent in titlesMeta AND still profile evidence. */
+  validTitleIds: Set<number>;
+}
+
+/**
+ * The screen variant's incremental payloads (spec 2026-09-22 §5.5): the book inputs, the current
+ * traits with their title citations, and a TITLES map of changed + already-cited titles with
+ * their current rating and status. A changed title that is no longer evidence is still SENT, so
+ * the model can see the retraction, but it is not a valid citation. Excluded titles are neither
+ * sent nor citable.
+ */
+export async function collectScreenUpdateInputs(
+  db: Db,
+  userId: string,
+  since: string | null
+): Promise<ScreenUpdateInputs> {
+  const base = await collectUpdateInputs(db, userId, since);
+
+  const refs = await db
+    .select({
+      id: schema.tasteTraits.id,
+      exhibitTitleIds: schema.tasteTraits.exhibitTitleIds,
+      contrastTitleIds: schema.tasteTraits.contrastTitleIds,
+    })
+    .from(schema.tasteTraits)
+    .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')))
+    .orderBy(asc(schema.tasteTraits.id));
+  const refsById = new Map(refs.map((r) => [r.id, r]));
+  const currentTraits = base.currentTraits.map((t) => {
+    const r = refsById.get(t.id as number);
+    return {
+      ...t,
+      exhibit_titles: (r?.exhibitTitleIds as number[] | null) ?? [],
+      contrast_titles: (r?.contrastTitleIds as number[] | null) ?? [],
+    };
+  });
+
+  const changed = await titlesChangedSince(db, since, userId);
+  const changedTitleIds = changed.filter((t) => !t.excludeFromProfile).map((t) => t.id);
+
+  const cited = new Set<number>();
+  for (const r of refs) {
+    for (const i of (r.exhibitTitleIds as number[] | null) ?? []) cited.add(i);
+    for (const i of (r.contrastTitleIds as number[] | null) ?? []) cited.add(i);
+  }
+  const wantedIds = [...new Set([...cited, ...changedTitleIds])];
+
+  const titlesMeta = new Map<string, Record<string, unknown>>();
+  const validTitleIds = new Set<number>();
+  if (wantedIds.length) {
+    const rows = await db
+      .select({ title: schema.titles, enrichment: schema.titleEnrichment })
+      .from(schema.titles)
+      .leftJoin(schema.titleEnrichment, eq(schema.titleEnrichment.titleId, schema.titles.id))
+      .where(
+        and(
+          eq(schema.titles.userId, userId),
+          inArray(schema.titles.id, wantedIds),
+          eq(schema.titles.excludeFromProfile, false)
+        )
+      )
+      .orderBy(asc(schema.titles.id));
+    for (const { title, enrichment } of rows) {
+      const payload = titlePayload(title, enrichment);
+      payload.rating = effectiveTitleRating(title);
+      payload.status = title.status;
+      titlesMeta.set(String(title.id), payload);
+      if (isTitleProfileEvidence(title)) validTitleIds.add(title.id);
+    }
+  }
+
+  return { ...base, currentTraits, titlesMeta, changedTitleIds, validTitleIds };
+}
+
 /**
  * Twin of profile.update_taste_profile. Four of its six branches never reach Claude;
  * see the branch table in the wave-3b plan. Like extractTasteProfile, the Claude call
@@ -182,6 +268,11 @@ export async function updateTasteProfile(
   userId: string,
   maxTokens: number = PROFILE_MAX_TOKENS
 ): Promise<Record<string, unknown>> {
+  // Before any read; see extractTasteProfile. The delegating branches below call
+  // extractTasteProfile, which captures its own start.
+  const runStartedAt = utcnowTs();
+  // [wave 6] Read at run start: a ScreenSprite toggle after this supersedes the run (§5.7).
+  const screenToggledAt = await readScreenToggledAt(db, userId);
   const model = profileModel();
 
   const existing = await db
@@ -197,8 +288,22 @@ export async function updateTasteProfile(
     return extractTasteProfile(db, client, userId, maxTokens);
   }
 
+  // A pending rebuild reason (screen enabled/disabled, a title deleted — spec §5.6) is a change
+  // the incremental prompt cannot express or retract. Only a full rebuild clears it, and it
+  // takes precedence over the "already up to date" early return below.
+  if (meta.rebuildReason !== null) {
+    return extractTasteProfile(db, client, userId, maxTokens);
+  }
+
   const changed = await booksChangedSince(db, since, userId);
   const changedIds = changed.filter((b) => !b.excludeFromProfile).map((b) => b.id);
+
+  // [wave 6] Spec §5.5: titles changed since the last build, eligible or not. Only while
+  // ScreenSprite is enabled; a disabled user's titles never enter a profile build.
+  const screenEnabled = await isScreenEnabled(db, userId);
+  const changedTitles = screenEnabled ? await titlesChangedSince(db, since, userId) : [];
+  const screenActive = screenEnabled && (await screenVariantActive(db, userId));
+  const changedTitleIds = changedTitles.filter((t) => !t.excludeFromProfile).map((t) => t.id);
 
   const traitVerdicts = await db
     .select({ id: schema.tasteTraits.id })
@@ -223,8 +328,15 @@ export async function updateTasteProfile(
     return extractTasteProfile(db, client, userId, maxTokens);
   }
 
-  if (!changedIds.length) {
-    if (!changed.length && !hasFeedbackSince) {
+  // [wave 6] Titles changed but none is evidence any more (all want, unrated or excluded).
+  // The book-variant update prompt cannot retract a title citation, and the status route
+  // reports these titles as changed, so a no-op would leave the profile dirty forever.
+  if (!screenActive && changedTitles.length > 0) {
+    return extractTasteProfile(db, client, userId, maxTokens);
+  }
+
+  if (!changedIds.length && !changedTitleIds.length) {
+    if (!changed.length && !changedTitles.length && !hasFeedbackSince) {
       return {
         mode: 'update',
         changed_books: 0,
@@ -239,7 +351,18 @@ export async function updateTasteProfile(
       // their (removed) metadata signal.
       return extractTasteProfile(db, client, userId, maxTokens);
     }
-    // Feedback-only update: fall through with an empty changedIds list.
+    // Feedback-only update: fall through with empty changed lists.
+  }
+
+  // [wave 6] The screen variant revises with titles; the book path below is unchanged.
+  if (screenActive) {
+    return reviseScreenProfile(db, client, userId, maxTokens, {
+      since,
+      traitsBefore: existing.length,
+      runStartedAt,
+      screenToggledAt,
+      model,
+    });
   }
 
   const inputs = await collectUpdateInputs(db, userId, since);
@@ -273,7 +396,16 @@ export async function updateTasteProfile(
   // Unlike the full build, valid ids come from books_meta, not the tiers.
   const validIds = new Set<number>([...inputs.booksMeta.keys()].map((k) => Number(k)));
 
-  const saved = await persistProposedTraits(db, userId, traits, validIds, 'update');
+  const saved = await persistProposedTraits(
+    db,
+    userId,
+    traits,
+    validIds,
+    'update',
+    runStartedAt,
+    null,
+    { expectedScreenToggledAt: screenToggledAt } // [wave 6]
+  );
 
   return {
     mode: 'update',
@@ -282,5 +414,76 @@ export async function updateTasteProfile(
     traits_before: existing.length,
     traits_after: saved,
     model,
+  };
+}
+
+interface ScreenReviseRun {
+  since: string;
+  traitsBefore: number;
+  runStartedAt: string;
+  screenToggledAt: string | null;
+  model: string;
+}
+
+/** [wave 6] The screen variant of the incremental revise (spec §5.4–§5.5). */
+async function reviseScreenProfile(
+  db: Db,
+  client: ClaudeClient,
+  userId: string,
+  maxTokens: number,
+  run: ScreenReviseRun
+): Promise<Record<string, unknown>> {
+  const inputs = await collectScreenUpdateInputs(db, userId, run.since);
+  const feedback = await feedbackContext(db, userId, { titles: true });
+  const prompt = buildScreenUpdatePrompt(
+    inputs.currentTraits,
+    inputs.booksMeta,
+    inputs.titlesMeta,
+    inputs.changedIds,
+    inputs.changedTitleIds,
+    feedback
+  );
+
+  const message = await trackedCreate(
+    client,
+    db,
+    { userId, operation: 'profile_update' },
+    {
+      model: run.model,
+      max_tokens: maxTokens,
+      system: SCREEN_REVISE_SYSTEM,
+      tools: [SCREEN_REVISE_TOOL],
+      tool_choice: { type: 'tool', name: 'revise_taste_traits' },
+      messages: [{ role: 'user', content: prompt }],
+    }
+  );
+
+  const input = toolInput(message, '');
+  let traits = (Array.isArray(input?.traits) ? input.traits : []) as Record<string, unknown>[];
+  traits = removeRejectedClaims(traits, feedback.rejected);
+  traits = removeRejectedClaims(traits, [...feedback.confirmed, ...feedback.edited]);
+
+  const validIds = new Set<number>([...inputs.booksMeta.keys()].map((k) => Number(k)));
+  const saved = await persistProposedTraits(
+    db,
+    userId,
+    traits,
+    validIds,
+    'update',
+    run.runStartedAt,
+    null,
+    { validTitleIds: inputs.validTitleIds, expectedScreenToggledAt: run.screenToggledAt }
+  );
+
+  return {
+    mode: 'update',
+    variant: 'screen',
+    changed_books: inputs.changedIds.length,
+    changed_titles: inputs.changedTitleIds.length,
+    books_sent: inputs.booksMeta.size,
+    titles_sent: inputs.titlesMeta.size,
+    traits_before: run.traitsBefore,
+    traits_after: saved,
+    model: run.model,
   };
 }

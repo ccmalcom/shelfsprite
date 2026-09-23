@@ -30,9 +30,10 @@ import {
   buildDiscoverRerankPrompt,
   buildInterpretPrompt,
 } from './recDiscoverPrompts';
-import { rankModel, RANK_MAX_TOKENS, SEED_MAX_TOKENS, SEED_MODEL } from './recPrompts';
+import { rankModel, RANK_MAX_TOKENS, SEED_MAX_TOKENS } from './recPrompts';
 import { buildSignal, type RecSignal } from './recSignal';
 import { round2 } from './serialize';
+import { modelFor } from './models';
 
 interface Interpretation {
   interpretation: string;
@@ -161,7 +162,7 @@ async function interpretQuery(
     db,
     { userId, operation: 'discover_interpret' },
     {
-      model: SEED_MODEL,
+      model: modelFor('seed'),
       max_tokens: SEED_MAX_TOKENS,
       system: DISCOVER_SYSTEM,
       tools: [DISCOVER_TOOL],

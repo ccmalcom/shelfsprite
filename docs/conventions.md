@@ -54,6 +54,32 @@
   change can require a full rebuild because an incremental prompt cannot retract missing metadata.
 - Ratings use half-star steps. Database columns remain `numeric(2,1)` with drizzle
   `mode: 'number'`; `0` is a clear/unrated sentinel, not a rating.
+- **`titles` is never dropped or recreated by a migration**, for the same reason as `books`. Its
+  rating columns reject `0`: unlike `books.goodreads_rating`, screen storage has no unrated
+  sentinel, only null. A Letterboxd re-import writes only `LETTERBOXD_OWNED_FIELDS`
+  (`lib/server/importTitles.ts`).
+- **Screen purge scope follows the spec §7.6 table.** Profile reset and book-library reset also
+  clear `title_recommendations`; account deletion clears every screen table. Book purge responses
+  do not report screen counts; `DELETE /api/screen/library` does.
+- **Screen catalog failure is not "no match".** Only a definite catalog answer (a 404, or a 200
+  with no hits) may be persisted as unresolved. A network error, 5xx, 429 after retries, other
+  4xx, unparseable body, or a request skipped for lack of time is `retryable`, and the title is
+  deferred: no `title_enrichment` row is written, so the next batch retries it. Search answers
+  503 on a retryable failure, never an empty list.
+- **Screen identity.** A movie's identity is `titles.wikidata_qid`; a show's is `titles.tvmaze_id`.
+  Identity columns are written only for `HIGH`/`MEDIUM` auto resolutions, manual adds and
+  corrections; a second title resolving to a held identity records `duplicate_of_title_id` and
+  keeps its own identity columns null. A `manual` or `corrected` identity is never overwritten by
+  a later job, forced or not.
+- **Screen cache retention.** Rows with `source like 'screen:%'` are pruned by the janitor at 90
+  days and beyond the newest 50,000. Book cache rows never expire.
+- **Screen recommendations follow the book two-stage rule.** Every candidate comes from a
+  Wikidata or TVmaze lookup; Claude's seeds are lookup inputs, never candidates. Each pool
+  requires an English Wikipedia article and at least 10 sitelinks, and a series without a TVmaze
+  id never enters the pool.
+- **Acting on a screen recommendation never overwrites the library.** An existing title (matched
+  by QID, TVmaze id, or normalized title plus year) is returned unchanged. A new one is created
+  with `feedback_updated_at` null, so accepting a recommendation never forces a re-profile.
 
 ## Search and recommender
 

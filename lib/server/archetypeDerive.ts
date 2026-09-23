@@ -13,8 +13,9 @@ import { toolInput } from './claude';
 import { trackedCreate } from './anthropic';
 import { utcnowTs } from './serialize';
 import { ARCHETYPES, scoresToCode } from './archetype';
-
-export const ARCHETYPE_MODEL = 'claude-haiku-4-5-20251001';
+import { modelFor } from './models';
+import { readScreenToggledAt } from './screenSettings';
+import { assertScreenToggleUnchanged } from './screenProfile';
 
 // Copied verbatim from mylibrary/archetype.py:193-198.
 export const ARCHETYPE_SYSTEM =
@@ -189,6 +190,9 @@ export async function deriveArchetype(
   client: ClaudeClient,
   userId: string
 ): Promise<ArchetypeResult> {
+  // Spec 2026-09-22 §5.7: an archetype derived from traits a ScreenSprite toggle has since
+  // deleted must not land. Read now, re-checked inside the write transaction.
+  const screenToggledAt = await readScreenToggledAt(db, userId);
   const traits = await db
     .select({ claim: schema.tasteTraits.claim, polarity: schema.tasteTraits.polarity })
     .from(schema.tasteTraits)
@@ -204,7 +208,7 @@ export async function deriveArchetype(
     db,
     { userId, operation: 'archetype' },
     {
-      model: ARCHETYPE_MODEL,
+      model: modelFor('archetype'),
       max_tokens: 512,
       system: ARCHETYPE_SYSTEM,
       tools: [ARCHETYPE_TOOL],
@@ -244,6 +248,7 @@ export async function deriveArchetype(
   };
 
   await db.transaction(async (tx) => {
+    await assertScreenToggleUnchanged(tx, userId, screenToggledAt);
     const existing = await tx
       .select({ id: schema.readerArchetypes.id })
       .from(schema.readerArchetypes)

@@ -1,5 +1,6 @@
 import { eq, inArray } from 'drizzle-orm';
 import { schema, type DbTx } from './db';
+import { deleteScreenLibraryRows, deleteTitleRecommendationRows } from './screenPurge';
 
 export type ProfilePurgeResult = {
   traits_removed: number;
@@ -26,6 +27,9 @@ export async function deleteProfileRows(tx: DbTx, userId: string): Promise<Profi
     .delete(schema.recommendations)
     .where(eq(schema.recommendations.userId, userId))
     .returning({ id: schema.recommendations.id });
+  // Spec §7.6: every profile reset clears BOTH recommendation tables. Not reported: the response
+  // keys are pinned Python-parity counts; DELETE /api/screen/library reports screen counts.
+  await deleteTitleRecommendationRows(tx, userId);
   await tx.delete(schema.profileMeta).where(eq(schema.profileMeta.userId, userId));
   await tx.delete(schema.readerArchetypes).where(eq(schema.readerArchetypes.userId, userId));
 
@@ -57,6 +61,9 @@ export async function deleteLibraryRows(tx: DbTx, userId: string): Promise<numbe
 export async function deleteAccountRows(tx: DbTx, userId: string): Promise<AccountPurgeResult> {
   const profile = await deleteProfileRows(tx, userId);
   const books_removed = await deleteLibraryRows(tx, userId);
+  // Wire every user-owned table into account deletion (docs/conventions.md). Runs before the
+  // user_settings delete; title signals are counted into signals_removed below.
+  const screen = await deleteScreenLibraryRows(tx, userId);
   const settings = await tx
     .delete(schema.userSettings)
     .where(eq(schema.userSettings.userId, userId))
@@ -87,7 +94,7 @@ export async function deleteAccountRows(tx: DbTx, userId: string): Promise<Accou
     ...profile,
     settings_removed: settings.length,
     goals_removed: goals.length,
-    signals_removed: signals.length,
+    signals_removed: signals.length + screen.title_signals_removed,
     jobs_removed: jobs.length,
     usage_events_removed: usage.length,
     directive_removed: directive.length,

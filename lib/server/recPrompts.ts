@@ -6,7 +6,7 @@
  * parity-recommend-prompts.test.ts. Do not reflow or re-punctuate them.
  */
 import { readPreferences } from './preferences';
-import { profileModel } from './profileBuild';
+import { modelFor } from './models';
 import type { AssembledCandidate } from './recAssemble';
 import { LOVED_SAMPLE, type RecSignal } from './recSignal';
 import { pyJsonDumps } from './serialize';
@@ -19,7 +19,6 @@ export interface PromptBlock {
 
 // --- stage 1b: propose search queries --------------------------------------
 
-export const SEED_MODEL = 'claude-haiku-4-5-20251001';
 export const SEED_MAX_TOKENS = 1500;
 
 export const SEED_TOOL = {
@@ -66,9 +65,9 @@ export const SEED_SYSTEM =
 
 export const RANK_MAX_TOKENS = 4000;
 
-/** Python reads settings.model at call time; profileModel() is the same env lookup. */
+/** The rerank model (lib/server/models.ts), read at call time. */
 export function rankModel(): string {
-  return profileModel();
+  return modelFor('rerank');
 }
 
 export const RANK_TOOL = {

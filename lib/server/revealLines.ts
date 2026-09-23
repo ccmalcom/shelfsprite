@@ -22,8 +22,9 @@ import { toolInput } from './claude';
 import { trackedCreate } from './anthropic';
 import { pyJsonDumps } from './serialize';
 import { REVEAL_NO_KEY_MESSAGE } from './claudeErrors';
-
-export const REVEAL_MODEL = 'claude-haiku-4-5-20251001';
+import { modelFor } from './models';
+import { readScreenToggledAt } from './screenSettings';
+import { assertScreenToggleUnchanged } from './screenProfile';
 
 // Copied verbatim from mylibrary/reveal.py:27-34.
 export const REVEAL_SYSTEM =
@@ -143,6 +144,9 @@ export async function generateRevealLines(
   userId: string,
   maxTokens = 1200
 ): Promise<RevealLinesResult> {
+  // Spec 2026-09-22 §5.7: see archetypeDerive.ts. Read now, re-checked inside the write.
+  const screenToggledAt = await readScreenToggledAt(db, userId);
+  const model = modelFor('reveal');
   const pending = await db
     .select({
       id: schema.tasteTraits.id,
@@ -154,7 +158,7 @@ export async function generateRevealLines(
     .orderBy(asc(schema.tasteTraits.id));
 
   if (pending.length === 0) {
-    return { generated: 0, traits: 0, model: REVEAL_MODEL };
+    return { generated: 0, traits: 0, model };
   }
 
   if (!client) {
@@ -172,7 +176,7 @@ export async function generateRevealLines(
     db,
     { userId, operation: 'reveal_lines' },
     {
-      model: REVEAL_MODEL,
+      model,
       max_tokens: maxTokens,
       system: REVEAL_SYSTEM,
       tools: [REVEAL_TOOL],
@@ -201,6 +205,7 @@ export async function generateRevealLines(
   const validIds = new Set(payload.map((p) => p.id));
   let generated = 0;
   await db.transaction(async (tx) => {
+    await assertScreenToggleUnchanged(tx, userId, screenToggledAt);
     for (const [tid, line] of byId) {
       if (!validIds.has(tid)) continue;
       const rows = await tx
@@ -222,5 +227,5 @@ export async function generateRevealLines(
     }
   });
 
-  return { generated, traits: payload.length, model: REVEAL_MODEL };
+  return { generated, traits: payload.length, model };
 }

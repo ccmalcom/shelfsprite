@@ -6,14 +6,19 @@ import { LogOut, Shield, User, X } from 'lucide-react';
 import useSWR from 'swr';
 import { authEnabled, getSupabaseClient } from '@/utils/supabase/client';
 import { adminMe, ADMIN_ME_KEY } from '@/lib/api';
-import { NAV_ROUTES } from '@/lib/nav';
-import BrandLogo from '@/components/BrandLogo';
+import { navRoutesFor, sectionFor } from '@/lib/nav';
+import { useScreenSettings } from '@/lib/useScreenSettings';
+import SectionSwitch from '@/components/SectionSwitch';
+import Wordmark from '@/components/Wordmark';
 import FeedbackLauncher from '@/components/FeedbackLauncher';
 import FeedbackModal from '@/components/FeedbackModal';
 import { Modal } from '@/components/ui';
 
 export default function NavBar() {
   const pathname = usePathname();
+  const section = sectionFor(pathname);
+  const { enabled: screenEnabled } = useScreenSettings();
+  const showSwitch = screenEnabled;
   const { data: me } = useSWR(ADMIN_ME_KEY, adminMe);
   const [accountOpen, setAccountOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -73,27 +78,42 @@ export default function NavBar() {
         Skip to content
       </a>
       <header className="shell-nav">
-        <Link href="/" aria-label="ShelfSprite home" className="shrink-0 rounded">
-          <BrandLogo alt="" priority sizes="160px" className="h-auto w-[150px] lg:w-[170px]" />
+        <Link
+          href={section === 'screen' ? '/screen' : '/'}
+          aria-label={section === 'screen' ? 'ScreenSprite home' : 'ShelfSprite home'}
+          // One box for both wordmarks, so the section switch holds still between sections: at lg
+          // the book logo is ~41.6 px tall and the ScreenSprite mark 28 px; on a phone the switch
+          // sits beside a 112 px logo or a 140 px mark.
+          className={[
+            'shrink-0 rounded lg:flex lg:h-[42px] lg:items-center',
+            showSwitch ? 'min-w-[141px] lg:min-w-0' : '',
+          ].join(' ')}
+        >
+          <Wordmark section={section} compact={showSwitch} />
         </Link>
+        {showSwitch && <SectionSwitch active={section} className="lg:mt-6 lg:self-start" />}
         <nav
           aria-label="Desktop navigation"
           className="hidden lg:flex lg:flex-1 lg:flex-col lg:gap-1 lg:mt-12"
         >
-          <p className="mb-3 px-3 text-[11px] uppercase tracking-[0.18em] text-faint">
-            Your reading room
+          {/* No right padding and no wrap: "Your screening room" is 4.5 px wider than the rail's
+              text box and would otherwise take two lines. */}
+          <p className="mb-3 whitespace-nowrap pl-3 text-[11px] uppercase tracking-[0.18em] text-faint">
+            {section === 'screen' ? 'Your screening room' : 'Your reading room'}
           </p>
-          {NAV_ROUTES.filter((r) => r.primary).map(({ href, label, Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              aria-current={pathname === href ? 'page' : undefined}
-              className="shell-link"
-            >
-              <Icon size={19} aria-hidden="true" />
-              {label}
-            </Link>
-          ))}
+          {navRoutesFor(section)
+            .filter((r) => r.primary)
+            .map(({ href, label, Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                aria-current={pathname === href ? 'page' : undefined}
+                className="shell-link"
+              >
+                <Icon size={19} aria-hidden="true" />
+                {label}
+              </Link>
+            ))}
           <div className="mt-auto border-t border-border pt-4">{utilityLinks()}</div>
         </nav>
         <button
@@ -103,7 +123,8 @@ export default function NavBar() {
           onClick={() => setAccountOpen(true)}
           aria-haspopup="dialog"
         >
-          <User size={18} aria-hidden="true" /> Account
+          <User size={18} aria-hidden="true" />
+          <span className={showSwitch ? 'sr-only sm:not-sr-only' : undefined}>Account</span>
         </button>
       </header>
       {feedbackOpen && (

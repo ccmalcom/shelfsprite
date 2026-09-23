@@ -56,6 +56,44 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 - `lib/tasteAccent.ts` — maps 4-letter archetype code to one of 16 curated HSL colors (warm for Immersive types, cool for Reflective); falls back to hash-derived color.
 - `lib/useStickySort.ts` — `useStickySort(storageKey, fallback, allowed)`, a `useState` drop-in that persists a sort choice in `localStorage`. Built on `useSyncExternalStore` rather than `useState` + an effect: the server snapshot returns `fallback`, so the prerender and the hydrating render agree and React swaps the stored value in itself (reading storage during render is a hydration mismatch, and setting it from an effect trips `react-hooks/set-state-in-effect`). A stored value is only accepted if it is still in `allowed` — each caller's comparator is an exhaustive `switch` over its sort union, so a key left by a renamed option would fall through, return `undefined`, and throw inside `Array.prototype.sort`. Writes also land in a module-scoped map so the control keeps working where `setItem` throws (private browsing, disabled site data); the preference just doesn't outlive the session.
 
+## ScreenSprite (movies & TV)
+
+An opt-in section (spec `docs/superpowers/specs/2026-09-22-screen-media-design.md` §7). User-facing
+copy says ScreenSprite; code, routes and keys say `screen`.
+
+- **Navigation.** `lib/nav.ts#sectionFor(pathname)` derives the section from the URL (`/screen`
+  or `/screen/*`); it is never stored. `navRoutesFor(section)` picks `NAV_ROUTES` or
+  `SCREEN_NAV_ROUTES` (For you, Library, Profile) for the rail and the bottom nav.
+  `components/SectionSwitch.tsx` (Books | Screen) renders only while ScreenSprite is on, and the
+  wordmark (`components/Wordmark.tsx`) reads ScreenSprite inside the section. At 390 px the
+  account button drops to its icon and the logo narrows while the switch shows.
+- **The gate.** `app/(main)/screen/layout.tsx` is a server layout (`metadata.title`
+  `'ScreenSprite'`) wrapping `components/screen/ScreenGate.tsx`, which sends a reader without
+  ScreenSprite to `/settings#screen`. Screen reads pass `handleScreenError`
+  (`lib/screenCache.ts`) as SWR `onError`: a 403 re-reads the settings so the gate redirects
+  without a reload. Screen routes are not behind `LibraryGate`.
+- **Client.** `lib/api.ts#screenApi` throws `ApiRequestError(status, detail)`; show `message`,
+  which is the route's `detail`. Keys: `SCREEN_SETTINGS_KEY`, `SCREEN_TITLES_KEY`,
+  `SCREEN_RECS_KEY`, `SCREEN_ACTIVE_JOB_KEY`, `REVEAL_TITLES_KEY`, `BOOKS_ALL_KEY`.
+- **Invalidation (§7.7).** `invalidateTitleEdits()` after any title edit, correction, removal or
+  add (profile status goes dirty). `invalidateScreenState()` after turning ScreenSprite off or
+  deleting the screen library (traits, archetype, reveal, status, every screen key, in the
+  three-argument form). Neither blanks `SCREEN_SETTINGS_KEY`; callers write the fresh settings.
+- **Images.** `components/screen/TitleTile.tsx` hotlinks posters with `next/image`
+  `unoptimized`, so nothing is copied and `images.remotePatterns` stays limited to the book
+  cover hosts. A missing or failed image falls back to a typographic tile, remembered per URL.
+  Posters never appear on the marketing page.
+- **Attribution (§7.9).** Every shown description carries `DescriptionSource` (Wikipedia names
+  and links the article, CC BY-SA 4.0; TVmaze links back). Every `/screen` page ends with
+  `ScreenCredits`. Recommendation cards and search results show no description.
+- **Profile.** `components/profile/ProfileView.tsx` is the profile body; `/profile` and
+  `/screen/profile` both render it. It passes a title evidence map to `TraitsSection` only while
+  ScreenSprite is on; `TraitRow` and `lib/revealBeats.ts` put books first and let titles fill
+  the remaining evidence slots, so a books-only reader sees no change.
+- **Reject picker.** `components/RejectReasonPicker.tsx` is shared by `/swipe` (book vocabulary)
+  and `/screen` (`SCREEN_REJECT_REASONS`). An empty reason list is sent as a bare
+  `{status: 'rejected'}` to the screen route, which refuses an empty list.
+
 ## Routes (`app/`)
 
 - `/welcome` — the public marketing page, in the `(marketing)` route group. Served at `/` for
@@ -90,7 +128,7 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
   the reader still submits Search. Results use the same divided list rhythm as Library.
 - `/to-read` — legacy redirect to `/library?tab=to-read`; it has no independent page UI.
 - `/library` — Read includes unrated books directly in its list, not only via the review queue; click a row to re-rate/review; each tab's sort dropdown is sticky per tab via `useStickySort` under `shelfsprite:library-sort:<tab>` (issue #63), so the hardcoded default only applies to a browser that has never chosen one — search text and the star-band filter stay transient by design; "N books waiting on a rating" button steps through unrated read books; **+ Add book** button opens `AddBookModal`; "N books need a match check" button (shown whenever any book across all four shelves has `confidence_label === 'LOW'`) steps through `EnrichmentCorrectionModal`.
-- `/profile` — `TasteHero` archetype card at top; taste traits with inline editing, `CustomInstructions` editor, rating distribution, genre breakdown. Also carries the **mobile escape-hatch row** (`sm:hidden`, top-right): links to `/settings` and — gated on `me?.is_admin` — `/admin`. Both routes are unreachable on a phone otherwise, since the `NavBar` link row is `hidden sm:flex` and the `BottomNav` is capped at 5 items (issue #80).
+- `/profile` — `TasteHero` archetype card at top; taste traits as compact, independently expandable rows (`components/profile/TraitsSection.tsx`, `components/profile/TraitRow.tsx`): a collapsed row shows polarity, a two-line claim, confidence, any non-`proposed` status, the reduced-weight marker and rejected dimming; the expanded panel holds evidence (`e.g.` / `unlike`), Confirm / Not me / Apply less, and **Reword**, which opens the inline editor (a row cannot collapse while editing). `?trait=<id>` opens and scrolls to that trait once traits load, resetting the Loves/Avoids filter to All when it would hide it; it is read with `useSearchParams` inside a `<Suspense>` boundary (required for the production build) because Next's router navigates with `history.pushState`, so a `#hash` would not react to client navigation. Then the `CustomInstructions` editor, rating distribution, genre breakdown. Also carries the **mobile escape-hatch row** (`sm:hidden`, top-right): links to `/settings` and — gated on `me?.is_admin` — `/admin`. Both routes are unreachable on a phone otherwise, since the `NavBar` link row is `hidden sm:flex` and the `BottomNav` is capped at 5 items (issue #80).
 - `/setup` — CSV import wizard plus a no-CSV "add books manually" branch (`ManualStep`). Now a thin wrapper around `components/SetupWizard.tsx`. `UploadStep` also links a downloadable blank template (`public/shelfsprite-template.csv`, headers = the `canonical` import format) for testers with no Goodreads/StoryGraph export — fills through the same upload/`detect_format` path, no separate code path.
 - `/settings` — API key management, **Claude usage this month** panel, + Danger Zone.
   The usage panel (`getUsage` / `USAGE_KEY` SWR call) shows month-to-date spend vs. the

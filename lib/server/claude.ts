@@ -38,7 +38,12 @@ export interface ClaudeMessage {
   usage?: Record<string, number> | null;
 }
 export interface ClaudeClient {
-  messages: { create(params: Record<string, unknown>): Promise<ClaudeMessage> };
+  messages: {
+    create(
+      params: Record<string, unknown>,
+      options?: { signal?: AbortSignal }
+    ): Promise<ClaudeMessage>;
+  };
 }
 
 export function makeAnthropicClient(apiKey: string): ClaudeClient {

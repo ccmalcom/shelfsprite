@@ -12,6 +12,9 @@ export function traitOut(t: TraitRow) {
     polarity: t.polarity,
     exhibits: t.exhibits,
     contrasts: t.contrasts,
+    // Spec 2026-09-22 §5.4: typed title evidence, a separate id namespace from `exhibits`.
+    exhibit_title_ids: (t.exhibitTitleIds as number[] | null) ?? [],
+    contrast_title_ids: (t.contrastTitleIds as number[] | null) ?? [],
     inference_confidence: t.inferenceConfidence,
     status: t.status,
     user_note: t.userNote,
