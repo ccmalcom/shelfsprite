@@ -15,8 +15,9 @@ import {
   recordTasteSignal,
   PROFILE_STATUS_KEY,
 } from '@/lib/api';
-import { Button, Spinner, useToast, Modal } from '@/components/ui';
+import { Button, Spinner, useToast } from '@/components/ui';
 import SwipeCard from '@/components/SwipeCard';
+import RejectReasonPicker from '@/components/RejectReasonPicker';
 import BookEditModal from '@/components/BookEditModal';
 import { useFeedbackPrompt } from '@/hooks/useFeedbackPrompt';
 import ShelfSprite from '@/components/ShelfSprite';
@@ -27,7 +28,6 @@ export default function SwipePage() {
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const [reviewing, setReviewing] = useState<Book | null>(null);
   const [pendingRejectId, setPendingRejectId] = useState<number | null>(null);
-  const [selectedReasons, setSelectedReasons] = useState<Set<string>>(new Set());
 
   const {
     data: recs,
@@ -58,7 +58,6 @@ export default function SwipePage() {
     async (recId: number, status: 'accepted' | 'rejected' | 'already_read') => {
       if (status === 'rejected') {
         setPendingRejectId(recId);
-        setSelectedReasons(new Set());
         return;
       }
       setDismissed((prev) => new Set([...prev, recId]));
@@ -79,18 +78,6 @@ export default function SwipePage() {
     [toast]
   );
 
-  const toggleReason = useCallback((key: string) => {
-    setSelectedReasons((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) {
-        next.delete(key);
-      } else {
-        next.add(key);
-      }
-      return next;
-    });
-  }, []);
-
   const handleTasteSignal = useCallback(async (rec: Recommendation, direction: 'more' | 'less') => {
     try {
       await recordTasteSignal({
@@ -109,22 +96,25 @@ export default function SwipePage() {
     }
   }, []);
 
-  const submitReject = useCallback(async () => {
-    if (pendingRejectId === null) return;
-    const recId = pendingRejectId;
-    setPendingRejectId(null);
-    setDismissed((prev) => new Set([...prev, recId]));
-    try {
-      await rejectRecWithReasons(recId, [...selectedReasons]);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'Failed to save decision.');
-      setDismissed((prev) => {
-        const next = new Set(prev);
-        next.delete(recId);
-        return next;
-      });
-    }
-  }, [pendingRejectId, selectedReasons, toast]);
+  const submitReject = useCallback(
+    async (reasons: string[]) => {
+      if (pendingRejectId === null) return;
+      const recId = pendingRejectId;
+      setPendingRejectId(null);
+      setDismissed((prev) => new Set([...prev, recId]));
+      try {
+        await rejectRecWithReasons(recId, reasons);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'Failed to save decision.');
+        setDismissed((prev) => {
+          const next = new Set(prev);
+          next.delete(recId);
+          return next;
+        });
+      }
+    },
+    [pendingRejectId, toast]
+  );
 
   if (recsLoading) {
     return (
@@ -321,55 +311,15 @@ export default function SwipePage() {
       )}
       {recsModal}
       {pendingRejectId !== null && (
-        <Modal
+        <RejectReasonPicker
           labelId="reject-reason-title"
-          onClose={() => {
-            setPendingRejectId(null);
-            setSelectedReasons(new Set());
-          }}
-          className="w-full max-w-sm rounded-2xl bg-surface p-6 shadow-xl"
-        >
-          <p id="reject-reason-title" className="mb-1 text-sm font-semibold text-text">
-            What missed?
-          </p>
-          <p className="mb-4 text-xs text-muted">
-            Optional. Every reason makes the next batch smarter.
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {Object.entries(REJECT_REASONS).map(([key, label]) => {
-              const active = selectedReasons.has(key);
-              return (
-                <button
-                  key={key}
-                  onClick={() => toggleReason(key)}
-                  className={[
-                    'rounded-full border px-3 py-1 text-xs font-medium transition',
-                    active
-                      ? 'border-accent bg-accent/20 text-accent'
-                      : 'border-border bg-base text-muted hover:border-accent hover:text-accent',
-                  ].join(' ')}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-          <div className="mt-5 flex gap-3 justify-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setPendingRejectId(null);
-                setSelectedReasons(new Set());
-              }}
-            >
-              Cancel
-            </Button>
-            <Button size="sm" onClick={submitReject}>
-              {selectedReasons.size > 0 ? 'Skip with reason' : 'Skip this book'}
-            </Button>
-          </div>
-        </Modal>
+          heading="What missed?"
+          hint="Optional. Every reason makes the next batch smarter."
+          reasons={REJECT_REASONS}
+          skipLabel="Skip this book"
+          onSubmit={(reasons) => void submitReject(reasons)}
+          onCancel={() => setPendingRejectId(null)}
+        />
       )}
     </>
   );

@@ -1,0 +1,96 @@
+import type { ScreenCandidate, TitleOut, TitleRec } from '@/lib/api';
+
+/** Synthetic library titles for UI tests. Never a real export. */
+export function makeTitle(over: Partial<TitleOut> = {}): TitleOut {
+  return {
+    id: 1,
+    media_type: 'movie',
+    title: 'Heat',
+    year: 1995,
+    status: 'watched',
+    rating: 4,
+    app_rating: null,
+    letterboxd_rating: 4,
+    review: null,
+    app_review: null,
+    letterboxd_review: null,
+    last_watched_on: '2026-08-01',
+    is_favorite: false,
+    exclude_from_profile: false,
+    wikidata_qid: 'Q100',
+    tvmaze_id: null,
+    created_at: '2026-09-01T10:00:00',
+    enrichment: {
+      confidence_label: 'HIGH',
+      resolution_confidence: 0.95,
+      match_method: 'title_year',
+      identity_source: 'auto',
+      image_url: 'https://upload.wikimedia.org/wikipedia/en/0/00/heat.jpg',
+      description: 'A crime film about a detective and a thief.',
+      description_source: 'wikipedia',
+      description_url: 'https://en.wikipedia.org/wiki/Heat_(1995_film)',
+      wikipedia_page: 'Heat (1995 film)',
+      genres: ['crime film'],
+      directors: ['Michael Mann'],
+      creators: [],
+      duplicate_of_title_id: null,
+    },
+    ...over,
+  };
+}
+
+export function makeCandidate(over: Partial<ScreenCandidate> = {}): ScreenCandidate {
+  return {
+    media_type: 'movie',
+    title: 'Heat',
+    year: 1995,
+    wikidata_qid: 'Q100',
+    tvmaze_id: null,
+    image_url: null,
+    description: 'A crime film.',
+    description_source: 'wikipedia',
+    description_url: 'https://en.wikipedia.org/wiki/Heat_(1995_film)',
+    wikipedia_page: 'Heat (1995 film)',
+    genres: ['crime film'],
+    directors: ['Michael Mann'],
+    creators: [],
+    writers: ['Michael Mann'],
+    countries: ['United States'],
+    original_language: 'en',
+    based_on: [],
+    main_subjects: [],
+    series: [],
+    production_companies: [],
+    sitelinks: 60,
+    ...over,
+  };
+}
+
+export function makeRec(over: Partial<TitleRec> = {}): TitleRec {
+  return {
+    id: 1,
+    run_id: 'run000000001',
+    rank: 1,
+    media_type: 'movie',
+    media_filter: 'both',
+    title: 'Thief',
+    year: 1981,
+    wikidata_qid: 'Q200',
+    tvmaze_id: null,
+    image_url: null,
+    genres: ['crime film'],
+    description: null,
+    retrieval_pool: 'metadata',
+    seed_reason: null,
+    score: 0.9,
+    rationale: 'Same patient, procedural tension you rated highly.',
+    grounded_trait_ids: [],
+    grounded_book_ids: [],
+    grounded_title_ids: [],
+    status: 'served',
+    user_note: null,
+    reject_reasons: null,
+    created_at: '2026-09-20T10:00:00',
+    ...over,
+  };
+}
