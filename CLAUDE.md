@@ -171,6 +171,12 @@ nothing” does not prove production has no drift. Verify production columns, nu
 checked-in schema and snapshot, inspect the SQL, then apply through the documented drizzle
 workflow.
 
+**Before merging a PR that adds a migration**, run `npm run db:migrate` against production and
+confirm the new shape with `information_schema.columns`. Merging deploys on its own, so unmigrated
+code goes live the moment the merge lands, and a "migrate before deploying" note in the PR body is
+not a guard: PR #98 (2026-09-23) merged with exactly that note in place and the live app failed for
+over an hour until the migration was run by hand.
+
 ## Product decisions
 
 The approved application design combines Ink & Paper’s desktop rail and reading-first layout
