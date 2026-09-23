@@ -66,6 +66,14 @@ export const profileMeta = pgTable(
     lastProfileKind: varchar('last_profile_kind'),
     recFeedbackUpdatedAt: timestamp('rec_feedback_updated_at', { mode: 'string' }),
     enrichmentCorrectedAt: timestamp('enrichment_corrected_at', { mode: 'string' }),
+    // Why the next profile build must be a FULL rebuild (spec 2026-09-22 §5.6), e.g. screen
+    // was enabled or a title was deleted: changes the incremental prompt cannot retract.
+    // Null = no pending reason. Set via profileMeta.ts#setRebuildReason (first reason wins);
+    // cleared only by a completed full rebuild that started after the last request.
+    rebuildReason: varchar('rebuild_reason'),
+    // Bumped by every setRebuildReason call, even when a reason is already pending, so a
+    // request that lands while a full build is running is never cleared by that build.
+    rebuildRequestedAt: timestamp('rebuild_requested_at', { mode: 'string' }),
   },
   (table) => [
     uniqueIndex('ix_profile_meta_user_id').using(

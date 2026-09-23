@@ -134,7 +134,9 @@ export async function makeTestDb(): Promise<{ db: Db; close: () => Promise<void>
       last_profiled_at timestamp,
       last_profile_kind text,
       rec_feedback_updated_at timestamp,
-      enrichment_corrected_at timestamp
+      enrichment_corrected_at timestamp,
+      rebuild_reason text,
+      rebuild_requested_at timestamp
     );
     create table user_settings (
       id serial primary key,

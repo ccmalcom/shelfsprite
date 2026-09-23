@@ -50,6 +50,13 @@
       "when": 1787687928994,
       "tag": "0006_nervous_thor",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790138644370,
+      "tag": "0007_futuristic_marauders",
+      "breakpoints": true
     }
   ]
 }
