@@ -79,19 +79,30 @@ export async function recordUsage(
   }
 }
 
+/** The subset of the SDK's per-request options this app uses. */
+export interface RequestOptionsLike {
+  signal?: AbortSignal;
+}
+
 interface MessagesClient {
-  messages: { create: (params: Record<string, unknown>) => Promise<unknown> };
+  messages: {
+    create: (params: Record<string, unknown>, options?: RequestOptionsLike) => Promise<unknown>;
+  };
 }
 
 export async function trackedCreate<T extends MessagesClient>(
   client: T,
   db: Db,
   meta: { userId: string; operation: string },
-  params: { model: string } & Record<string, unknown>
+  params: { model: string } & Record<string, unknown>,
+  // Optional and forwarded ONLY when given: every existing caller (and every test that
+  // asserts `create` was called with exactly the params) keeps its one-argument call.
+  requestOptions?: RequestOptionsLike
 ): Promise<Awaited<ReturnType<T['messages']['create']>>> {
-  const message = (await client.messages.create(params)) as Awaited<
-    ReturnType<T['messages']['create']>
-  >;
+  const pending = requestOptions
+    ? client.messages.create(params, requestOptions)
+    : client.messages.create(params);
+  const message = (await pending) as Awaited<ReturnType<T['messages']['create']>>;
   const usage = (message as { usage?: UsageLike | null })?.usage ?? null;
   await recordUsage(db, {
     userId: meta.userId,

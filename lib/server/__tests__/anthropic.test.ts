@@ -117,4 +117,33 @@ describe('trackedCreate', () => {
       model: 'claude-sonnet-4-6',
     });
   });
+
+  it('forwards request options only when given, so existing callers still pass one argument', async () => {
+    const calls: unknown[][] = [];
+    const client = {
+      messages: {
+        create: async (...args: unknown[]) => {
+          calls.push(args);
+          return { content: [], usage: null };
+        },
+      },
+    };
+    const controller = new AbortController();
+    await trackedCreate(
+      client,
+      db,
+      { userId: 'u3', operation: 'screen_rec_seed' },
+      { model: 'claude-haiku-4-5-20251001' },
+      { signal: controller.signal }
+    );
+    await trackedCreate(
+      client,
+      db,
+      { userId: 'u3', operation: 'screen_rec_seed' },
+      { model: 'claude-haiku-4-5-20251001' }
+    );
+    expect(calls[0]).toHaveLength(2);
+    expect((calls[0][1] as { signal: AbortSignal }).signal).toBe(controller.signal);
+    expect(calls[1]).toHaveLength(1);
+  });
 });
