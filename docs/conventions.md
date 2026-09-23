@@ -61,6 +61,18 @@
 - **Screen purge scope follows the spec §7.6 table.** Profile reset and book-library reset also
   clear `title_recommendations`; account deletion clears every screen table. Book purge responses
   do not report screen counts; `DELETE /api/screen/library` does.
+- **Screen catalog failure is not "no match".** Only a definite catalog answer (a 404, or a 200
+  with no hits) may be persisted as unresolved. A network error, 5xx, 429 after retries, other
+  4xx, unparseable body, or a request skipped for lack of time is `retryable`, and the title is
+  deferred: no `title_enrichment` row is written, so the next batch retries it. Search answers
+  503 on a retryable failure, never an empty list.
+- **Screen identity.** A movie's identity is `titles.wikidata_qid`; a show's is `titles.tvmaze_id`.
+  Identity columns are written only for `HIGH`/`MEDIUM` auto resolutions, manual adds and
+  corrections; a second title resolving to a held identity records `duplicate_of_title_id` and
+  keeps its own identity columns null. A `manual` or `corrected` identity is never overwritten by
+  a later job, forced or not.
+- **Screen cache retention.** Rows with `source like 'screen:%'` are pruned by the janitor at 90
+  days and beyond the newest 50,000. Book cache rows never expire.
 
 ## Search and recommender
 
