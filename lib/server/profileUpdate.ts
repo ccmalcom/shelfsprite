@@ -7,7 +7,7 @@
  */
 import { and, asc, eq, gt, inArray, isNotNull } from 'drizzle-orm';
 import { schema, type Db } from './db';
-import { effectiveRating, pyFloat, pyJsonDumps, pyRepr } from './serialize';
+import { effectiveRating, pyFloat, pyJsonDumps, pyRepr, utcnowTs } from './serialize';
 import { bookPayload, type BookRow, type EnrichmentRow } from './profileTiers';
 import {
   feedbackBlock,
@@ -182,6 +182,9 @@ export async function updateTasteProfile(
   userId: string,
   maxTokens: number = PROFILE_MAX_TOKENS
 ): Promise<Record<string, unknown>> {
+  // Before any read; see extractTasteProfile. The delegating branches below call
+  // extractTasteProfile, which captures its own start.
+  const runStartedAt = utcnowTs();
   const model = profileModel();
 
   const existing = await db
@@ -273,7 +276,7 @@ export async function updateTasteProfile(
   // Unlike the full build, valid ids come from books_meta, not the tiers.
   const validIds = new Set<number>([...inputs.booksMeta.keys()].map((k) => Number(k)));
 
-  const saved = await persistProposedTraits(db, userId, traits, validIds, 'update');
+  const saved = await persistProposedTraits(db, userId, traits, validIds, 'update', runStartedAt);
 
   return {
     mode: 'update',

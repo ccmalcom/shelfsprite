@@ -3,7 +3,7 @@
  * _build_prompt, extract_taste_profile). Strings are copied verbatim from Python —
  * prompt parity is asserted byte-for-byte in parity-prompts.test.ts.
  */
-import { eq, and } from 'drizzle-orm';
+import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import { trackedCreate } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
@@ -18,6 +18,7 @@ import {
 } from './profileFeedback';
 import { NO_RATED_BOOKS_MESSAGE } from './claudeErrors';
 import { modelFor } from './models';
+import { readRebuildReason } from './profileMeta';
 
 /** The profile builder's model (lib/server/models.ts). Read at call time, as Python did. */
 export function profileModel(): string {
@@ -159,17 +160,52 @@ export function buildProfilePrompt(tiers: Tiers, feedback: FeedbackContext | nul
   );
 }
 
-/** Twin of profile.mark_profiled — clears the 'dirty' state. Must run inside a tx. */
-export async function markProfiled(tx: Db, kind: string, userId: string): Promise<void> {
+/**
+ * Twin of profile.mark_profiled — clears the 'dirty' state. Must run inside a tx.
+ *
+ * Stamps `runStartedAt`, the moment the builder began reading, NOT the completion time
+ * (spec 2026-09-22 §5.6). A rating edited while Claude was thinking was not in the prompt,
+ * so it must stay newer than last_profiled_at and keep the profile dirty. Stamping completion
+ * silently marked such edits as profiled.
+ *
+ * A 'full' build clears `rebuild_reason`, but only if it still holds the value the build read
+ * at its start (`observedRebuildReason`) AND no request arrived after the run started
+ * (`rebuild_requested_at < runStartedAt`; profileMeta.ts#setRebuildReason stamps it on every
+ * call). A request made mid-run describes a change this build may not have seen, so it must
+ * survive to force the next rebuild, even when it repeats the reason already pending. A null
+ * stamp (a reason written by hand, as in the real-flow check) counts as old.
+ */
+export async function markProfiled(
+  tx: Db,
+  kind: string,
+  userId: string,
+  runStartedAt: string,
+  observedRebuildReason: string | null = null
+): Promise<void> {
   const rows = await tx
     .select({ id: schema.profileMeta.id })
     .from(schema.profileMeta)
     .where(eq(schema.profileMeta.userId, userId));
-  const stamp = { lastProfiledAt: utcnowTs(), lastProfileKind: kind };
+  const stamp = { lastProfiledAt: runStartedAt, lastProfileKind: kind };
   if (rows[0]) {
     await tx.update(schema.profileMeta).set(stamp).where(eq(schema.profileMeta.id, rows[0].id));
   } else {
     await tx.insert(schema.profileMeta).values({ userId, ...stamp });
+  }
+  if (kind === 'full' && observedRebuildReason !== null) {
+    await tx
+      .update(schema.profileMeta)
+      .set({ rebuildReason: null })
+      .where(
+        and(
+          eq(schema.profileMeta.userId, userId),
+          eq(schema.profileMeta.rebuildReason, observedRebuildReason),
+          or(
+            isNull(schema.profileMeta.rebuildRequestedAt),
+            lt(schema.profileMeta.rebuildRequestedAt, runStartedAt)
+          )
+        )
+      );
   }
 }
 
@@ -189,6 +225,10 @@ export async function extractTasteProfile(
   userId: string,
   maxTokens: number = PROFILE_MAX_TOKENS
 ): Promise<Record<string, unknown>> {
+  // Captured before the first read (spec §5.6): anything edited after this instant is not in
+  // the prompt and must stay pending. The reason read here is the only one this build clears.
+  const runStartedAt = utcnowTs();
+  const observedRebuildReason = await readRebuildReason(db, userId);
   const tiers = await buildTiers(db, userId);
   let totalRated = 0;
   for (const [k, v] of tiers) if (k !== 'rejected') totalRated += v.length;
@@ -226,7 +266,15 @@ export async function extractTasteProfile(
     }
   }
 
-  const saved = await persistProposedTraits(db, userId, traits, validIds, 'full');
+  const saved = await persistProposedTraits(
+    db,
+    userId,
+    traits,
+    validIds,
+    'full',
+    runStartedAt,
+    observedRebuildReason
+  );
 
   // Deliberately a plain object, not a Map: this becomes the `tiers` field of the
   // HTTP response body via JSON.stringify, and V8 emits key order 3,4,5,<=2,dnf,
@@ -253,14 +301,17 @@ export async function extractTasteProfile(
  * hold a single Python-style session across the Claude call (db.ts uses max: 1, so
  * touching `db` inside an open transaction deadlocks) — both callers run this only
  * AFTER their Claude call has already resolved, matching Python's own write-nothing-
- * before-the-call behavior. Returns the number of traits saved.
+ * before-the-call behavior. Returns the number of traits saved. `runStartedAt` is the
+ * caller's pre-read timestamp (see markProfiled).
  */
 export async function persistProposedTraits(
   db: Db,
   userId: string,
   traits: Record<string, unknown>[],
   validIds: Set<number>,
-  kind: 'full' | 'update'
+  kind: 'full' | 'update',
+  runStartedAt: string,
+  observedRebuildReason: string | null = null
 ): Promise<number> {
   return db.transaction(async (tx) => {
     await tx
@@ -283,7 +334,7 @@ export async function persistProposedTraits(
       });
       n++;
     }
-    await markProfiled(tx, kind, userId);
+    await markProfiled(tx, kind, userId, runStartedAt, observedRebuildReason);
     return n;
   });
 }
