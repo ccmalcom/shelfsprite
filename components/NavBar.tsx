@@ -81,7 +81,13 @@ export default function NavBar() {
         <Link
           href={section === 'screen' ? '/screen' : '/'}
           aria-label={section === 'screen' ? 'ScreenSprite home' : 'ShelfSprite home'}
-          className="shrink-0 rounded"
+          // One box for both wordmarks, so the section switch holds still between sections: at lg
+          // the book logo is ~41.6 px tall and the ScreenSprite mark 28 px; on a phone the switch
+          // sits beside a 112 px logo or a 140 px mark.
+          className={[
+            'shrink-0 rounded lg:flex lg:h-[42px] lg:items-center',
+            showSwitch ? 'min-w-[141px] lg:min-w-0' : '',
+          ].join(' ')}
         >
           <Wordmark section={section} compact={showSwitch} />
         </Link>
@@ -90,7 +96,9 @@ export default function NavBar() {
           aria-label="Desktop navigation"
           className="hidden lg:flex lg:flex-1 lg:flex-col lg:gap-1 lg:mt-12"
         >
-          <p className="mb-3 px-3 text-[11px] uppercase tracking-[0.18em] text-faint">
+          {/* No right padding and no wrap: "Your screening room" is 4.5 px wider than the rail's
+              text box and would otherwise take two lines. */}
+          <p className="mb-3 whitespace-nowrap pl-3 text-[11px] uppercase tracking-[0.18em] text-faint">
             {section === 'screen' ? 'Your screening room' : 'Your reading room'}
           </p>
           {navRoutesFor(section)
