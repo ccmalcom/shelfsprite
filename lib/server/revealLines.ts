@@ -23,6 +23,8 @@ import { trackedCreate } from './anthropic';
 import { pyJsonDumps } from './serialize';
 import { REVEAL_NO_KEY_MESSAGE } from './claudeErrors';
 import { modelFor } from './models';
+import { readScreenToggledAt } from './screenSettings';
+import { assertScreenToggleUnchanged } from './screenProfile';
 
 // Copied verbatim from mylibrary/reveal.py:27-34.
 export const REVEAL_SYSTEM =
@@ -142,6 +144,8 @@ export async function generateRevealLines(
   userId: string,
   maxTokens = 1200
 ): Promise<RevealLinesResult> {
+  // Spec 2026-09-22 §5.7: see archetypeDerive.ts. Read now, re-checked inside the write.
+  const screenToggledAt = await readScreenToggledAt(db, userId);
   const model = modelFor('reveal');
   const pending = await db
     .select({
@@ -201,6 +205,7 @@ export async function generateRevealLines(
   const validIds = new Set(payload.map((p) => p.id));
   let generated = 0;
   await db.transaction(async (tx) => {
+    await assertScreenToggleUnchanged(tx, userId, screenToggledAt);
     for (const [tid, line] of byId) {
       if (!validIds.has(tid)) continue;
       const rows = await tx
