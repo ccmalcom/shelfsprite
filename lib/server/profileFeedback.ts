@@ -16,14 +16,33 @@ export interface FeedbackContext {
   less_like: string[];
   favorites: string[];
   directive_text: string | null;
+  /**
+   * Screen variant only (spec 2026-09-22 §5.2): the user's favourite films and shows. Absent
+   * (not empty) in the book variant, so the book prompt stays byte-identical.
+   */
+  favorite_titles?: string[];
 }
 
 function label(title: string, author: string | null): string {
   return author ? `${title} by ${author}` : title;
 }
 
+export interface FeedbackOptions {
+  /** Read title-targeted signals and favourite titles (screen variant only, spec §5.9). */
+  titles?: boolean;
+}
+
+function titleLabel(t: { title: string; year: number | null; mediaType: string }): string {
+  const kind = t.mediaType === 'tv' ? 'TV series' : 'film';
+  return t.year !== null ? `${t.title} (${t.year} ${kind})` : `${t.title} (${kind})`;
+}
+
 /** Twin of profile._feedback_context. */
-export async function feedbackContext(db: Db, userId: string): Promise<FeedbackContext> {
+export async function feedbackContext(
+  db: Db,
+  userId: string,
+  opts: FeedbackOptions = {}
+): Promise<FeedbackContext> {
   const traits = await db
     .select({
       claim: schema.tasteTraits.claim,
@@ -44,16 +63,30 @@ export async function feedbackContext(db: Db, userId: string): Promise<FeedbackC
   const signals = await db
     .select({
       targetBookId: schema.tasteSignal.targetBookId,
+      targetTitleId: schema.tasteSignal.targetTitleId,
+      targetKind: schema.tasteSignal.targetKind,
       direction: schema.tasteSignal.direction,
     })
     .from(schema.tasteSignal)
-    .where(and(eq(schema.tasteSignal.userId, userId), eq(schema.tasteSignal.targetKind, 'book')))
+    .where(
+      and(
+        eq(schema.tasteSignal.userId, userId),
+        opts.titles
+          ? inArray(schema.tasteSignal.targetKind, ['book', 'title'])
+          : eq(schema.tasteSignal.targetKind, 'book')
+      )
+    )
     .orderBy(asc(schema.tasteSignal.id));
 
   // Python resolves each signal's book with its own userId-scoped query; batching
   // into one IN(...) is equivalent because the map is keyed by id and scoped the same.
   const bookIds = [
-    ...new Set(signals.map((s) => s.targetBookId).filter((id): id is number => id != null)),
+    ...new Set(
+      signals
+        .filter((s) => s.targetKind === 'book')
+        .map((s) => s.targetBookId)
+        .filter((id): id is number => id != null)
+    ),
   ];
   const labels = new Map<number, string>();
   if (bookIds.length) {
@@ -64,10 +97,40 @@ export async function feedbackContext(db: Db, userId: string): Promise<FeedbackC
     for (const b of books) labels.set(b.id, label(b.title, b.author));
   }
 
+  // Screen variant only. Scoped by userId, so another tenant's title id resolves to nothing.
+  const titleIds = [
+    ...new Set(
+      signals
+        .filter((s) => s.targetKind === 'title')
+        .map((s) => s.targetTitleId)
+        .filter((id): id is number => id != null)
+    ),
+  ];
+  const titleLabels = new Map<number, string>();
+  if (titleIds.length) {
+    const titles = await db
+      .select({
+        id: schema.titles.id,
+        title: schema.titles.title,
+        year: schema.titles.year,
+        mediaType: schema.titles.mediaType,
+      })
+      .from(schema.titles)
+      .where(and(eq(schema.titles.userId, userId), inArray(schema.titles.id, titleIds)));
+    for (const t of titles) titleLabels.set(t.id, titleLabel(t));
+  }
+
   const more_like: string[] = [];
   const less_like: string[] = [];
   for (const sig of signals) {
-    const l = sig.targetBookId != null ? labels.get(sig.targetBookId) : undefined;
+    const l =
+      sig.targetKind === 'title'
+        ? sig.targetTitleId != null
+          ? titleLabels.get(sig.targetTitleId)
+          : undefined
+        : sig.targetBookId != null
+          ? labels.get(sig.targetBookId)
+          : undefined;
     if (l === undefined) continue;
     if (sig.direction === 'more') more_like.push(l);
     else if (sig.direction === 'less') less_like.push(l);
@@ -95,7 +158,7 @@ export async function feedbackContext(db: Db, userId: string): Promise<FeedbackC
     }
   }
 
-  return {
+  const context: FeedbackContext = {
     confirmed,
     edited,
     rejected,
@@ -105,6 +168,19 @@ export async function feedbackContext(db: Db, userId: string): Promise<FeedbackC
     favorites,
     directive_text,
   };
+  if (opts.titles) {
+    const favoriteTitles = await db
+      .select({
+        title: schema.titles.title,
+        year: schema.titles.year,
+        mediaType: schema.titles.mediaType,
+      })
+      .from(schema.titles)
+      .where(and(eq(schema.titles.userId, userId), eq(schema.titles.isFavorite, true)))
+      .orderBy(asc(schema.titles.id));
+    context.favorite_titles = favoriteTitles.map(titleLabel);
+  }
+  return context;
 }
 
 /** Twin of profile._feedback_block. Returns '' when no bucket is populated. */
@@ -155,6 +231,13 @@ export function feedbackBlock(feedback: FeedbackContext | null): string {
       "The following are the user's all-time favorite books — weight these " +
         'as the strongest possible positive signal when deriving taste traits: ' +
         feedback.favorites.join('; ')
+    );
+  }
+  if (feedback.favorite_titles?.length) {
+    lines.push(
+      "The following are the user's all-time favorite films and shows — weight these " +
+        'as the strongest possible positive signal when deriving taste traits: ' +
+        feedback.favorite_titles.join('; ')
     );
   }
   const directiveText = (feedback.directive_text ?? '').trim();
