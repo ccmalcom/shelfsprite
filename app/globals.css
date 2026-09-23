@@ -12,8 +12,8 @@
   --elevated-rgb: 48 42 36;
   --border: #3a332d;
   --border-rgb: 58 51 45;
-  --border-strong: #7a6f66;
-  --border-strong-rgb: 122 111 102; /* >=3:1 on surface+elevated — interactive control edges (WCAG 1.4.11) */
+  --border-strong: #7f746b;
+  --border-strong-rgb: 127 116 107; /* >=3:1 on surface+elevated — interactive control edges (WCAG 1.4.11) */
   --hairline: #3b342d;
   --hairline-rgb: 59 52 45;
 
