@@ -1,9 +1,9 @@
 import { getDb } from '@/lib/server/db';
-import { withApi } from '@/lib/server/http';
+import { ApiError, withApi } from '@/lib/server/http';
 import { missingImportFileResponse, readZipUpload } from '@/lib/server/import-upload';
 import { importLetterboxdFilms } from '@/lib/server/importTitles';
 import { readLetterboxdZip } from '@/lib/server/letterboxd';
-import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from '@/lib/server/ratelimit';
+import { checkRateLimit, RATE_LIMITS } from '@/lib/server/ratelimit';
 import { queueScreenEnrichment } from '@/lib/server/screenJobs';
 
 export const runtime = 'nodejs';
@@ -20,10 +20,7 @@ export const POST = withApi('/api/screen/import', async (req, ctx) => {
       ...RATE_LIMITS.screenImport,
     });
     if (!rateLimit.allowed) {
-      return rateLimitExceededResponse(
-        RATE_LIMITS.screenImport.limit,
-        RATE_LIMITS.screenImport.windowSeconds
-      );
+      throw new ApiError(429, 'Too many imports. Try again in a minute.');
     }
     const { bytes } = await readZipUpload(req);
     const { films } = readLetterboxdZip(bytes);

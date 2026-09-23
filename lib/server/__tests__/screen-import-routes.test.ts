@@ -100,13 +100,16 @@ describe('POST /api/screen/import', () => {
     expect(await db.select().from(schema.enrichJobs)).toEqual([]); // a failed import queues nothing
   });
 
-  test('is rate limited per user', async () => {
+  test('is rate limited per user with the normal detail shape', async () => {
     freezeInsideRateWindow();
     const statuses: number[] = [];
+    let last: Response | null = null;
     for (let i = 0; i < 6; i += 1) {
-      statuses.push((await importRoute(upload('e.zip', letterboxdZip()))).status);
+      last = await importRoute(upload('e.zip', letterboxdZip()));
+      statuses.push(last.status);
     }
     expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+    expect(await last!.json()).toEqual({ detail: 'Too many imports. Try again in a minute.' });
   });
 
   test("never touches another user's titles", async () => {
