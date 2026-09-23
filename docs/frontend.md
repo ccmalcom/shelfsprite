@@ -92,12 +92,14 @@ copy says ScreenSprite; code, routes and keys say `screen`.
   the remaining evidence slots, so a books-only reader sees no change. Only the closing stats
   differ by `section`: `/profile` shows the book rating distribution and genre breakdown
   (`/api/stats`, `/api/profile/subjects`); `/screen/profile` passes `section="screen"`, never
-  requests those, and renders `ScreenStats` instead — film/show and status counts, rating
+  requests those (it also passes `bookSubjects={false}` to `TasteHero`, which otherwise fetches the
+  subjects for its accent seed), and renders `ScreenStats` instead — film/show and status counts, rating
   distribution, genre breakdown and repeat directors/creators, all derived client-side from the
   screen title list by the pure `lib/screenStats.ts`. Possible duplicates are skipped, and genres
   are grouped by display label (the Wikidata medium suffix stripped, hyphens folded) so Wikidata
-  and TVmaze spellings share a bar. Both sections draw their charts with
-  `components/profile/StatSections.tsx`.
+  and TVmaze spellings share a bar. The mean is rounded half-to-even like the server's `round2`, so
+  the two profiles never disagree on a tie. A failed title fetch shows a retry line rather than an
+  empty section. Both sections draw their charts with `components/profile/StatSections.tsx`.
 - **Reject picker.** `components/RejectReasonPicker.tsx` is shared by `/swipe` (book vocabulary)
   and `/screen` (`SCREEN_REJECT_REASONS`). An empty reason list is sent as a bare
   `{status: 'rejected'}` to the screen route, which refuses an empty list.

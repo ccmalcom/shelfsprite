@@ -21,6 +21,7 @@ export interface ScreenStats {
   shows: number;
   byStatus: Record<TitleStatus, number>;
   rated: number;
+  /** Rounded half-to-even at two digits, like the book stats' `mean_rating`. */
   meanRating: number | null;
   /** Keyed like the book stats: "4" for whole stars, "4.5" for halves. */
   byStar: Record<string, number>;
@@ -33,6 +34,20 @@ export interface ScreenStats {
 export function genreLabel(raw: string): string {
   const trimmed = raw.trim().replace(MEDIUM_SUFFIX, '');
   return trimmed ? trimmed[0].toUpperCase() + trimmed.slice(1) : '';
+}
+
+/**
+ * Half-to-even rounding at two digits, so a screen mean reads like the book one, which the
+ * server rounds with `round2` (lib/server/serialize.ts). Copied rather than imported to keep
+ * server code out of the client bundle; see that file for why the tie test is exact.
+ */
+export function round2HalfEven(x: number): number {
+  const tie = x * 2 ** 3;
+  if (Number.isInteger(tie) && tie % 2 !== 0) {
+    const floored = Math.floor(x * 100);
+    return (floored % 2 === 0 ? floored : floored + 1) / 100;
+  }
+  return Number(x.toFixed(2));
 }
 
 function mostCommon(counts: Map<string, SubjectCount>, n: number): SubjectCount[] {
@@ -117,7 +132,7 @@ export function screenStats(titles: readonly TitleOut[]): ScreenStats {
     shows,
     byStatus,
     rated,
-    meanRating: rated > 0 ? ratingSum / rated : null,
+    meanRating: rated > 0 ? round2HalfEven(ratingSum / rated) : null,
     byStar,
     genres: { overall: mostCommon(overall, TOP_GENRES), by_tier },
     directors: topPeople(directors),

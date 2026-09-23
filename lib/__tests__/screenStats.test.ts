@@ -1,4 +1,5 @@
-import { genreLabel, screenStats } from '@/lib/screenStats';
+import { genreLabel, round2HalfEven, screenStats } from '@/lib/screenStats';
+import { round2 } from '@/lib/server/serialize';
 import { makeTitle } from '@/lib/__tests__/fixtures/screenFixtures';
 import type { TitleOut } from '@/lib/api';
 
@@ -54,7 +55,13 @@ describe('screenStats', () => {
     ]);
     expect(s.rated).toBe(3);
     expect(s.byStar).toEqual({ '4': 1, '4.5': 1, '3': 1 });
-    expect(s.meanRating).toBeCloseTo(3.8333, 3);
+    expect(s.meanRating).toBe(3.83);
+  });
+
+  it('rounds the mean half-to-even, as the book stats do', () => {
+    const ratings = [4, 4, 4, 4.5];
+    const s = screenStats(ratings.map((rating, i) => makeTitle({ id: i + 1, rating })));
+    expect(s.meanRating).toBe(4.12);
   });
 
   it('has a null mean with nothing rated', () => {
@@ -110,5 +117,18 @@ describe('screenStats', () => {
     const s = screenStats([makeTitle({ enrichment: null })]);
     expect(s.films).toBe(1);
     expect(s.genres.overall).toEqual([]);
+  });
+});
+
+describe('round2HalfEven', () => {
+  it('agrees with the server round2 on every mean a rating library can produce', () => {
+    // Means of n ratings on the 0.5 grid are k / (2n); cover every one up to n = 40,
+    // which includes all the exact ties (odd eighths).
+    for (let n = 1; n <= 40; n++) {
+      for (let k = n; k <= 10 * n; k++) {
+        const x = k / (2 * n);
+        expect([x, round2HalfEven(x)]).toEqual([x, round2(x)]);
+      }
+    }
   });
 });

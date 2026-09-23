@@ -5,7 +5,7 @@ import type { SubjectBreakdown } from '@/lib/api';
 import { Card } from '@/components/ui';
 
 function stars(star: number): string {
-  return '★'.repeat(Math.floor(star)) + (star % 1 ? '½' : '');
+  return '\u2605'.repeat(Math.floor(star)) + (star % 1 ? '\u00bd' : '');
 }
 
 // ─── Rating distribution ──────────────────────────────────────────────────────
@@ -41,7 +41,8 @@ export function RatingSection({
         <h2 className="font-display text-lg font-semibold text-text">Rating distribution</h2>
         <p className="mt-0.5 text-xs text-faint">
           {rated} rated {noun}
-          {rated !== 1 ? 's' : ''} {meanRating != null ? `· mean ${meanRating.toFixed(2)}` : ''}
+          {rated !== 1 ? 's' : ''}{' '}
+          {meanRating != null ? `\u00b7 mean ${meanRating.toFixed(2)}` : ''}
         </p>
       </div>
       <Card>

@@ -61,7 +61,7 @@ function PeopleList({
                 {p.name}
               </span>
               <span className="shrink-0 font-mono text-xs text-faint">
-                {p.count} · <span className="text-accent">{'★'}</span> {p.mean.toFixed(1)}
+                {p.count} · <span className="text-accent">{'\u2605'}</span> {p.mean.toFixed(1)}
               </span>
             </li>
           ))}

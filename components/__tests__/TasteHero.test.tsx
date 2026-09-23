@@ -17,9 +17,11 @@ const DEFAULT_ARCHETYPE = {
 };
 
 let mockArchetype: typeof DEFAULT_ARCHETYPE = DEFAULT_ARCHETYPE;
+const mockRequested: (string | null)[] = [];
 
 beforeEach(() => {
   mockArchetype = DEFAULT_ARCHETYPE;
+  mockRequested.length = 0;
 });
 
 // next/image needs no network here, but it warns on unknown props in jsdom; render a plain img
@@ -31,7 +33,9 @@ jest.mock('next/image', () => ({
 
 jest.mock('swr', () => ({
   __esModule: true,
-  default: (key: string) => {
+  default: (key: string | null) => {
+    mockRequested.push(key);
+    if (key === null) return { data: undefined, isLoading: false };
     if (key === 'archetype') return { data: mockArchetype, isLoading: false };
     // Non-empty: an empty trait list routes TasteHero into its no-profile CTA branch.
     if (key === 'profile-traits')
@@ -43,15 +47,23 @@ jest.mock('swr', () => ({
 }));
 
 // TasteHero calls useToast, which throws outside a provider.
-function renderHero() {
+function renderHero(props: { bookSubjects?: boolean } = {}) {
   return render(
     <ToastProvider>
-      <TasteHero />
+      <TasteHero {...props} />
     </ToastProvider>
   );
 }
 
 describe('TasteHero', () => {
+  it('loads book subjects by default and skips them when told to', () => {
+    renderHero();
+    expect(mockRequested).toContain('profile-subjects');
+    mockRequested.length = 0;
+    renderHero({ bookSubjects: false });
+    expect(mockRequested).not.toContain('profile-subjects');
+  });
+
   it('renders the archetype panel as a drenched user-colored field', () => {
     const { container } = renderHero();
     const panel = container.firstElementChild as HTMLElement;

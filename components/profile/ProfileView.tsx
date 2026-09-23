@@ -69,10 +69,12 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
   );
   const { data: allBooks = [] } = useSWR<Book[]>(BOOKS_ALL_KEY, () => api.books({ limit: 500 }));
   const { enabled: screenEnabled } = useScreenSettings();
-  const { data: titles, isLoading: titlesLoading } = useSWR<TitleOut[]>(
-    screenEnabled ? SCREEN_TITLES_KEY : null,
-    () => screenApi.titles()
-  );
+  const {
+    data: titles,
+    error: titlesError,
+    isLoading: titlesLoading,
+    mutate: retryTitles,
+  } = useSWR<TitleOut[]>(screenEnabled ? SCREEN_TITLES_KEY : null, () => screenApi.titles());
   // Films and shows as evidence only while ScreenSprite is on (spec §7.5). undefined keeps
   // TraitRow and the reveal exactly as they are for a books-only reader.
   const titleEvidence = useMemo(
@@ -134,7 +136,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
             Settings
           </Link>
         </div>
-        <TasteHero compact />
+        <TasteHero compact bookSubjects={!isScreen} />
         {traits.length > 0 && (
           <div className="text-center">
             <button
@@ -167,7 +169,23 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
           />
           <CustomInstructions />
           {isScreen ? (
-            titles && <ScreenStats titles={titles} />
+            titles ? (
+              <ScreenStats titles={titles} />
+            ) : (
+              titlesError && (
+                // SWR keeps the last good titles through a failed refresh, so this shows only with none.
+                <p role="alert" className="py-10 text-center text-faint">
+                  Your films and shows didn&apos;t load.{' '}
+                  <button
+                    type="button"
+                    onClick={() => void retryTitles()}
+                    className="underline underline-offset-4 hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+                  >
+                    Try again
+                  </button>
+                </p>
+              )
+            )
           ) : (
             <>
               {stats && (
