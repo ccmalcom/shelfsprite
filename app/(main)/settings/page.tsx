@@ -15,7 +15,13 @@ import {
   type ApiKeyStatus,
   type UserProfile,
   type Usage,
+  SCREEN_RECS_KEY,
+  SCREEN_SETTINGS_KEY,
+  screenApi,
 } from '@/lib/api';
+import ScreenSettingsCard from '@/components/screen/ScreenSettingsCard';
+import { useScreenSettings } from '@/lib/useScreenSettings';
+import { invalidateScreenState } from '@/lib/screenCache';
 import { Button, Card, Badge, useToast, Field, Input } from '@/components/ui';
 import { getSupabaseClient, authEnabled } from '@/utils/supabase/client';
 import ImportModal from '@/components/ImportModal';
@@ -93,6 +99,11 @@ function DangerAction({
 
 export default function SettingsPage() {
   const toast = useToast();
+  const { settings: screenSettings } = useScreenSettings();
+  const screenEnabled = screenSettings?.enabled ?? false;
+  // The screen-library purge is not gated on the opt-in (wave 4), so a reader who turned
+  // ScreenSprite off with titles left can still delete them.
+  const hasScreenData = screenEnabled || (screenSettings?.title_count ?? 0) > 0;
 
   const { data: status, isLoading } = useSWR<ApiKeyStatus>(API_KEY_STATUS_KEY, () =>
     api.apiKeyStatus()
@@ -483,6 +494,11 @@ export default function SettingsPage() {
           </Card>
         </section>
 
+        {/* ScreenSprite (spec §7.4). ScreenGate sends /screen/* here while it is off. */}
+        <section id="screen" className="mb-6 scroll-mt-24">
+          <ScreenSettingsCard />
+        </section>
+
         {/* Export / backup */}
         <section className="mb-6">
           <Card>
@@ -576,7 +592,11 @@ export default function SettingsPage() {
           <div className="space-y-3">
             <DangerAction
               title="Reset taste profile"
-              description="Deletes your taste traits and recommendations. Your books stay put; rebuild anytime."
+              description={
+                hasScreenData
+                  ? 'Deletes your taste traits, archetype, and both book and ScreenSprite recommendations. Your books, films and shows stay put; rebuild anytime.'
+                  : 'Deletes your taste traits and recommendations. Your books stay put; rebuild anytime.'
+              }
               buttonLabel="Reset profile"
               onRun={async () => {
                 await api.clearProfile();
@@ -584,13 +604,18 @@ export default function SettingsPage() {
                   mutate('profile', [], { revalidate: false }),
                   mutate(PROFILE_STATUS_KEY),
                   mutate('recommendations', [], { revalidate: false }),
+                  mutate(SCREEN_RECS_KEY, [], { revalidate: false }),
                 ]);
               }}
             />
 
             <DangerAction
               title="Clear library"
-              description="Deletes every book, all enrichment, and your taste profile: a factory reset for your library."
+              description={
+                hasScreenData
+                  ? 'Deletes every book, all book enrichment, your taste profile, and both book and ScreenSprite recommendations: a factory reset for your books. Your films and shows stay.'
+                  : 'Deletes every book, all enrichment, and your taste profile: a factory reset for your library.'
+              }
               buttonLabel="Clear library"
               onRun={async () => {
                 await api.clearLibrary();
@@ -598,9 +623,29 @@ export default function SettingsPage() {
               }}
             />
 
+            {hasScreenData && (
+              <DangerAction
+                title="Delete screen library"
+                description="Deletes every film and show, their catalog matches, ScreenSprite recommendations and title signals, and your shared taste profile. Your books stay; rebuild your profile afterwards."
+                buttonLabel="Delete screen library"
+                onRun={async () => {
+                  const result = await screenApi.deleteLibrary();
+                  await invalidateScreenState();
+                  await mutate(SCREEN_SETTINGS_KEY);
+                  toast.success(
+                    `Deleted ${result.titles_removed} ${result.titles_removed === 1 ? 'title' : 'titles'}. Rebuild your profile from your books when you are ready.`
+                  );
+                }}
+              />
+            )}
+
             <DangerAction
               title="Delete account data"
-              description="Deletes ALL your data: library, profile, recommendations, and your stored Anthropic key."
+              description={
+                hasScreenData
+                  ? 'Deletes ALL your data: books, films and shows, profile, recommendations, and your stored Anthropic key.'
+                  : 'Deletes ALL your data: library, profile, recommendations, and your stored Anthropic key.'
+              }
               buttonLabel="Delete everything"
               onRun={async () => {
                 await api.deleteAccount();
