@@ -14,6 +14,18 @@ export const TITLE_STATUSES = ['watched', 'watching', 'dropped', 'want'] as cons
 export type MediaType = (typeof MEDIA_TYPES)[number];
 export type TitleStatus = (typeof TITLE_STATUSES)[number];
 
+export const WATCH_DATE_MESSAGE = 'last_watched_on must be a real date as YYYY-MM-DD.';
+
+/**
+ * A YYYY-MM-DD string naming a real day; the shape alone lets 2026-02-30 reach Postgres. Year 0000
+ * round-trips through Date but Postgres has no year zero, so it is refused here instead of a 500.
+ */
+export function isCalendarDate(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || value.startsWith('0000')) return false;
+  const d = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === value;
+}
+
 export interface TitleOut {
   id: number;
   media_type: 'movie' | 'tv';

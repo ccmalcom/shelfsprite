@@ -11,7 +11,13 @@ import {
 } from '@/lib/server/screenEnrichment';
 import { requireScreenEnabled } from '@/lib/server/screenSettings';
 import { serializeResolutionConfidence, utcnowTs } from '@/lib/server/serialize';
-import { MEDIA_TYPES, TITLE_STATUSES, titleOut } from '@/lib/server/titles';
+import {
+  isCalendarDate,
+  MEDIA_TYPES,
+  TITLE_STATUSES,
+  titleOut,
+  WATCH_DATE_MESSAGE,
+} from '@/lib/server/titles';
 
 const Query = z.object({
   type: z.enum(MEDIA_TYPES).optional(),
@@ -51,6 +57,8 @@ const AddTitle = z.object({
   // Permissive z.number() on purpose: the manual isValidRating guard owns the 422 (CLAUDE.md).
   rating: z.number().nullish(),
   review: z.string().nullish(),
+  // A string, not a regex, on purpose: isCalendarDate owns the 422 message, as for ratings.
+  last_watched_on: z.string().nullish(),
 });
 
 /** Manual add (spec §3.5): the user's pick fixes identity at once. */
@@ -63,6 +71,10 @@ export const POST = withApi('/api/screen/titles', async (req, ctx) => {
     );
   }
   const { candidate, status, rating } = parsed.data;
+  const lastWatchedOn = parsed.data.last_watched_on ?? null;
+  if (lastWatchedOn !== null && !isCalendarDate(lastWatchedOn)) {
+    throw new ApiError(422, WATCH_DATE_MESSAGE);
+  }
   // 0 is the "unrated" sentinel on the wire, never a stored rating.
   if (rating != null && rating !== 0 && !isValidRating(rating)) {
     throw new ApiError(
@@ -110,6 +122,7 @@ export const POST = withApi('/api/screen/titles', async (req, ctx) => {
           status,
           appRating: rated ? rating : null,
           appReview: review,
+          lastWatchedOn,
           wikidataQid: candidate.wikidata_qid,
           tvmazeId,
           feedbackUpdatedAt: rated || review ? now : null,

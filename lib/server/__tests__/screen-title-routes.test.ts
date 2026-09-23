@@ -1,5 +1,5 @@
 import { eq } from 'drizzle-orm';
-import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { GET as listTitles } from '../../../app/api/screen/titles/route';
 import {
   DELETE as deleteTitle,
@@ -16,6 +16,7 @@ beforeEach(async () => {
   _setDbForTests(db);
 });
 afterEach(async () => {
+  vi.restoreAllMocks();
   _setDbForTests(null);
   await close();
 });
@@ -138,7 +139,8 @@ describe('PATCH /api/screen/titles/[id]', () => {
     expect({ status: empty.status, body: await empty.json() }).toEqual({
       status: 422,
       body: {
-        detail: 'Nothing to update: pass a rating, review, status, favorite, and/or exclude flag.',
+        detail:
+          'Nothing to update: pass a rating, review, status, favorite, exclude flag, and/or watch date.',
       },
     });
     const status = await patch(t.id, { status: 'read' });
@@ -193,6 +195,70 @@ describe('PATCH /api/screen/titles/[id]', () => {
       true,
     ]);
   });
+
+  test('last_watched_on alone sets the watch date and keeps every other field', async () => {
+    await enable();
+    const t = await title({
+      lastWatchedOn: '2024-03-01',
+      appRating: 4,
+      appReview: 'Quiet and exact.',
+      status: 'dropped',
+      isFavorite: true,
+      excludeFromProfile: true,
+    });
+    const res = await patch(t.id, { last_watched_on: '2025-11-30' });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body).toMatchObject({
+      last_watched_on: '2025-11-30',
+      app_rating: 4,
+      app_review: 'Quiet and exact.',
+      status: 'dropped',
+      is_favorite: true,
+      exclude_from_profile: true,
+    });
+    const [row] = await db.select().from(schema.titles).where(eq(schema.titles.id, t.id));
+    const { updatedAt: _u, feedbackUpdatedAt: _f, ...rest } = row;
+    const { updatedAt: _u0, feedbackUpdatedAt: _f0, ...before } = t;
+    expect(rest).toEqual({ ...before, lastWatchedOn: '2025-11-30' });
+  });
+
+  test('a PATCH without last_watched_on does not write the date it read', async () => {
+    await enable();
+    const t = await title({ lastWatchedOn: '2024-03-01' });
+    // The race (a Letterboxd re-import moving the date between this PATCH's read and its write)
+    // cannot be staged in one connection, so check the write itself: the date is not in it.
+    const realUpdate = db.update.bind(db);
+    const written: Record<string, unknown>[] = [];
+    vi.spyOn(db, 'update').mockImplementation(((table: typeof schema.titles) => {
+      const builder = realUpdate(table);
+      const realSet = builder.set.bind(builder);
+      builder.set = ((values: Record<string, unknown>) => {
+        written.push(values);
+        return realSet(values);
+      }) as typeof builder.set;
+      return builder;
+    }) as typeof db.update);
+    expect((await patch(t.id, { is_favorite: true })).status).toBe(200);
+    expect(written).toHaveLength(1);
+    expect(written[0]).toMatchObject({ isFavorite: true });
+    expect(written[0]).not.toHaveProperty('lastWatchedOn');
+  });
+
+  test.each(['2025-02-30', '2025-13-01', '0000-01-01', '25-01-01', 'yesterday', ''])(
+    'rejects last_watched_on %j with the stable message and writes nothing',
+    async (value) => {
+      await enable();
+      const t = await title({ lastWatchedOn: '2024-03-01' });
+      const res = await patch(t.id, { last_watched_on: value });
+      expect({ status: res.status, body: await res.json() }).toEqual({
+        status: 422,
+        body: { detail: 'last_watched_on must be a real date as YYYY-MM-DD.' },
+      });
+      const [row] = await db.select().from(schema.titles).where(eq(schema.titles.id, t.id));
+      expect(row.lastWatchedOn).toBe('2024-03-01');
+    }
+  );
 
   test("404s another user's title and leaves it unchanged; 403 while disabled", async () => {
     await enable();
