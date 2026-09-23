@@ -35,6 +35,8 @@ export async function resolveAnthropicKey(db: Db, userId: string): Promise<strin
 
 export interface ClaudeMessage {
   content: Array<{ type: string; name?: string; input?: Record<string, unknown> }>;
+  /** 'max_tokens' means the reply was cut off, so a tool payload may be missing fields. */
+  stop_reason?: string | null;
   usage?: Record<string, number> | null;
 }
 export interface ClaudeClient {

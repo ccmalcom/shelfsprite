@@ -17,6 +17,12 @@ import { modelFor } from './models';
 import { readScreenToggledAt } from './screenSettings';
 import { assertScreenToggleUnchanged } from './screenProfile';
 
+/**
+ * Four scores plus four rationales. 512 cut replies off before the last scores often enough that
+ * a re-derive took several tries in production; a cut-off reply is still refused below.
+ */
+export const ARCHETYPE_MAX_TOKENS = 1024;
+
 // Copied verbatim from mylibrary/archetype.py:193-198.
 export const ARCHETYPE_SYSTEM =
   "You are a literary analyst scoring a reader's personality across 4 axes based on their " +
@@ -209,7 +215,7 @@ export async function deriveArchetype(
     { userId, operation: 'archetype' },
     {
       model: modelFor('archetype'),
-      max_tokens: 512,
+      max_tokens: ARCHETYPE_MAX_TOKENS,
       system: ARCHETYPE_SYSTEM,
       tools: [ARCHETYPE_TOOL],
       tool_choice: { type: 'tool', name: 'record_archetype_scores' },
@@ -217,6 +223,10 @@ export async function deriveArchetype(
     }
   );
 
+  if (message.stop_reason === 'max_tokens') {
+    // A truncated tool call can lack scores; never score a partial payload. Retrying usually works.
+    throw new ApiError(502, 'Claude ran out of room describing your archetype. Try again.');
+  }
   const input = toolInput(message, 'record_archetype_scores');
   if (!input) {
     throw new ApiError(400, 'Claude response missing tool payload (record_archetype_scores).');
