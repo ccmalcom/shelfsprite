@@ -38,7 +38,8 @@ export async function readScreenToggledAt(db: Conn, userId: string): Promise<str
 
 /**
  * Flip the flag inside the caller's transaction. Only a real change stamps screen_toggled_at and
- * records a rebuild reason (spec §5.5: enabling or disabling screen forces a full rebuild).
+ * records a rebuild reason (spec §5.5: enabling or disabling screen forces a full rebuild), and
+ * enabling records one only when the account already has titles.
  * Returns whether the flag changed. Wave 6's opt-out calls this for the disable half.
  */
 export async function setScreenEnabled(
@@ -59,7 +60,11 @@ export async function setScreenEnabled(
       .insert(schema.userSettings)
       .values({ userId, screenEnabled: enabled, screenToggledAt: now });
   }
-  await setRebuildReason(tx, userId, enabled ? 'screen_enabled' : 'screen_disabled');
+  // Enabling an empty screen library changes nothing a rebuild would see: the unified prompt is the
+  // book prompt byte for byte until a title exists, and titles added later take the update path.
+  if (!enabled || (await countTitles(tx, userId)) > 0) {
+    await setRebuildReason(tx, userId, enabled ? 'screen_enabled' : 'screen_disabled');
+  }
   return true;
 }
 

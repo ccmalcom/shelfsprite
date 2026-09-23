@@ -29,6 +29,18 @@ async function reason(userId: string): Promise<string | null> {
   return rows[0]?.r ?? null;
 }
 
+async function addTitle(userId: string): Promise<void> {
+  await db
+    .insert(schema.titles)
+    .values({
+      userId,
+      mediaType: 'movie',
+      title: 'The Lantern Keeper',
+      year: 2019,
+      status: 'want',
+    });
+}
+
 describe('screen opt-in flag', () => {
   test('is off with no settings row, and requireScreenEnabled answers 403', async () => {
     expect(await isScreenEnabled(db, 'local')).toBe(false);
@@ -39,11 +51,19 @@ describe('screen opt-in flag', () => {
   });
 
   test('enabling creates the row, stamps toggled_at, and sets the rebuild reason', async () => {
+    await addTitle('local');
     expect(await db.transaction((tx) => setScreenEnabled(tx, 'local', true))).toBe(true);
     expect(await isScreenEnabled(db, 'local')).toBe(true);
     expect(await readScreenToggledAt(db, 'local')).toEqual(expect.any(String));
     expect(await reason('local')).toBe('screen_enabled');
     await expect(requireScreenEnabled(db, 'local')).resolves.toBeUndefined();
+  });
+
+  test('enabling an empty screen library stamps toggled_at but records no rebuild reason', async () => {
+    // With no titles the rebuilt prompt is the book prompt byte for byte (spec §5.5, cost only).
+    expect(await db.transaction((tx) => setScreenEnabled(tx, 'local', true))).toBe(true);
+    expect(await readScreenToggledAt(db, 'local')).toEqual(expect.any(String));
+    expect(await reason('local')).toBeNull();
   });
 
   test('setting the same value again is a no-op that does not restamp', async () => {
@@ -55,6 +75,7 @@ describe('screen opt-in flag', () => {
 
   test('disabling an enabled account updates the existing row and keeps a reason set', async () => {
     await db.insert(schema.userSettings).values({ userId: 'local', displayName: 'Sam' });
+    await addTitle('local');
     await db.transaction((tx) => setScreenEnabled(tx, 'local', true));
     expect(await db.transaction((tx) => setScreenEnabled(tx, 'local', false))).toBe(true);
     expect(await isScreenEnabled(db, 'local')).toBe(false);
