@@ -2,7 +2,16 @@
 // every route; BottomNav (mobile) renders the `primary` ones. Previously the two
 // components kept separate lists, which is how /discover became unreachable on
 // mobile and how "My library" and "Library" ended up naming the same route.
-import { BookOpen, Compass, Home, Settings, Shuffle, User } from 'lucide-react';
+import {
+  BookOpen,
+  Clapperboard,
+  Compass,
+  Home,
+  Settings,
+  Shuffle,
+  Sparkles,
+  User,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface NavRoute {
@@ -21,3 +30,26 @@ export const NAV_ROUTES: readonly NavRoute[] = [
   { href: '/profile', label: 'Profile', Icon: User, primary: true },
   { href: '/settings', label: 'Settings', Icon: Settings, primary: false },
 ] as const;
+
+export type Section = 'books' | 'screen';
+
+/**
+ * The active section, derived from the pathname and never stored (spec §7.1): `/screen`
+ * exactly or anything under `/screen/`. `/screenings` is not the screen section.
+ */
+export function sectionFor(pathname: string | null): Section {
+  if (pathname === '/screen' || pathname?.startsWith('/screen/')) return 'screen';
+  return 'books';
+}
+
+/** The ScreenSprite nav set (spec §7.1). Settings is shared with books. */
+export const SCREEN_NAV_ROUTES: readonly NavRoute[] = [
+  { href: '/screen', label: 'For you', Icon: Sparkles, primary: true },
+  { href: '/screen/library', label: 'Library', Icon: Clapperboard, primary: true },
+  { href: '/screen/profile', label: 'Profile', Icon: User, primary: true },
+  { href: '/settings', label: 'Settings', Icon: Settings, primary: false },
+] as const;
+
+export function navRoutesFor(section: Section): readonly NavRoute[] {
+  return section === 'screen' ? SCREEN_NAV_ROUTES : NAV_ROUTES;
+}

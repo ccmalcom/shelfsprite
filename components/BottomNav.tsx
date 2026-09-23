@@ -2,15 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { NAV_ROUTES } from '@/lib/nav';
-
-const links = NAV_ROUTES.filter((r) => r.primary);
+import { navRoutesFor, sectionFor } from '@/lib/nav';
 
 const focusRing =
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const links = navRoutesFor(sectionFor(pathname)).filter((r) => r.primary);
 
   return (
     <nav
