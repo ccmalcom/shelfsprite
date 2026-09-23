@@ -34,6 +34,16 @@
   `GIT_PAGER=cat git diff`, `git log`, and `git show` while inspecting or verifying work. Do not
   commit on the user's behalf.
 
+## Agent hooks
+
+- `.claude/settings.json` registers only `post_edit.py` and `on_stop.py`. Shell reads of secrets
+  files are guarded by the user-level Claude hook (`guard_env_secrets.py`, maintained in
+  `agent-config`), which also blocks `.env.local` and allows existence checks. The project once
+  had its own `pre_bash.py` that blocked any mention of `.env`, including `test -f`; it was removed
+  as redundant and stricter in the wrong place. Do not re-add a project-level copy. The
+  `Read`/`Edit` deny rules for `./.env` stay. `.codex/hooks/pre_bash.py` is separate and stays:
+  Codex does not run Claude's hooks, so it is Codex's only guard.
+
 ## Data invariants
 
 - **`books` is never dropped or recreated by a migration.** It contains irreplaceable ratings and
