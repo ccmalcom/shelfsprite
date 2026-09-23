@@ -107,7 +107,8 @@ export default function ScreenForYouPage() {
     setBusyId(rec.id);
     try {
       const result = await screenApi.recFeedback(rec.id, { status });
-      await Promise.all([mutateRecs(), mutate(SCREEN_TITLES_KEY)]);
+      // Every decision stamps rec feedback server-side (spec §6.7), which can dirty the profile.
+      await Promise.all([mutateRecs(), mutate(SCREEN_TITLES_KEY), mutate(PROFILE_STATUS_KEY)]);
       if (status === 'already_watched' && result.title) {
         setOpenTitle(result.title);
       } else {

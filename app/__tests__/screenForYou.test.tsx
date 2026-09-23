@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { mutate } from 'swr';
 import ScreenForYouPage from '@/app/(main)/screen/page';
 import { ToastProvider } from '@/components/ui';
 import { screenApi, type ProfileStatus, type TitleRec } from '@/lib/api';
@@ -60,6 +61,7 @@ function renderPage(recs: TitleRec[], status: ProfileStatus = OK_STATUS) {
 beforeEach(() => {
   recommend.mockReset();
   recFeedback.mockReset().mockResolvedValue({ id: 1, status: 'rejected', title: null });
+  (mutate as jest.Mock).mockClear();
 });
 
 describe('/screen', () => {
@@ -106,6 +108,21 @@ describe('/screen', () => {
         reject_reasons: ['too_long'],
       })
     );
+  });
+
+  it.each([
+    ['Want to watch', 'accepted'],
+    ['Already watched', 'already_watched'],
+  ])('refreshes the profile status after %s', async (button, status) => {
+    // The server stamps rec feedback for every decision, which can make the profile dirty.
+    recFeedback.mockResolvedValue({
+      id: 1,
+      status,
+      title: makeTitle({ id: 50, title: 'Thief', year: 1981 }),
+    });
+    renderPage([makeRec()]);
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    await waitFor(() => expect(mutate).toHaveBeenCalledWith('profile-status'));
   });
 
   it('opens the title to rate after Already watched', async () => {
