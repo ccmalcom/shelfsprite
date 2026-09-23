@@ -18,6 +18,12 @@ const ENV_KEYS = [
   'FEEDBACK_PROMPTS_ENABLED',
   'FEEDBACK_SNOOZE_HOURS',
   'MYLIBRARY_MODEL',
+  'MYLIBRARY_MODEL_PROFILE',
+  'MYLIBRARY_MODEL_RERANK',
+  'MYLIBRARY_MODEL_SEED',
+  'MYLIBRARY_MODEL_ARCHETYPE',
+  'MYLIBRARY_MODEL_DISTILL',
+  'MYLIBRARY_MODEL_REVEAL',
   'GOOGLE_BOOKS_API_KEY',
   'GITHUB_TOKEN',
   'GITHUB_REPO',
@@ -48,6 +54,14 @@ export function setupTestEnv(): void {
     // defaults ever drift apart. A developer with MYLIBRARY_MODEL exported
     // (it lives in .env) would otherwise fail the profile prompt-parity tests.
     delete process.env.MYLIBRARY_MODEL;
+    // Same hazard as MYLIBRARY_MODEL: a developer with a per-operation override exported
+    // would change every pinned `model` in the request snapshots.
+    delete process.env.MYLIBRARY_MODEL_PROFILE;
+    delete process.env.MYLIBRARY_MODEL_RERANK;
+    delete process.env.MYLIBRARY_MODEL_SEED;
+    delete process.env.MYLIBRARY_MODEL_ARCHETYPE;
+    delete process.env.MYLIBRARY_MODEL_DISTILL;
+    delete process.env.MYLIBRARY_MODEL_REVEAL;
     // The Python fixture generator forces this empty so no live key is baked into a
     // recorded URL; a developer with it exported would build `...&key=...` URLs that
     // match no fixture entry and fail every replayed catalog fetch.
