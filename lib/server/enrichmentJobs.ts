@@ -1,8 +1,19 @@
 import { randomUUID } from 'node:crypto';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Db } from './db';
 import { enrichLibrary } from './enrichment';
-import { books, enrichment, enrichJobs } from './schema';
+import { books, enrichment, enrichJobs, titleEnrichment, titles } from './schema';
+import type { Deadline } from './screenCatalog';
+import {
+  persistTitleResolution,
+  refreshMovies,
+  resolveMovies,
+  resolveTv,
+  type FixedMovieInput,
+  type MovieInput,
+  type TitleResolution,
+  type TvInput,
+} from './screenEnrichment';
 import { effectiveRating, tsToIso, utcnowTs } from './serialize';
 
 export const FUNCTION_CEILING_SECONDS = 300; // Assumption: live Vercel Hobby + Fluid compute supports this.
@@ -30,6 +41,8 @@ export interface JobOptions {
 
 export const defaultJobOptions: JobOptions = { force: false, limit: null };
 
+export type JobKind = 'books' | 'screen';
+
 export interface PublicJob {
   job_id: string;
   status: string;
@@ -45,6 +58,8 @@ export type EnrichJobRow = typeof enrichJobs.$inferSelect;
 export interface NewJobValues {
   jobId: string;
   userId: string;
+  // Required, like progress/total: an insert never relies on a database default.
+  kind: JobKind;
   status: string;
   progress: number;
   total: number;
@@ -70,11 +85,21 @@ function storedOptions(row: EnrichJobRow): JobOptions {
   return { force: row.force, limit: row.runLimit };
 }
 
-export async function findActiveJob(db: Db, userId: string): Promise<EnrichJobRow | null> {
+export async function findActiveJob(
+  db: Db,
+  userId: string,
+  kind: JobKind = 'books'
+): Promise<EnrichJobRow | null> {
   const rows = await db
     .select()
     .from(enrichJobs)
-    .where(and(eq(enrichJobs.userId, userId), inArray(enrichJobs.status, ['pending', 'running'])))
+    .where(
+      and(
+        eq(enrichJobs.userId, userId),
+        eq(enrichJobs.kind, kind),
+        inArray(enrichJobs.status, ['pending', 'running'])
+      )
+    )
     .limit(1);
   return rows[0] ?? null;
 }
@@ -99,22 +124,27 @@ function errorMessages(error: unknown): string[] {
 }
 
 function isActiveUserViolation(error: unknown): boolean {
-  return errorMessages(error).some((message) => message.includes('uq_enrich_jobs_active_user'));
+  // Wave 4 replaced uq_enrich_jobs_active_user with the (user_id, kind) index.
+  return errorMessages(error).some((message) =>
+    message.includes('uq_enrich_jobs_active_user_kind')
+  );
 }
 
 export async function createOrGetActiveJob(
   db: Db,
   userId: string,
   options: JobOptions,
-  create: JobInsert = insertJob
+  create: JobInsert = insertJob,
+  kind: JobKind = 'books'
 ): Promise<{ created: boolean; job: PublicJob; options: JobOptions }> {
-  const active = await findActiveJob(db, userId);
+  const active = await findActiveJob(db, userId, kind);
   if (active) return { created: false, job: serializeJob(active), options: storedOptions(active) };
 
   try {
     const row = await create(db, {
       jobId: randomUUID(),
       userId,
+      kind,
       status: 'pending',
       // progress/total are NOT NULL with no server default in the Alembic-owned
       // table -- Python supplies them from the ORM-level `default=0`. Omitting
@@ -127,7 +157,7 @@ export async function createOrGetActiveJob(
     return { created: true, job: serializeJob(row), options: storedOptions(row) };
   } catch (error) {
     if (!isActiveUserViolation(error)) throw error;
-    const winner = await findActiveJob(db, userId);
+    const winner = await findActiveJob(db, userId, kind);
     if (!winner) throw error;
     return { created: false, job: serializeJob(winner), options: storedOptions(winner) };
   }
@@ -300,12 +330,17 @@ async function candidateRows(db: Db, userId: string): Promise<CandidateRow[]> {
   return rows.filter(({ book }) => effectiveRating(book.appRating, book.goodreadsRating) !== null);
 }
 
-function processedThisRun(rows: CandidateRow[], startedAt: string): number {
+/** A candidate row of either kind; the recount only reads its enrichment timestamp. */
+interface RecountRow {
+  enrichment: { resolvedAt: string } | null;
+}
+
+function processedThisRun(rows: readonly RecountRow[], startedAt: string): number {
   return rows.filter((row) => row.enrichment !== null && row.enrichment.resolvedAt >= startedAt)
     .length;
 }
 
-function selectableRows(rows: CandidateRow[], options: RunOptions): CandidateRow[] {
+function selectableRows<T extends RecountRow>(rows: readonly T[], options: RunOptions): T[] {
   return rows.filter(({ enrichment: existing }) =>
     options.force ? existing === null || existing.resolvedAt < options.startedAt : existing === null
   );
@@ -316,12 +351,13 @@ function limitedCount(count: number, limit: number | null): number {
   return Math.min(count, limit);
 }
 
-async function deriveState(
-  db: Db,
-  userId: string,
-  options: RunOptions
-): Promise<{ progress: number; remaining: number; total: number }> {
-  const rows = await candidateRows(db, userId);
+interface ChunkState {
+  progress: number;
+  remaining: number;
+  total: number;
+}
+
+function deriveFromRows(rows: readonly RecountRow[], options: RunOptions): ChunkState {
   const processed = processedThisRun(rows, options.startedAt);
   const preexisting = rows.filter(
     (row) => row.enrichment !== null && row.enrichment.resolvedAt < options.startedAt
@@ -341,16 +377,16 @@ async function deriveState(
   };
 }
 
+async function deriveState(db: Db, userId: string, options: RunOptions): Promise<ChunkState> {
+  return deriveFromRows(await candidateRows(db, userId), options);
+}
+
 export async function countPersistedEnrichment(
   db: Db,
   userId: string,
   options: RunOptions
 ): Promise<number> {
   return (await deriveState(db, userId, options)).progress;
-}
-
-async function hasWorkRemaining(db: Db, userId: string, options: RunOptions): Promise<boolean> {
-  return (await deriveState(db, userId, options)).remaining > 0;
 }
 
 async function nextUnenrichedBook(
@@ -398,18 +434,32 @@ export function oneBookEnrichmentRunner(userId: string): RunClaimedChunkDeps['ru
   };
 }
 
-export async function runClaimedChunk(
+function runOptions(job: EnrichJobRow): RunOptions {
+  if (job.startedAt === null) throw new Error('claimed enrichment job has no started_at');
+  return { force: job.force, limit: job.runLimit, startedAt: job.startedAt };
+}
+
+interface ChunkWork {
+  /** Recount from persisted rows -- never an in-memory counter (CLAUDE.md). */
+  derive(): Promise<ChunkState>;
+  /** Run the next unit of work; false when nothing is selectable. */
+  runNext(deadline: Deadline): Promise<boolean>;
+}
+
+/**
+ * The time-bounded chunk loop shared by both kinds. The book path's call sequence --
+ * derive, budget check, next work, derive, write progress, stall check -- is exactly the
+ * pre-wave-5 runClaimedChunk body, including where nowMs() is called: the existing tests
+ * drive a sequence clock and would shift if a call were added or moved.
+ */
+async function runChunkLoop(
   db: Db,
   job: EnrichJobRow,
-  deps: RunClaimedChunkDeps
+  work: ChunkWork,
+  nowMs: () => number,
+  dispatch: (jobId: string) => Promise<void>
 ): Promise<RunClaimedChunkResult> {
-  if (job.startedAt === null) throw new Error('claimed enrichment job has no started_at');
-  const options: RunOptions = {
-    force: job.force,
-    limit: job.runLimit,
-    startedAt: job.startedAt,
-  };
-  const initial = await deriveState(db, job.userId, options);
+  const initial = await work.derive();
   const progressBefore = initial.progress;
 
   if (job.attempts > MAX_JOB_ATTEMPTS) {
@@ -423,19 +473,19 @@ export async function runClaimedChunk(
     };
   }
 
-  const startedMs = deps.nowMs();
+  const startedMs = nowMs();
+  // Lazy: the book path never calls it, so its clock sequence is unchanged.
+  const deadline: Deadline = { remainingMs: () => CHUNK_BUDGET_MS - (nowMs() - startedMs) };
   let lastDerived = progressBefore;
-  while (await hasWorkRemaining(db, job.userId, options)) {
-    if (deps.nowMs() - startedMs >= CHUNK_BUDGET_MS) break;
-    const next = await nextUnenrichedBook(db, job.userId, options);
-    if (!next) break;
-    await deps.runOne(db, next.id, options);
-    const derived = await countPersistedEnrichment(db, job.userId, options);
+  while ((await work.derive()).remaining > 0) {
+    if (nowMs() - startedMs >= CHUNK_BUDGET_MS) break;
+    if (!(await work.runNext(deadline))) break;
+    const derived = (await work.derive()).progress;
     await writeDerivedProgress(db, job.jobId, derived, initial.total);
     if (derived === lastDerived) break;
     lastDerived = derived;
   }
-  const finalState = await deriveState(db, job.userId, options);
+  const finalState = await work.derive();
   const progressAfter = finalState.progress;
 
   if (finalState.remaining === 0) {
@@ -466,7 +516,7 @@ export async function runClaimedChunk(
     .where(eq(enrichJobs.jobId, job.jobId));
   let rearmed = true;
   try {
-    await deps.dispatch(job.jobId);
+    await dispatch(job.jobId);
   } catch (error) {
     rearmed = false;
     console.error(`Failed to dispatch enrichment job ${job.jobId}`, error);
@@ -477,5 +527,141 @@ export async function runClaimedChunk(
     progressAfter,
     remaining: finalState.remaining,
     rearmed,
+  };
+}
+
+export async function runClaimedChunk(
+  db: Db,
+  job: EnrichJobRow,
+  deps: RunClaimedChunkDeps
+): Promise<RunClaimedChunkResult> {
+  const options = runOptions(job);
+  return runChunkLoop(
+    db,
+    job,
+    {
+      derive: () => deriveState(db, job.userId, options),
+      runNext: async () => {
+        const next = await nextUnenrichedBook(db, job.userId, options);
+        if (!next) return false;
+        await deps.runOne(db, next.id, options);
+        return true;
+      },
+    },
+    deps.nowMs,
+    deps.dispatch
+  );
+}
+
+// --- Screen enrichment (spec §4.6) ----------------------------------------------------
+
+/**
+ * Titles per loop iteration. The resolver batches Stage A SPARQL (~120 names per query)
+ * and wbgetentities (50 ids per call), so one iteration per title would waste both. The
+ * loop still recounts from persisted rows after every batch, and a batch that persists
+ * nothing trips the stall check exactly as a book that fails to persist does.
+ */
+export const SCREEN_BATCH_SIZE = 50;
+
+export interface ScreenChunkDeps {
+  nowMs: () => number;
+  runBatch: (db: Db, titleIds: number[], options: JobOptions, deadline: Deadline) => Promise<void>;
+  dispatch: (jobId: string) => Promise<void>;
+}
+
+interface ScreenCandidateRow {
+  title: typeof titles.$inferSelect;
+  enrichment: typeof titleEnrichment.$inferSelect | null;
+}
+
+/** Every title is a candidate: the want list needs identity for dedup and images (§4.6). */
+async function screenCandidateRows(db: Db, userId: string): Promise<ScreenCandidateRow[]> {
+  return db
+    .select({ title: titles, enrichment: titleEnrichment })
+    .from(titles)
+    .leftJoin(titleEnrichment, eq(titleEnrichment.titleId, titles.id))
+    .where(eq(titles.userId, userId))
+    .orderBy(asc(titles.id));
+}
+
+export async function runClaimedScreenChunk(
+  db: Db,
+  job: EnrichJobRow,
+  deps: ScreenChunkDeps
+): Promise<RunClaimedChunkResult> {
+  if (job.kind !== 'screen') throw new Error(`runClaimedScreenChunk was given a ${job.kind} job`);
+  const options = runOptions(job);
+  return runChunkLoop(
+    db,
+    job,
+    {
+      derive: async () => deriveFromRows(await screenCandidateRows(db, job.userId), options),
+      runNext: async (deadline) => {
+        const rows = await screenCandidateRows(db, job.userId);
+        const { remaining } = deriveFromRows(rows, options);
+        const batch = selectableRows(rows, options).slice(
+          0,
+          Math.min(SCREEN_BATCH_SIZE, remaining)
+        );
+        if (batch.length === 0) return false;
+        await deps.runBatch(
+          db,
+          batch.map((row) => row.title.id),
+          options,
+          deadline
+        );
+        return true;
+      },
+    },
+    deps.nowMs,
+    deps.dispatch
+  );
+}
+
+/**
+ * Resolves one batch and persists every definite result in one transaction. Routing
+ * (design decision 9): a TV title with a TVmaze id refreshes through TVmaze and the
+ * crosswalk; a manual or corrected movie refreshes metadata by its QID; everything else is
+ * resolved from its title and year. A deferred title writes nothing, so the next batch or
+ * chunk retries it.
+ */
+export function screenEnrichmentRunner(userId: string): ScreenChunkDeps['runBatch'] {
+  return async (db, titleIds, _options, deadline) => {
+    if (titleIds.length === 0) return;
+    const rows = await db
+      .select({ title: titles, enrichment: titleEnrichment })
+      .from(titles)
+      .leftJoin(titleEnrichment, eq(titleEnrichment.titleId, titles.id))
+      .where(and(eq(titles.userId, userId), inArray(titles.id, titleIds)))
+      .orderBy(asc(titles.id));
+
+    const movies: MovieInput[] = [];
+    const fixed: FixedMovieInput[] = [];
+    const shows: TvInput[] = [];
+    for (const { title, enrichment: existing } of rows) {
+      const fixedIdentity =
+        existing?.identitySource === 'manual' || existing?.identitySource === 'corrected';
+      if (title.mediaType === 'tv' && title.tvmazeId !== null) {
+        shows.push({ id: title.id, tvmazeId: title.tvmazeId });
+      } else if (fixedIdentity && title.wikidataQid !== null) {
+        fixed.push({ id: title.id, wikidataQid: title.wikidataQid });
+      } else {
+        movies.push({ id: title.id, title: title.title, year: title.year });
+      }
+    }
+
+    const results = new Map<number, TitleResolution>([
+      ...(await resolveMovies(db, movies, deadline)),
+      ...(await refreshMovies(db, fixed, deadline)),
+      ...(await resolveTv(db, shows, deadline)),
+    ]);
+
+    await db.transaction(async (tx) => {
+      for (const { title } of rows) {
+        const result = results.get(title.id);
+        if (!result || result.kind === 'deferred') continue;
+        await persistTitleResolution(tx, title.id, result);
+      }
+    });
   };
 }
