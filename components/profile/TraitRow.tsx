@@ -2,14 +2,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { mutate } from 'swr';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Film, Tv } from 'lucide-react';
 import { api, setTraitVerdict, type Trait, PROFILE_STATUS_KEY, TRAITS_KEY } from '@/lib/api';
 import { Badge, Button, useToast } from '@/components/ui';
 
-/**
- * A film or show a trait cites. Unused until wave 8 of the screen-media plan, which passes a
- * map of these so title evidence can render beside book evidence (spec §7.5, §8).
- */
+/** A film or show a trait cites (spec §7.5, §8). */
 export interface TitleEvidence {
   id: number;
   title: string;
@@ -23,7 +20,7 @@ export interface TraitRowProps {
   /** Controlled by TraitsSection so the ?trait= deep link can open a row. */
   open: boolean;
   onToggle: () => void;
-  /** Wave 8 renders these; this wave only accepts the prop. */
+  /** Films and shows this trait cites, passed only while ScreenSprite is on (spec §7.5). */
   titleEvidence?: Map<number, TitleEvidence>;
 }
 
@@ -36,7 +33,24 @@ function statusVariant(status: string): BadgeVariant {
   return 'default';
 }
 
-export function TraitRow({ trait, bookMap, open, onToggle }: TraitRowProps) {
+function TitleBadge({
+  title,
+  variant = 'default',
+}: {
+  title: TitleEvidence;
+  variant?: 'default' | 'mono';
+}) {
+  const Icon = title.media_type === 'tv' ? Tv : Film;
+  return (
+    <Badge variant={variant} className="inline-flex items-center gap-1">
+      <Icon className="h-3 w-3" aria-hidden="true" />
+      <span className="sr-only">{title.media_type === 'tv' ? 'TV:' : 'Film:'}</span>
+      <span>{title.year === null ? title.title : `${title.title} (${title.year})`}</span>
+    </Badge>
+  );
+}
+
+export function TraitRow({ trait, bookMap, open, onToggle, titleEvidence }: TraitRowProps) {
   const toast = useToast();
   const isReward = trait.polarity === 'reward';
   const [editing, setEditing] = useState(false);
@@ -113,6 +127,17 @@ export function TraitRow({ trait, bookMap, open, onToggle }: TraitRowProps) {
   const contrastTitles = (trait.contrasts ?? [])
     .map((id) => bookMap.get(id))
     .filter(Boolean) as string[];
+  // Books first, so a book-only trait renders exactly as before; titles fill the same caps.
+  const exhibitRefs = (trait.exhibit_title_ids ?? [])
+    .map((id) => titleEvidence?.get(id))
+    .filter((t): t is TitleEvidence => t !== undefined)
+    .slice(0, Math.max(0, 4 - exhibitTitles.length));
+  const contrastRefs = (trait.contrast_title_ids ?? [])
+    .map((id) => titleEvidence?.get(id))
+    .filter((t): t is TitleEvidence => t !== undefined)
+    .slice(0, Math.max(0, 3 - contrastTitles.length));
+  const hasExhibits = exhibitTitles.length > 0 || exhibitRefs.length > 0;
+  const hasContrasts = contrastTitles.length > 0 || contrastRefs.length > 0;
 
   const polarityVariant = isReward ? 'success' : 'danger';
   const polarityLabel = isReward ? 'Loves' : 'Avoids';
@@ -207,9 +232,9 @@ export function TraitRow({ trait, bookMap, open, onToggle }: TraitRowProps) {
           </>
         ) : (
           <>
-            {(exhibitTitles.length > 0 || contrastTitles.length > 0) && (
+            {(hasExhibits || hasContrasts) && (
               <div className="space-y-1.5">
-                {exhibitTitles.length > 0 && (
+                {hasExhibits && (
                   <div className="flex flex-wrap gap-1">
                     <span className="mr-1 text-xs text-faint">e.g.</span>
                     {exhibitTitles.slice(0, 4).map((t) => (
@@ -217,13 +242,19 @@ export function TraitRow({ trait, bookMap, open, onToggle }: TraitRowProps) {
                         {t}
                       </Badge>
                     ))}
+                    {exhibitRefs.map((t) => (
+                      <TitleBadge key={`title-${t.id}`} title={t} variant="mono" />
+                    ))}
                   </div>
                 )}
-                {contrastTitles.length > 0 && (
+                {hasContrasts && (
                   <div className="flex flex-wrap gap-1">
                     <span className="mr-1 text-xs text-faint">unlike</span>
                     {contrastTitles.slice(0, 3).map((t) => (
                       <Badge key={t}>{t}</Badge>
+                    ))}
+                    {contrastRefs.map((t) => (
+                      <TitleBadge key={`title-${t.id}`} title={t} />
                     ))}
                   </div>
                 )}
