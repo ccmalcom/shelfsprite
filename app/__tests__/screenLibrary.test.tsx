@@ -120,15 +120,22 @@ describe('/screen/library', () => {
     expect(gridNames()).toEqual(['Heat (1995)']);
   });
 
-  it('searches the shelf by title or director', () => {
+  it('searches the shelf by title, director, or creator', () => {
     titles!.push(makeTitle({ id: 4, title: 'Thief', year: 1981 }));
     titles![3]!.enrichment!.directors = ['Someone Else'];
+    titles!.push(
+      makeTitle({ id: 5, title: 'Fargo', year: 2014, media_type: 'tv', status: 'watched' })
+    );
+    titles![4]!.enrichment!.directors = [];
+    titles![4]!.enrichment!.creators = ['Noah Hawley'];
     renderPage();
     const box = screen.getByRole('searchbox', { name: /Search/ });
     fireEvent.change(box, { target: { value: 'thi' } });
     expect(gridNames()).toEqual(['Thief (1981)']);
     fireEvent.change(box, { target: { value: 'mann' } });
     expect(gridNames()).toEqual(['Heat (1995)']);
+    fireEvent.change(box, { target: { value: 'hawley' } });
+    expect(gridNames()).toEqual(['Fargo (2014)']);
     fireEvent.change(box, { target: { value: 'zzz' } });
     expect(screen.queryByRole('list', { name: 'Titles' })).not.toBeInTheDocument();
     expect(screen.getByText('Nothing matches these filters.')).toBeInTheDocument();

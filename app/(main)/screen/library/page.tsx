@@ -203,7 +203,7 @@ function ScreenLibraryInner() {
           {lowTitles.length > 0 && (
             <details className="text-sm text-muted">
               <summary className="cursor-pointer py-2">
-                {`Library care · ${lowTitles.length} match ${lowTitles.length === 1 ? 'check' : 'checks'}`}
+                {`Library care \u00b7 ${lowTitles.length} match ${lowTitles.length === 1 ? 'check' : 'checks'}`}
               </summary>
               <Button variant="ghost" size="sm" onClick={() => setCorrectingId(lowTitles[0]!.id)}>
                 {lowTitles.length === 1
@@ -217,8 +217,8 @@ function ScreenLibraryInner() {
             {/* An expression container: a bare-attribute escape ships literally (docs/conventions.md). */}
             <input
               type="search"
-              placeholder={'Search title or director…'}
-              aria-label="Search this shelf by title or director"
+              placeholder={'Search title, director, or creator\u2026'}
+              aria-label="Search this shelf by title, director, or creator"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={[
@@ -300,10 +300,10 @@ function ScreenLibraryInner() {
                       {[
                         mediaLabel(t.media_type),
                         t.year === null ? null : String(t.year),
-                        t.rating === null ? null : `${t.rating}★`,
+                        t.rating === null ? null : `${t.rating}\u2605`,
                       ]
                         .filter((x): x is string => x !== null)
-                        .join(' · ')}
+                        .join(' \u00b7 ')}
                     </span>
                     {needsCorrection(t) && (
                       <Badge variant="warning" className="mt-1">
