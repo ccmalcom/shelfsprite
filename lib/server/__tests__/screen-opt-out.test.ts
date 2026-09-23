@@ -20,26 +20,24 @@ async function withSeed(fn: (db: Db) => Promise<void>): Promise<void> {
       status: 'proposed',
       ...over,
     });
-    await db
-      .insert(schema.tasteTraits)
-      .values([
-        t({ claim: 'Mixed confirmed', status: 'confirmed', exhibits: [1], exhibitTitleIds: [7] }),
-        t({ claim: 'Title-only proposed', exhibitTitleIds: [8] }),
-        t({
-          claim: 'Edited, contrast title only',
-          status: 'edited',
-          exhibits: [2],
-          contrastTitleIds: [9],
-        }),
-        t({ claim: 'Rejected, titles', status: 'rejected', exhibitTitleIds: [7] }),
-        t({
-          claim: 'Empty title arrays',
-          exhibits: [3],
-          exhibitTitleIds: [],
-          contrastTitleIds: [],
-        }),
-        t({ userId: 'other', claim: 'Other tenant, titles', exhibitTitleIds: [7] }),
-      ]);
+    await db.insert(schema.tasteTraits).values([
+      t({ claim: 'Mixed confirmed', status: 'confirmed', exhibits: [1], exhibitTitleIds: [7] }),
+      t({ claim: 'Title-only proposed', exhibitTitleIds: [8] }),
+      t({
+        claim: 'Edited, contrast title only',
+        status: 'edited',
+        exhibits: [2],
+        contrastTitleIds: [9],
+      }),
+      t({ claim: 'Rejected, titles', status: 'rejected', exhibitTitleIds: [7] }),
+      t({
+        claim: 'Empty title arrays',
+        exhibits: [3],
+        exhibitTitleIds: [],
+        contrastTitleIds: [],
+      }),
+      t({ userId: 'other', claim: 'Other tenant, titles', exhibitTitleIds: [7] }),
+    ]);
     await fn(db);
   } finally {
     await close();
