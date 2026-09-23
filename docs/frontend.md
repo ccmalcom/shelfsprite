@@ -106,6 +106,15 @@ copy says ScreenSprite; code, routes and keys say `screen`.
   nothing. The routes check it with `lib/server/titles.ts#isCalendarDate`, which owns the 422
   message the way `isValidRating` does. A Letterboxd re-import still replaces it with a later
   watch date. It drives the "Recently watched" sort and the profile's `watched_year`.
+- **Library shelves.** `/screen/library` mirrors `/library`: one tab per `TitleStatus` (Watched,
+  Watching, Want to watch, Dropped) in the same `library-shelves` strip, with counts, the active
+  shelf in `?tab=` (default `watched`, so `?tab=want` is the watchlist's URL; phones label it
+  "Watchlist"), and `useSearchParams` behind a `<Suspense>` boundary. There is no "All" shelf,
+  as on books. Search (title, directors, creators), the Films/TV toggle and the sort apply within
+  the open shelf; the sort is shared across shelves under `screen-library-sort`, and search and
+  type stay transient. "Library care" counts `LOW` titles across every shelf and opens
+  `CorrectTitleModal` on the first. An added title switches to its status's shelf. The poster
+  grid stays; books use rows.
 - **Reject picker.** `components/RejectReasonPicker.tsx` is shared by `/swipe` (book vocabulary)
   and `/screen` (`SCREEN_REJECT_REASONS`). An empty reason list is sent as a bare
   `{status: 'rejected'}` to the screen route, which refuses an empty list.
