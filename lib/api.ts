@@ -159,6 +159,9 @@ export interface Trait {
   polarity: string;
   exhibits: number[] | null;
   contrasts: number[] | null;
+  /** Title ids this trait cites (wave 6). Absent on book-era fixtures; the API always sends them. */
+  exhibit_title_ids?: number[];
+  contrast_title_ids?: number[];
   inference_confidence: number;
   status: string;
   user_weight: number | null;
@@ -323,6 +326,9 @@ export interface ProfileStatus {
   dirty: boolean;
   changed_books: number;
   changed_book_ids: number[];
+  /** Titles changed since the last build (wave 6); they dirty the profile like books. */
+  changed_titles?: number;
+  changed_title_ids?: number[];
   last_profiled_at: string | null;
   last_profile_kind: string | null;
   /** A pending full-rebuild reason (e.g. screen enabled); `dirty` is already true when set. */
@@ -1100,3 +1106,284 @@ export async function pingBackend(base: string, path: string): Promise<boolean> 
     return false;
   }
 }
+
+// ─── ScreenSprite (movies & TV) ─────────────────────────────────────────────
+
+export type MediaType = 'movie' | 'tv';
+export type TitleStatus = 'watched' | 'watching' | 'dropped' | 'want';
+export type ScreenMediaFilter = 'both' | 'movie' | 'tv';
+
+/** GET /settings/screen. */
+export interface ScreenSettings {
+  enabled: boolean;
+  toggled_at: string | null;
+  title_count: number;
+}
+
+/** PUT /settings/screen. Disabling also reports how many traits the opt-out removed. */
+export interface ScreenSettingsUpdate extends ScreenSettings {
+  traits_removed?: number;
+}
+
+export interface TitleEnrichmentOut {
+  confidence_label: string | null;
+  resolution_confidence: number;
+  match_method: string | null;
+  identity_source: 'auto' | 'manual' | 'corrected';
+  image_url: string | null;
+  description: string | null;
+  description_source: 'wikipedia' | 'tvmaze' | null;
+  description_url: string | null;
+  wikipedia_page: string | null;
+  genres: string[];
+  directors: string[];
+  creators: string[];
+  duplicate_of_title_id: number | null;
+}
+
+/** One film or show in the reader's library (lib/server/titles.ts#titleOut). */
+export interface TitleOut {
+  id: number;
+  media_type: MediaType;
+  title: string;
+  year: number | null;
+  status: TitleStatus;
+  /** Effective: app_rating ?? letterboxd_rating. */
+  rating: number | null;
+  app_rating: number | null;
+  letterboxd_rating: number | null;
+  /** Effective: app_review ?? letterboxd_review. */
+  review: string | null;
+  app_review: string | null;
+  letterboxd_review: string | null;
+  last_watched_on: string | null;
+  is_favorite: boolean;
+  exclude_from_profile: boolean;
+  wikidata_qid: string | null;
+  tvmaze_id: number | null;
+  created_at: string;
+  enrichment: TitleEnrichmentOut | null;
+}
+
+/** A catalog record from search, passed back unchanged to add or correct. */
+export interface ScreenCandidate {
+  media_type: MediaType;
+  title: string;
+  year: number | null;
+  wikidata_qid: string | null;
+  tvmaze_id: number | null;
+  image_url: string | null;
+  description: string | null;
+  description_source: 'wikipedia' | 'tvmaze' | null;
+  description_url: string | null;
+  wikipedia_page: string | null;
+  genres: string[];
+  directors: string[];
+  creators: string[];
+  writers: string[];
+  countries: string[];
+  original_language: string | null;
+  based_on: Array<{ qid: string; title: string | null; author: string | null }>;
+  main_subjects: string[];
+  series: Array<{ qid: string; label: string | null }>;
+  production_companies: Array<{ qid: string; label: string | null }>;
+  sitelinks: number;
+}
+
+/** One persisted screen recommendation (lib/server/screenRecs.ts#titleRecOut). */
+export interface TitleRec {
+  id: number;
+  run_id: string;
+  rank: number;
+  media_type: MediaType;
+  media_filter: ScreenMediaFilter;
+  title: string;
+  year: number | null;
+  wikidata_qid: string | null;
+  tvmaze_id: number | null;
+  image_url: string | null;
+  genres: string[];
+  description: string | null;
+  retrieval_pool: string | null;
+  seed_reason: string | null;
+  score: number;
+  rationale: string | null;
+  grounded_trait_ids: number[];
+  grounded_book_ids: number[];
+  grounded_title_ids: number[];
+  status: 'served' | 'accepted' | 'rejected' | 'already_watched';
+  user_note: string | null;
+  reject_reasons: string[] | null;
+  created_at: string | null;
+}
+
+/** POST /screen/recommend. A run with run_id null persisted nothing (issue #64). */
+export interface ScreenRecommendRunResult {
+  run_id: string | null;
+  served: number;
+  media_filter: ScreenMediaFilter;
+  candidates: number;
+  note?: string;
+}
+
+export interface ScreenImportResult {
+  inserted: number;
+  updated: number;
+  unchanged: number;
+  job: EnrichJobOut;
+}
+
+export interface ScreenOptOutPreview {
+  traits: number;
+  confirmed: number;
+}
+
+export interface ScreenLibraryPurgeResult {
+  titles_removed: number;
+  title_recommendations_removed: number;
+  title_signals_removed: number;
+  traits_removed: number;
+  recommendations_removed: number;
+  profile_reset: true;
+}
+
+/** PATCH /screen/titles/{id}. rating 0 clears the in-app rating; review '' clears the in-app review. */
+export interface TitleUpdate {
+  rating?: number;
+  review?: string;
+  status?: TitleStatus;
+  is_favorite?: boolean;
+  exclude_from_profile?: boolean;
+}
+
+export interface AddTitleRequest {
+  candidate: ScreenCandidate;
+  status: TitleStatus;
+  rating: number | null;
+  review: string | null;
+}
+
+export type ScreenRecDecision = 'accepted' | 'already_watched' | 'rejected';
+
+export interface ScreenRecFeedback {
+  status: ScreenRecDecision;
+  /** Only with 'rejected', and only when non-empty (the route rejects an empty list). */
+  reject_reasons?: string[];
+  user_note?: string;
+}
+
+export interface ScreenRecFeedbackResult {
+  id: number;
+  status: ScreenRecDecision;
+  user_note: string | null;
+  reject_reasons: string[] | null;
+  /** The matched or created title for accepted/already_watched; null when rejected. */
+  title: TitleOut | null;
+}
+
+/**
+ * A non-2xx answer from a screen route. `message` is the server's `detail`, which is written
+ * for people, so screens can show it as is.
+ */
+export class ApiRequestError extends Error {
+  readonly status: number;
+  readonly detail: string;
+
+  constructor(status: number, detail: string) {
+    super(detail);
+    this.name = 'ApiRequestError';
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
+async function screenRequest<T>(
+  method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE',
+  path: string,
+  body?: unknown
+): Promise<T> {
+  const headers: Record<string, string> = { ...(await authHeaders()) };
+  let payload: BodyInit | undefined;
+  if (body instanceof FormData) {
+    // The browser sets the multipart boundary; a hand-set Content-Type would break it.
+    payload = body;
+  } else if (body !== undefined) {
+    headers['Content-Type'] = 'application/json';
+    payload = JSON.stringify(body);
+  }
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    cache: 'no-store',
+    headers,
+    body: payload,
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let detail = text || `${method} ${path} failed (${res.status})`;
+    try {
+      const parsed = JSON.parse(text) as { detail?: unknown };
+      if (typeof parsed.detail === 'string') detail = parsed.detail;
+    } catch {
+      // Not JSON (a proxy error page, say): keep the text.
+    }
+    throw new ApiRequestError(res.status, detail);
+  }
+  return res.json() as Promise<T>;
+}
+
+export const screenApi = {
+  settings: () => screenRequest<ScreenSettings>('GET', '/settings/screen'),
+  setEnabled: (enabled: boolean) =>
+    screenRequest<ScreenSettingsUpdate>('PUT', '/settings/screen', { enabled }),
+  optOutPreview: () =>
+    screenRequest<ScreenOptOutPreview>('GET', '/settings/screen/opt-out-preview'),
+  importLetterboxd: (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return screenRequest<ScreenImportResult>('POST', '/screen/import', form);
+  },
+  activeJob: () => screenRequest<{ job: EnrichJobOut | null }>('GET', '/screen/enrich/active'),
+  startEnrich: (opts: { force?: boolean } = {}) =>
+    screenRequest<EnrichJobOut>('POST', '/screen/enrich/start', {
+      force: opts.force ?? false,
+      limit: null,
+    }),
+  titles: () => screenRequest<TitleOut[]>('GET', '/screen/titles'),
+  updateTitle: (id: number, body: TitleUpdate) =>
+    screenRequest<TitleOut>('PATCH', `/screen/titles/${id}`, body),
+  deleteTitle: (id: number) =>
+    screenRequest<{ id: number; title: string; removed: true }>('DELETE', `/screen/titles/${id}`),
+  deleteLibrary: () => screenRequest<ScreenLibraryPurgeResult>('DELETE', '/screen/library'),
+  search: (q: string, type: MediaType) =>
+    screenRequest<ScreenCandidate[]>('GET', `/screen/search?${new URLSearchParams({ q, type })}`),
+  addTitle: (body: AddTitleRequest) => screenRequest<TitleOut>('POST', '/screen/titles', body),
+  correctTitle: (id: number, candidate: ScreenCandidate) =>
+    screenRequest<TitleOut>('POST', `/screen/titles/${id}/correct`, { candidate }),
+  recommend: (mediaFilter: ScreenMediaFilter) =>
+    screenRequest<ScreenRecommendRunResult>('POST', '/screen/recommend', {
+      media_filter: mediaFilter,
+    }),
+  recommendations: () => screenRequest<TitleRec[]>('GET', '/screen/recommendations'),
+  recFeedback: (id: number, body: ScreenRecFeedback) =>
+    screenRequest<ScreenRecFeedbackResult>('POST', `/screen/recommendations/${id}/feedback`, body),
+};
+
+/** Shared SWR keys for ScreenSprite. lib/screenCache.ts invalidates them together. */
+export const SCREEN_SETTINGS_KEY = 'screen-settings';
+export const SCREEN_TITLES_KEY = 'screen-titles';
+export const SCREEN_RECS_KEY = 'screen-recommendations';
+export const SCREEN_ACTIVE_JOB_KEY = 'screen-enrich-active';
+/** Every library book (limit 500): the profile's evidence map and the screen book chips. */
+export const BOOKS_ALL_KEY = 'books-all';
+/** The reveal flow's title list (components/reveal/RevealSequence.tsx). */
+export const REVEAL_TITLES_KEY = 'reveal-titles';
+
+/** Screen rejection vocabulary (spec §6.7): the book list without tried_author. */
+export const SCREEN_REJECT_REASONS: Record<string, string> = {
+  wrong_genre: 'Wrong genre',
+  too_dark: 'Too dark',
+  too_long: 'Too long (runtime or seasons)',
+  not_now: 'Not in the mood',
+  overhyped: 'Feels overhyped',
+  wrong_vibe: 'Wrong vibe',
+};
