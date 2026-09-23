@@ -1,4 +1,7 @@
 import { vi } from 'vitest';
+import { replayKey } from './replayKey';
+
+export { replayKey };
 
 export interface ReplayEntry {
   status: number;
@@ -24,23 +27,26 @@ export class HttpReplayMissError extends Error {
 /**
  * Replace global fetch with a fixture-driven stub. Any URL not present in the
  * map throws — a test must never reach the real network. onCall fires per
- * attempted fetch so tests can assert cache hits and retry counts.
+ * attempted fetch so tests can assert cache hits and retry counts. A request with a body is
+ * keyed by `replayKey` (method, URL and body); a GET by its bare URL.
  */
 export function installHttpReplay(
   fixtures: Record<string, ReplayEntry>,
   onCall?: (url: string) => void
 ): () => void {
   const original = globalThis.fetch;
-  globalThis.fetch = (async (input: RequestInfo | URL) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url =
       typeof input === 'string'
         ? input
         : input instanceof URL
           ? input.toString()
           : (input as Request).url;
-    onCall?.(url);
-    const entry = fixtures[url];
-    if (!entry) throw new HttpReplayMissError(url);
+    // GET keys stay the bare URL, so every existing fixture still matches.
+    const key = replayKey(url, init);
+    onCall?.(key);
+    const entry = fixtures[key];
+    if (!entry) throw new HttpReplayMissError(key);
     return new Response(entry.body === undefined ? null : JSON.stringify(entry.body), {
       status: entry.status,
       headers: { 'content-type': 'application/json', ...(entry.headers ?? {}) },
