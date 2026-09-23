@@ -12,6 +12,8 @@ interface TitleTileProps {
   imageUrl: string | null;
   className?: string;
   sizes?: string;
+  /** Load now instead of lazily: set it on tiles that can be the page's LCP element. */
+  eager?: boolean;
 }
 
 /**
@@ -28,6 +30,7 @@ export default function TitleTile({
   imageUrl,
   className = '',
   sizes = '160px',
+  eager = false,
 }: TitleTileProps) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   const showImage = imageUrl !== null && imageUrl !== '' && failedUrl !== imageUrl;
@@ -44,6 +47,7 @@ export default function TitleTile({
           alt={`Poster for ${title}`}
           fill
           sizes={sizes}
+          loading={eager ? 'eager' : 'lazy'}
           unoptimized
           className="object-cover"
           onError={() => setFailedUrl(imageUrl)}

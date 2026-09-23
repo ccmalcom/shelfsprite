@@ -63,6 +63,18 @@ describe('/screen/library', () => {
     expect(gridNames()).toEqual(['Alien (1979), check the match']);
   });
 
+  it('loads the first row of posters eagerly and the rest lazily', () => {
+    // Five columns at its widest: any tile in the first row can be the LCP element.
+    titles = Array.from({ length: 7 }, (_, i) =>
+      makeTitle({ id: i + 1, title: `Film ${i + 1}`, year: 2000 + i })
+    );
+    renderPage();
+    const loading = within(screen.getByRole('list', { name: 'Titles' }))
+      .getAllByRole('img')
+      .map((img) => img.getAttribute('loading'));
+    expect(loading).toEqual(['eager', 'eager', 'eager', 'eager', 'eager', 'lazy', 'lazy']);
+  });
+
   it('flags titles that need a second look', () => {
     renderPage();
     expect(screen.getByText('Check match')).toBeInTheDocument();

@@ -13,6 +13,15 @@ describe('TitleTile', () => {
     expect(screen.getByAltText('Poster for Heat')).toHaveAttribute('src', URL_A);
   });
 
+  it('loads lazily unless it is marked eager', () => {
+    const { rerender } = render(
+      <TitleTile title="Heat" year={1995} mediaType="movie" imageUrl={URL_A} />
+    );
+    expect(screen.getByAltText('Poster for Heat')).toHaveAttribute('loading', 'lazy');
+    rerender(<TitleTile title="Heat" year={1995} mediaType="movie" imageUrl={URL_A} eager />);
+    expect(screen.getByAltText('Poster for Heat')).toHaveAttribute('loading', 'eager');
+  });
+
   it('falls back when the image fails', () => {
     render(<TitleTile title="Heat" year={1995} mediaType="movie" imageUrl={URL_A} />);
     fireEvent.error(screen.getByAltText('Poster for Heat'));

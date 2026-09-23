@@ -190,7 +190,7 @@ export default function ScreenLibraryPage() {
               aria-label="Titles"
               className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5"
             >
-              {visible.map((t) => (
+              {visible.map((t, index) => (
                 <li key={t.id}>
                   <button
                     type="button"
@@ -204,6 +204,8 @@ export default function ScreenLibraryPage() {
                       mediaType={t.media_type}
                       imageUrl={t.enrichment?.image_url ?? null}
                       sizes="(min-width: 1024px) 180px, 45vw"
+                      // Up to five columns: any first-row poster can be the LCP element.
+                      eager={index < 5}
                     />
                     <span className="mt-2 line-clamp-2 block text-sm font-medium text-text">
                       {t.title}
