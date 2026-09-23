@@ -30,15 +30,13 @@ async function reason(userId: string): Promise<string | null> {
 }
 
 async function addTitle(userId: string): Promise<void> {
-  await db
-    .insert(schema.titles)
-    .values({
-      userId,
-      mediaType: 'movie',
-      title: 'The Lantern Keeper',
-      year: 2019,
-      status: 'want',
-    });
+  await db.insert(schema.titles).values({
+    userId,
+    mediaType: 'movie',
+    title: 'The Lantern Keeper',
+    year: 2019,
+    status: 'want',
+  });
 }
 
 describe('screen opt-in flag', () => {
