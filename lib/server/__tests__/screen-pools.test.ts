@@ -17,7 +17,7 @@ import {
   wd,
 } from './helpers/screenRecFixtures';
 
-const owned = { owned_qids: new Set(['Q134773']), owned_tvmaze_ids: new Set([44778]) };
+const owned = { owned_qids: new Set(['Q134773']), owned_tvmaze_ids: new Set([44933]) };
 
 function lovedTitle(id: number, qid: string | null): ScreenLovedTitle {
   return {

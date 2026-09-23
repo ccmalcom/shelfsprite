@@ -5,7 +5,7 @@
  *   books  1 Leviathan Wakes (5, loved)   2 All Systems Red (4.5, loved, favorite)
  *          3 A Book I Disliked (2)        -- and 'other' owns book 4 (Dune)
  *   titles 1 Forrest Gump (movie, 4.5, Q134773)   2 Toy Story (movie, 5, favorite, Q171048)
- *          3 Arrival (movie, want, Q900003)       4 Severance (tv, 4, tvmaze 44778, Q900004)
+ *          3 Arrival (movie, want, Q900003)       4 Severance (tv, 4, tvmaze 44933, Q900004)
  *          -- and 'other' owns title 5 (Heat, Q900099)
  *   traits 1 proposed   2 rejected   -- and 'other' owns trait 3
  * All enrichment resolved and all feedback stamped BEFORE PROFILED_AT, so the gate is clean.
@@ -99,7 +99,7 @@ export async function seedScreenLibrary(db: Db, opts: { enabled?: boolean } = {}
       year: 2022,
       status: 'watched',
       appRating: 4,
-      tvmazeId: 44778,
+      tvmazeId: 44933,
       lastWatchedOn: '2025-06-01',
       feedbackUpdatedAt: BEFORE,
     },
@@ -141,7 +141,7 @@ export async function seedScreenLibrary(db: Db, opts: { enabled?: boolean } = {}
     enr(3, { wikidataQid: 'Q900003', genres: ['science fiction film'] }),
     enr(4, {
       wikidataQid: 'Q900004',
-      tvmazeId: 44778,
+      tvmazeId: 44933,
       genres: ['drama television series'],
       creators: ['Dan Erickson'],
       originalLanguage: 'English',

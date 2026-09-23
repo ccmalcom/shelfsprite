@@ -60,7 +60,7 @@ describe('screen Stage 1 against recorded catalog answers', () => {
   test('owned titles never come back, by QID, TVmaze id, or title and year', () => {
     for (const c of all(fixture.observed)) {
       expect(OWNED_QIDS).not.toContain(c.qid);
-      expect(c.tvmaze_id).not.toBe(44778);
+      expect(c.tvmaze_id).not.toBe(44933);
       expect(OWNED_KEYS).not.toContain(normalizeTitleKey(c.title, c.year));
     }
   });

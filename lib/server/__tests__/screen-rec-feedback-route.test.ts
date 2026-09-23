@@ -92,7 +92,7 @@ async function seedRecs(db: Db): Promise<void> {
       title: 'Severance',
       year: 2022,
       wikidataQid: 'Q20000002',
-      tvmazeId: 44778,
+      tvmazeId: 44933,
     },
     {
       ...base,

@@ -36,13 +36,13 @@ describe('DescriptionSource', () => {
     render(
       <DescriptionSource
         source="tvmaze"
-        url="https://www.tvmaze.com/shows/44778/severance"
+        url="https://www.tvmaze.com/shows/44933/severance"
         page={null}
       />
     );
     expect(screen.getByRole('link', { name: 'TVmaze' })).toHaveAttribute(
       'href',
-      'https://www.tvmaze.com/shows/44778/severance'
+      'https://www.tvmaze.com/shows/44933/severance'
     );
   });
 

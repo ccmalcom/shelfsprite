@@ -46,7 +46,7 @@ describe('buildScreenSignal', () => {
       await seedScreenLibrary(db);
       const s = await buildScreenSignal(db, 'local');
       expect([...s.owned_qids].sort()).toEqual(['Q134773', 'Q171048', 'Q900003', 'Q900004']);
-      expect([...s.owned_tvmaze_ids]).toEqual([44778]);
+      expect([...s.owned_tvmaze_ids]).toEqual([44933]);
       expect(s.owned_keys.has(normalizeTitleKey('Arrival', 2016))).toBe(true);
       expect(s.owned_qids.has('Q900099')).toBe(false);
       // Most recently watched first; never-watched rows last.
