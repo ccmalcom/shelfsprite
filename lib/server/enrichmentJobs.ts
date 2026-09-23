@@ -216,6 +216,7 @@ interface RawJobRow {
   job_id: string;
   user_id: string;
   status: string;
+  kind: string;
   progress: number;
   total: number;
   started_at: string | null;
@@ -234,6 +235,7 @@ function hydrateJob(row: RawJobRow): EnrichJobRow {
     jobId: row.job_id,
     userId: row.user_id,
     status: row.status,
+    kind: row.kind,
     progress: row.progress,
     total: row.total,
     startedAt: row.started_at,

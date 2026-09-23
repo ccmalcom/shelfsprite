@@ -51,6 +51,9 @@ export const tasteTraits = pgTable(
       .notNull(),
     verdictUpdatedAt: timestamp('verdict_updated_at', { mode: 'string' }),
     revealLine: text('reveal_line'),
+    // Typed title evidence (screen variant, wave 6). Null on every book-only trait.
+    exhibitTitleIds: json('exhibit_title_ids'),
+    contrastTitleIds: json('contrast_title_ids'),
   },
   (table) => [
     index('ix_taste_traits_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
@@ -147,6 +150,10 @@ export const userSettings = pgTable(
     createdAt: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { mode: 'string' }),
     displayName: varchar('display_name'),
+    // ScreenSprite opt-in (spec §3.1). screen_toggled_at is compared inside every profile,
+    // archetype and reveal-line write transaction (wave 6) to discard runs that straddle a toggle.
+    screenEnabled: boolean('screen_enabled').default(false).notNull(),
+    screenToggledAt: timestamp('screen_toggled_at', { mode: 'string' }),
   },
   (table) => [
     uniqueIndex('ix_user_settings_user_id').using(
@@ -200,6 +207,7 @@ export const tasteSignal = pgTable(
     direction: varchar().notNull(),
     targetKind: varchar('target_kind').notNull(),
     targetBookId: integer('target_book_id'),
+    targetTitleId: integer('target_title_id'),
     snapshot: json(),
     createdAt: timestamp('created_at', { mode: 'string' })
       .default(sql`CURRENT_TIMESTAMP`)
@@ -265,6 +273,9 @@ export const enrichJobs = pgTable(
     // the note on them below for why they now carry .default(0) while their
     // inserts stay explicit.
     status: varchar().notNull(),
+    // 'books' | 'screen'. The default keeps every existing insert (typed by the hand-written
+    // NewJobValues, which does not mention kind) a book job. Wave 5 threads it through.
+    kind: varchar().default('books').notNull(),
     // Production carries DEFAULT 0 (the `0003` lineage), so the generated
     // baseline must too -- without it drizzle-kit generate emits a spurious
     // DROP DEFAULT. This is for schema/baseline fidelity ONLY: the inserts
@@ -291,8 +302,10 @@ export const enrichJobs = pgTable(
       table.jobId.asc().nullsLast().op('text_ops')
     ),
     index('ix_enrich_jobs_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
-    uniqueIndex('uq_enrich_jobs_active_user')
-      .on(table.userId)
+    // One active job per user PER KIND (spec §4.6). The name must keep the substring
+    // 'uq_enrich_jobs_active_user': isActiveUserViolation in enrichmentJobs.ts matches on it.
+    uniqueIndex('uq_enrich_jobs_active_user_kind')
+      .on(table.userId, table.kind)
       .where(sql`${table.status} in ('pending', 'running')`),
   ]
 );
@@ -533,6 +546,146 @@ export const readingGoals = pgTable(
     check(
       'ck_reading_goals_subject',
       sql`(${table.kind} = 'genre') = (${table.subject} is not null)`
+    ),
+  ]
+);
+
+/**
+ * ScreenSprite tables (spec §3.2, §3.3, §6.6). Hand-added and owned by ShelfSprite alone, like
+ * invite_requests: there is no introspected shape to drift from. Tenant-scoped by user_id;
+ * title_enrichment is scoped through titles, as enrichment is through books.
+ *
+ * Rating columns are numeric(2,1) with mode: 'number' -- LOAD-BEARING, exactly as on books.
+ * Unlike books.goodreads_rating there is NO 0 sentinel in storage: null means unrated, and the
+ * check constraints reject 0.
+ */
+export const titles = pgTable(
+  'titles',
+  {
+    id: serial().primaryKey().notNull(),
+    userId: varchar('user_id').default('local').notNull(),
+    mediaType: varchar('media_type').notNull(), // 'movie' | 'tv'
+    title: varchar().notNull(),
+    year: integer(),
+    status: varchar().notNull(), // 'watched' | 'watching' | 'dropped' | 'want'
+    letterboxdRating: numeric('letterboxd_rating', { precision: 2, scale: 1, mode: 'number' }),
+    appRating: numeric('app_rating', { precision: 2, scale: 1, mode: 'number' }),
+    letterboxdReview: text('letterboxd_review'),
+    appReview: text('app_review'),
+    lastWatchedOn: date('last_watched_on'),
+    letterboxdUri: varchar('letterboxd_uri'),
+    wikidataQid: varchar('wikidata_qid'),
+    tvmazeId: integer('tvmaze_id'),
+    isFavorite: boolean('is_favorite').default(false).notNull(),
+    excludeFromProfile: boolean('exclude_from_profile').default(false).notNull(),
+    feedbackUpdatedAt: timestamp('feedback_updated_at', { mode: 'string' }),
+    createdAt: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'string' }),
+  },
+  (table) => [
+    index('ix_titles_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
+    uniqueIndex('uq_titles_user_letterboxd_uri')
+      .on(table.userId, table.letterboxdUri)
+      .where(sql`${table.letterboxdUri} is not null`),
+    uniqueIndex('uq_titles_user_wikidata_qid')
+      .on(table.userId, table.wikidataQid)
+      .where(sql`${table.wikidataQid} is not null`),
+    uniqueIndex('uq_titles_user_tvmaze_id')
+      .on(table.userId, table.tvmazeId)
+      .where(sql`${table.tvmazeId} is not null`),
+    check('ck_titles_media_type', sql`${table.mediaType} in ('movie', 'tv')`),
+    check('ck_titles_status', sql`${table.status} in ('watched', 'watching', 'dropped', 'want')`),
+    check(
+      'ck_titles_letterboxd_rating_half_step',
+      sql`${table.letterboxdRating} is null or (${table.letterboxdRating} >= 0.5 and ${table.letterboxdRating} <= 5.0 and (${table.letterboxdRating} * 2) % 1 = 0)`
+    ),
+    check(
+      'ck_titles_app_rating_half_step',
+      sql`${table.appRating} is null or (${table.appRating} >= 0.5 and ${table.appRating} <= 5.0 and (${table.appRating} * 2) % 1 = 0)`
+    ),
+  ]
+);
+
+export const titleEnrichment = pgTable(
+  'title_enrichment',
+  {
+    id: serial().primaryKey().notNull(),
+    titleId: integer('title_id').notNull(),
+    wikidataQid: varchar('wikidata_qid'),
+    tvmazeId: integer('tvmaze_id'),
+    wikipediaPage: varchar('wikipedia_page'),
+    genres: json(), // string[]
+    directors: json(), // string[]
+    creators: json(), // string[]
+    writers: json(), // string[]
+    countries: json(), // string[]
+    originalLanguage: varchar('original_language'),
+    basedOn: json('based_on'), // Array<{ qid, title, author }>
+    mainSubjects: json('main_subjects'), // string[]
+    series: json(), // Array<{ qid, label }>
+    productionCompanies: json('production_companies'), // Array<{ qid, label }>
+    sitelinks: integer(),
+    description: text(),
+    descriptionSource: varchar('description_source'), // 'wikipedia' | 'tvmaze'
+    descriptionUrl: varchar('description_url'),
+    imageUrl: varchar('image_url'),
+    resolutionConfidence: doublePrecision('resolution_confidence').notNull(),
+    confidenceLabel: varchar('confidence_label'), // HIGH | MEDIUM | LOW | CORRECTED
+    matchMethod: varchar('match_method'),
+    identitySource: varchar('identity_source').default('auto').notNull(), // auto | manual | corrected
+    duplicateOfTitleId: integer('duplicate_of_title_id'),
+    rawResponse: json('raw_response'),
+    resolvedAt: timestamp('resolved_at', { mode: 'string' }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('ix_title_enrichment_title_id').using(
+      'btree',
+      table.titleId.asc().nullsLast().op('int4_ops')
+    ),
+    foreignKey({
+      columns: [table.titleId],
+      foreignColumns: [titles.id],
+      name: 'title_enrichment_title_id_fkey',
+    }),
+  ]
+);
+
+export const titleRecommendations = pgTable(
+  'title_recommendations',
+  {
+    id: serial().primaryKey().notNull(),
+    userId: varchar('user_id').default('local').notNull(),
+    runId: varchar('run_id').notNull(),
+    rank: integer().notNull(),
+    mediaType: varchar('media_type').notNull(),
+    mediaFilter: varchar('media_filter').notNull(), // 'both' | 'movie' | 'tv'
+    title: varchar().notNull(),
+    year: integer(),
+    wikidataQid: varchar('wikidata_qid'),
+    tvmazeId: integer('tvmaze_id'),
+    imageUrl: varchar('image_url'),
+    genres: json(),
+    description: text(),
+    retrievalPool: varchar('retrieval_pool'),
+    seedReason: varchar('seed_reason'),
+    score: doublePrecision().notNull(),
+    rationale: text(),
+    groundedTraitIds: json('grounded_trait_ids'),
+    groundedBookIds: json('grounded_book_ids'),
+    groundedTitleIds: json('grounded_title_ids'),
+    status: varchar().notNull(), // served | accepted | rejected | already_watched
+    userNote: text('user_note'),
+    rejectReasons: json('reject_reasons'),
+    createdAt: timestamp('created_at', { mode: 'string' }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('ix_title_recommendations_user_id').using(
+      'btree',
+      table.userId.asc().nullsLast().op('text_ops')
+    ),
+    index('ix_title_recommendations_run_id').using(
+      'btree',
+      table.runId.asc().nullsLast().op('text_ops')
     ),
   ]
 );
