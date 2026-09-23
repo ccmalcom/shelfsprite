@@ -69,13 +69,35 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm test
 
-      - name: Test (Vitest -- lib/server and app/api)
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm run test:server
-
       - name: Build
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
+
+  # Vitest (lib/server and app/api) is most of the gate's runtime, so it runs as its own jobs,
+  # split into shards that run side by side. The shards together are the whole suite: all of them
+  # have to pass, exactly as `npm run test:server` would have to.
+  server-tests:
+    name: Server tests (${{ matrix.shard }}/3)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      # One red shard should not hide the others' results.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install from the lockfile
+        run: npm ci
+
+      - name: Test (Vitest -- lib/server and app/api)
+        run: npm run test:server -- --shard=${{ matrix.shard }}/3
 
   audit:
     name: Dependency audit
