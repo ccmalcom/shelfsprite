@@ -21,17 +21,24 @@ import {
   entityNames,
   enwikiTitle,
   isQid,
+  qidFromUri,
   sitelinkCount,
+  sparqlString,
+  tvmazeSearch,
   tvmazeShow,
   wikidataEntities,
+  wikidataSearch,
+  wikidataSparql,
   wikipediaSummary,
   type CatalogResult,
   type Deadline,
+  type SparqlBinding,
   type TvmazeShow,
   type WikidataEntity,
   type WikipediaSummary,
 } from './screenCatalog';
 import { screenNormalize, screenRatio, titleVariants } from './screenMatch';
+import { round4 } from './serialize';
 
 // --- Scoring (spec §4.3) --------------------------------------------------------------
 
@@ -563,4 +570,405 @@ export async function fetchScreenMetadata(
     out.set(qid, candidate);
   }
   return { kind: 'ok', value: out };
+}
+
+// --- Resolution orchestration (spec §4.3 candidate lookup) ----------------------------
+
+export const STAGE_A_NAMES_PER_QUERY = 120; // the spike's batch size
+export const STAGE_B_LIMIT = 10;
+export const SEARCH_LIMIT = 10;
+
+export type TitleResolution =
+  | {
+      kind: 'resolved';
+      label: ScreenLabel;
+      method: ScreenMatchMethod;
+      candidate: ScreenCandidate;
+      raw: Record<string, unknown>;
+    }
+  | { kind: 'unresolved'; raw: Record<string, unknown> }
+  | { kind: 'refreshed'; candidate: ScreenCandidate | null }
+  | { kind: 'deferred'; reason: string };
+
+export interface MovieInput {
+  id: number;
+  title: string;
+  year: number | null;
+}
+
+export interface FixedMovieInput {
+  id: number;
+  wikidataQid: string;
+}
+
+export interface TvInput {
+  id: number;
+  tvmazeId: number;
+}
+
+function reasonOf(result: { kind: string; reason?: string }): string {
+  return result.kind === 'retryable' ? (result.reason ?? 'retryable') : 'no answer';
+}
+
+/** Every variant of every title, de-duplicated, in first-seen order. */
+export function stageANames(titles: readonly string[]): string[] {
+  return [...new Set(titles.flatMap((title) => titleVariants(title)))];
+}
+
+/** The spike's measured Stage A query (cold.py), with ?name returned for the join. */
+export function stageAQuery(names: readonly string[]): string {
+  const values = names
+    .flatMap((name) => [`${sparqlString(name)}@en`, `${sparqlString(name)}@mul`])
+    .join(' ');
+  return (
+    `SELECT DISTINCT ?q ?name WHERE { VALUES ?name { ${values} } ` +
+    '{ ?q rdfs:label ?name } UNION { ?q skos:altLabel ?name } ' +
+    '?q wdt:P31 ?c . { ?c wdt:P279* wd:Q11424 } UNION { ?c wdt:P279* wd:Q15416 } }'
+  );
+}
+
+/** TVmaze id -> Wikidata item through P8600 (§2.1 finding 4). */
+export function crosswalkQuery(tvmazeIds: readonly number[]): string {
+  const values = [...new Set(tvmazeIds)]
+    .sort((a, b) => a - b)
+    .map((id) => sparqlString(String(id)))
+    .join(' ');
+  return `SELECT ?s ?tvm WHERE { VALUES ?tvm { ${values} } ?s wdt:P8600 ?tvm . }`;
+}
+
+function crosswalkMap(bindings: readonly SparqlBinding[]): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const row of bindings) {
+    const tvmazeId = Number(row.tvm?.value);
+    const qid = row.s ? qidFromUri(row.s.value) : null;
+    if (!Number.isInteger(tvmazeId) || !qid) continue;
+    const existing = out.get(tvmazeId);
+    if (!existing || compareQids(qid, existing) < 0) out.set(tvmazeId, qid);
+  }
+  return out;
+}
+
+async function stageA(
+  db: Db,
+  titles: readonly string[],
+  deadline: Deadline
+): Promise<CatalogResult<Map<string, Set<string>>>> {
+  const names = stageANames(titles);
+  const exact = new Map<string, Set<string>>();
+  for (let i = 0; i < names.length; i += STAGE_A_NAMES_PER_QUERY) {
+    const rows = await wikidataSparql(
+      db,
+      stageAQuery(names.slice(i, i + STAGE_A_NAMES_PER_QUERY)),
+      deadline
+    );
+    if (rows.kind !== 'ok') return rows;
+    for (const row of rows.value) {
+      const qid = row.q ? qidFromUri(row.q.value) : null;
+      const key = screenNormalize(row.name?.value);
+      if (!qid || !key) continue;
+      const set = exact.get(key) ?? new Set<string>();
+      set.add(qid);
+      exact.set(key, set);
+    }
+  }
+  return { kind: 'ok', value: exact };
+}
+
+function stageACandidates(title: string, exact: ReadonlyMap<string, Set<string>>): Set<string> {
+  const out = new Set<string>();
+  for (const variant of titleVariants(title)) {
+    for (const qid of exact.get(screenNormalize(variant)) ?? []) out.add(qid);
+  }
+  return out;
+}
+
+/** Spike resolve3.py#has_exact_year: a classified candidate dated in the title's year. */
+function hasExactYearItem(
+  year: number | null,
+  qids: ReadonlySet<string>,
+  entities: ReadonlyMap<string, WikidataEntity>
+): boolean {
+  if (year === null) return false;
+  for (const qid of qids) {
+    const entity = entities.get(qid);
+    if (!entity || !classifyP31(claimIds(entity, 'P31'))) continue;
+    if (claimYears(entity, 'P577').includes(year) || claimYears(entity, 'P580').includes(year)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The trimmed raw payload stored on title_enrichment (spec §3.3). */
+function rawFor(score: TitleScore, stage: 'A' | 'B'): Record<string, unknown> {
+  const brief = (c: ScoredCandidate) => ({
+    qid: c.qid,
+    kind: c.kind,
+    similarity: round4(c.similarity),
+    years: c.years,
+    sitelinks: c.sitelinks,
+  });
+  return {
+    stage,
+    label: score.label,
+    method: score.method,
+    pick: score.pick ? brief(score.pick) : null,
+    top: score.top.map(brief),
+  };
+}
+
+export async function resolveMovies(
+  db: Db,
+  titles: readonly MovieInput[],
+  deadline: Deadline
+): Promise<Map<number, TitleResolution>> {
+  const results = new Map<number, TitleResolution>();
+  const deferAll = (list: readonly MovieInput[], reason: string) => {
+    for (const title of list) {
+      if (!results.has(title.id)) results.set(title.id, { kind: 'deferred', reason });
+    }
+    return results;
+  };
+
+  const work = titles.filter((title) => {
+    if (screenNormalize(title.title)) return true;
+    results.set(title.id, { kind: 'unresolved', raw: { reason: 'empty normalized title' } });
+    return false;
+  });
+  if (work.length === 0) return results;
+
+  const exact = await stageA(
+    db,
+    work.map((title) => title.title),
+    deadline
+  );
+  if (exact.kind !== 'ok') return deferAll(work, reasonOf(exact));
+
+  const candidates = new Map(work.map((t) => [t.id, stageACandidates(t.title, exact.value)]));
+  const entities = new Map<string, WikidataEntity>();
+  const firstFetch = await wikidataEntities(
+    db,
+    [...new Set([...candidates.values()].flatMap((set) => [...set]))],
+    FULL_ENTITY_PROPS,
+    deadline
+  );
+  if (firstFetch.kind !== 'ok') return deferAll(work, reasonOf(firstFetch));
+  for (const [qid, entity] of firstFetch.value) entities.set(qid, entity);
+
+  // Stage B: only titles with no Stage A item in their exact year (10 of 562 in the spike).
+  const stageB = work.filter((t) => !hasExactYearItem(t.year, candidates.get(t.id)!, entities));
+  const searchedIds = new Set<string>();
+  for (const title of stageB) {
+    const hits = await wikidataSearch(db, title.title, STAGE_B_LIMIT, deadline);
+    if (hits.kind !== 'ok') {
+      results.set(title.id, { kind: 'deferred', reason: reasonOf(hits) });
+      continue;
+    }
+    for (const qid of hits.value) {
+      candidates.get(title.id)!.add(qid);
+      if (!entities.has(qid)) searchedIds.add(qid);
+    }
+  }
+  if (searchedIds.size > 0) {
+    const more = await wikidataEntities(db, [...searchedIds], FULL_ENTITY_PROPS, deadline);
+    if (more.kind !== 'ok') deferAll(stageB, reasonOf(more));
+    else for (const [qid, entity] of more.value) entities.set(qid, entity);
+  }
+
+  const stageBIds = new Set(stageB.map((title) => title.id));
+  const scores = new Map<number, TitleScore>();
+  for (const title of work) {
+    if (results.has(title.id)) continue;
+    const scoredEntities = [...candidates.get(title.id)!]
+      .map((qid) => entities.get(qid))
+      .filter((entity): entity is WikidataEntity => entity !== undefined);
+    const score = scoreTitle(title.title, title.year, scoredEntities);
+    const stage = stageBIds.has(title.id) ? 'B' : 'A';
+    if (score.label === 'UNRESOLVED' || !score.pick) {
+      results.set(title.id, { kind: 'unresolved', raw: rawFor(score, stage) });
+    } else {
+      scores.set(title.id, score);
+    }
+  }
+  if (scores.size === 0) return results;
+
+  const meta = await fetchScreenMetadata(
+    db,
+    [...scores.values()].map((score) => score.pick!.qid),
+    deadline,
+    { entities }
+  );
+  for (const [id, score] of scores) {
+    if (meta.kind !== 'ok') {
+      results.set(id, { kind: 'deferred', reason: reasonOf(meta) });
+      continue;
+    }
+    const candidate = meta.value.get(score.pick!.qid);
+    results.set(
+      id,
+      candidate
+        ? {
+            kind: 'resolved',
+            label: score.label as ScreenLabel,
+            method: score.method,
+            candidate,
+            raw: rawFor(score, stageBIds.has(id) ? 'B' : 'A'),
+          }
+        : { kind: 'deferred', reason: `no metadata for ${score.pick!.qid}` }
+    );
+  }
+  return results;
+}
+
+/** Force re-run for a manual or corrected movie: metadata only, identity untouched (§4.4). */
+export async function refreshMovies(
+  db: Db,
+  titles: readonly FixedMovieInput[],
+  deadline: Deadline
+): Promise<Map<number, TitleResolution>> {
+  const results = new Map<number, TitleResolution>();
+  if (titles.length === 0) return results;
+  const meta = await fetchScreenMetadata(
+    db,
+    titles.map((title) => title.wikidataQid),
+    deadline
+  );
+  for (const title of titles) {
+    results.set(
+      title.id,
+      meta.kind === 'ok'
+        ? { kind: 'refreshed', candidate: meta.value.get(title.wikidataQid) ?? null }
+        : { kind: 'deferred', reason: reasonOf(meta) }
+    );
+  }
+  return results;
+}
+
+/** TV identity is the TVmaze id (§4.4): refresh from TVmaze, add Wikidata via the crosswalk. */
+export async function resolveTv(
+  db: Db,
+  titles: readonly TvInput[],
+  deadline: Deadline
+): Promise<Map<number, TitleResolution>> {
+  const results = new Map<number, TitleResolution>();
+  const shows = new Map<number, TvmazeShow>();
+  for (const title of titles) {
+    const show = await tvmazeShow(db, title.tvmazeId, deadline);
+    if (show.kind === 'retryable') results.set(title.id, { kind: 'deferred', reason: show.reason });
+    else if (show.kind === 'empty') results.set(title.id, { kind: 'refreshed', candidate: null });
+    else shows.set(title.id, show.value);
+  }
+  if (shows.size === 0) return results;
+
+  const crosswalk = await wikidataSparql(
+    db,
+    crosswalkQuery([...shows.values()].map((show) => show.id)),
+    deadline
+  );
+  if (crosswalk.kind !== 'ok') {
+    for (const id of shows.keys())
+      results.set(id, { kind: 'deferred', reason: reasonOf(crosswalk) });
+    return results;
+  }
+  const qidByShow = crosswalkMap(crosswalk.value);
+  const meta = await fetchScreenMetadata(db, [...qidByShow.values()], deadline, {
+    skipTvmaze: true,
+  });
+  for (const [id, show] of shows) {
+    if (meta.kind !== 'ok') {
+      results.set(id, { kind: 'deferred', reason: reasonOf(meta) });
+      continue;
+    }
+    const qid = qidByShow.get(show.id);
+    results.set(id, {
+      kind: 'refreshed',
+      candidate: mergeTvmaze(show, qid ? (meta.value.get(qid) ?? null) : null),
+    });
+  }
+  return results;
+}
+
+const QUERY_YEAR = /^(.*\S)\s+\(?((?:18|19|20)\d{2})\)?$/;
+
+/**
+ * Manual-add movie search. Stage A (exact label) is unioned with wbsearchentities,
+ * because short common titles never reach search's top results (§2.1 finding 2b).
+ * Films only. Ranked: exact title in the queried year, exact title, then popularity.
+ */
+export async function searchMovies(
+  db: Db,
+  query: string,
+  deadline: Deadline
+): Promise<CatalogResult<ScreenCandidate[]>> {
+  const trimmed = query.trim();
+  const match = QUERY_YEAR.exec(trimmed);
+  const title = match ? match[1] : trimmed;
+  const year = match ? Number(match[2]) : null;
+  const normalized = screenNormalize(title);
+  if (!normalized) return { kind: 'ok', value: [] };
+
+  const exact = await stageA(db, [title], deadline);
+  if (exact.kind !== 'ok') return exact;
+  const hits = await wikidataSearch(db, title, STAGE_B_LIMIT, deadline);
+  if (hits.kind !== 'ok') return hits;
+  const ids = new Set([...stageACandidates(title, exact.value), ...hits.value]);
+  const entities = await wikidataEntities(db, [...ids], FULL_ENTITY_PROPS, deadline);
+  if (entities.kind !== 'ok') return entities;
+
+  const variants = new Set(titleVariants(title).map(screenNormalize).filter(Boolean));
+  const ranked = [...entities.value.values()]
+    .map((entity) => scoreCandidate(normalized, variants, year, entity))
+    .filter((c): c is ScoredCandidate => c !== null && c.kind === 'film')
+    .sort(
+      (a, b) =>
+        Number(b.exact && b.yearExact) - Number(a.exact && a.yearExact) ||
+        Number(b.exact) - Number(a.exact) ||
+        b.sitelinks - a.sitelinks ||
+        compareQids(a.qid, b.qid)
+    )
+    .slice(0, SEARCH_LIMIT);
+
+  const meta = await fetchScreenMetadata(
+    db,
+    ranked.map((c) => c.qid),
+    deadline,
+    { entities: entities.value }
+  );
+  if (meta.kind !== 'ok') return meta;
+  return {
+    kind: 'ok',
+    value: ranked
+      .map((c) => meta.value.get(c.qid))
+      .filter((c): c is ScreenCandidate => c !== undefined),
+  };
+}
+
+/** Manual-add TV search: TVmaze search, crosswalked to Wikidata where possible. */
+export async function searchShows(
+  db: Db,
+  query: string,
+  deadline: Deadline
+): Promise<CatalogResult<ScreenCandidate[]>> {
+  const hits = await tvmazeSearch(db, query.trim(), deadline);
+  if (hits.kind !== 'ok') return hits;
+  const shows = hits.value.slice(0, SEARCH_LIMIT);
+  if (shows.length === 0) return { kind: 'ok', value: [] };
+  const crosswalk = await wikidataSparql(
+    db,
+    crosswalkQuery(shows.map((show) => show.id)),
+    deadline
+  );
+  if (crosswalk.kind !== 'ok') return crosswalk;
+  const qidByShow = crosswalkMap(crosswalk.value);
+  const meta = await fetchScreenMetadata(db, [...qidByShow.values()], deadline, {
+    skipTvmaze: true,
+  });
+  if (meta.kind !== 'ok') return meta;
+  return {
+    kind: 'ok',
+    value: shows.map((show) => {
+      const qid = qidByShow.get(show.id);
+      return mergeTvmaze(show, qid ? (meta.value.get(qid) ?? null) : null);
+    }),
+  };
 }
