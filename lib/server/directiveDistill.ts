@@ -10,8 +10,7 @@ import { toolInput } from './claude';
 import { trackedCreate } from './anthropic';
 import { pyJsonDumps } from './serialize';
 import { cleanDirectiveConstraints } from './directive';
-
-export const DISTILL_MODEL = 'claude-haiku-4-5-20251001';
+import { modelFor } from './models';
 
 // Copied verbatim from mylibrary/directive.py:124-145 — a single differing character
 // fails prompt-parity (parity-prompts.test.ts).
@@ -186,7 +185,7 @@ export async function distillDirective(
     db,
     { userId: opts.userId, operation: 'directive_distill' },
     {
-      model: DISTILL_MODEL,
+      model: modelFor('distill'),
       max_tokens: 1200,
       system: DISTILL_SYSTEM,
       tools: [DISTILL_TOOL],

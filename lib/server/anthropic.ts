@@ -21,11 +21,15 @@ type Pricing = [number, number, number, number]; // USD/1M: input, output, cache
 // introductory $2/$10 that Anthropic later made permanent, so it carries no
 // expiry: an earlier version of this table stepped it up to $3/$15 on
 // 2026-09-01 and overstated every Sonnet 5 run by 50% until that was removed.
-// Source: https://www.anthropic.com/pricing — last_verified 2026-09-01.
+// Source: https://www.anthropic.com/pricing — last_verified 2026-09-23.
 const MODEL_PRICING: Record<string, Pricing> = {
   'claude-sonnet-5': [2.0, 10.0, 2.5, 0.2],
   'claude-sonnet-4-6': [3.0, 15.0, 3.75, 0.3],
   'claude-haiku-4-5-20251001': [1.0, 5.0, 1.25, 0.1],
+  // Not used by default (spec 2026-09-22 §6.8). Present so a per-operation switch to Opus
+  // records its real cost instead of the $3/$15 fallback, which would under-report it.
+  // Cache hits are 0.05x base input on Opus 5.5 ($0.20), not the usual 0.1x.
+  'claude-opus-5-5': [4.0, 20.0, 5.0, 0.2],
 };
 // Unknown models bill at the priciest tier we know, so a missed table entry
 // over-reports rather than hiding spend.

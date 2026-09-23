@@ -17,10 +17,11 @@ import {
   type FeedbackContext,
 } from './profileFeedback';
 import { NO_RATED_BOOKS_MESSAGE } from './claudeErrors';
+import { modelFor } from './models';
 
-/** Twin of config.get_settings().model — read at call time, as Python does. */
+/** The profile builder's model (lib/server/models.ts). Read at call time, as Python did. */
 export function profileModel(): string {
-  return process.env.MYLIBRARY_MODEL || 'claude-sonnet-5';
+  return modelFor('profile');
 }
 
 export const PROFILE_MAX_TOKENS = 3000;

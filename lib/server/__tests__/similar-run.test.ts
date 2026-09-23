@@ -164,4 +164,22 @@ describe('runSimilar', () => {
       await close();
     }
   });
+
+  test('sends the seed and rerank overrides to their own stages', async () => {
+    process.env.MYLIBRARY_MODEL_SEED = 'model-seed';
+    process.env.MYLIBRARY_MODEL_RERANK = 'model-rerank';
+    const { db, close } = await makeTestDb();
+    const restore = installHttpReplay(httpFixtures as any);
+    try {
+      await loadSeed(db, seedJson as any);
+      const client = fakeClient([{ candidate_index: 0, score: 0.5, rationale: 'r' }]);
+      const out: any = await runSimilar(db, client, 'local', 1, 8);
+      expect(client.calls[0].model).toBe('model-seed');
+      expect(client.calls[1].model).toBe('model-rerank');
+      expect(out.model).toBe('model-rerank');
+    } finally {
+      restore();
+      await close();
+    }
+  });
 });

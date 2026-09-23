@@ -13,8 +13,7 @@ import { toolInput } from './claude';
 import { trackedCreate } from './anthropic';
 import { utcnowTs } from './serialize';
 import { ARCHETYPES, scoresToCode } from './archetype';
-
-export const ARCHETYPE_MODEL = 'claude-haiku-4-5-20251001';
+import { modelFor } from './models';
 
 // Copied verbatim from mylibrary/archetype.py:193-198.
 export const ARCHETYPE_SYSTEM =
@@ -204,7 +203,7 @@ export async function deriveArchetype(
     db,
     { userId, operation: 'archetype' },
     {
-      model: ARCHETYPE_MODEL,
+      model: modelFor('archetype'),
       max_tokens: 512,
       system: ARCHETYPE_SYSTEM,
       tools: [ARCHETYPE_TOOL],

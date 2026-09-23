@@ -197,4 +197,22 @@ describe('runDiscover', () => {
       await close();
     }
   });
+
+  test('sends the seed override to interpretation and the rerank override to ranking', async () => {
+    process.env.MYLIBRARY_MODEL_SEED = 'model-seed';
+    process.env.MYLIBRARY_MODEL_RERANK = 'model-rerank';
+    const { db, close } = await makeTestDb();
+    const restore = installHttpReplay(httpFixtures as any);
+    try {
+      await loadSeed(db, seedJson as any);
+      const client = fakeClient(INTERP_INPUT, [{ candidate_index: 0, score: 0.5, rationale: 'r' }]);
+      const out: any = await runDiscover(db, client, 'local', DISCOVER_QUERY, 10);
+      expect(client.calls[0].model).toBe('model-seed');
+      expect(client.calls[1].model).toBe('model-rerank');
+      expect(out.model).toBe('model-rerank');
+    } finally {
+      restore();
+      await close();
+    }
+  });
 });

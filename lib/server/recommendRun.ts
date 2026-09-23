@@ -46,12 +46,12 @@ import {
   RANK_TOOL,
   RANK_SYSTEM,
   SEED_MAX_TOKENS,
-  SEED_MODEL,
   SEED_SYSTEM,
   SEED_TOOL,
 } from './recPrompts';
 import { buildSignal, isColdStart, type RecSignal } from './recSignal';
 import { round2, utcnowTs } from './serialize';
+import { modelFor } from './models';
 
 export interface RecommendOptions {
   n: number;
@@ -227,7 +227,7 @@ async function claudeSeedQueries(
     db,
     { userId, operation: 'recommend_seed' },
     {
-      model: SEED_MODEL,
+      model: modelFor('seed'),
       max_tokens: SEED_MAX_TOKENS,
       system: SEED_SYSTEM,
       tools: [SEED_TOOL],

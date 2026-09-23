@@ -24,7 +24,7 @@ import {
   SEED_QUERIES,
   type AssembledCandidate,
 } from './recAssemble';
-import { rankModel, RANK_MAX_TOKENS, SEED_MAX_TOKENS, SEED_MODEL, SEED_TOOL } from './recPrompts';
+import { rankModel, RANK_MAX_TOKENS, SEED_MAX_TOKENS, SEED_TOOL } from './recPrompts';
 import { buildBookSignal, type BookAnchor } from './recSignal';
 import {
   BOOK_FACET_SYSTEM,
@@ -34,6 +34,7 @@ import {
   buildSimilarRerankPrompt,
 } from './recSimilarPrompts';
 import { round2 } from './serialize';
+import { modelFor } from './models';
 
 interface RankedSimilar extends AssembledCandidate {
   score: number;
@@ -127,7 +128,7 @@ async function bookFacetQueries(
     db,
     { userId, operation: 'similar_seed' },
     {
-      model: SEED_MODEL,
+      model: modelFor('seed'),
       max_tokens: SEED_MAX_TOKENS,
       system: BOOK_FACET_SYSTEM,
       tools: [SEED_TOOL],

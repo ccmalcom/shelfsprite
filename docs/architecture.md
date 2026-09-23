@@ -37,6 +37,9 @@ applied with drizzle-kit from `drizzle/`.
 - `claude.ts`, `anthropic.ts`, `claudeErrors.ts` — per-user Anthropic key resolution, injectable
   Claude clients/tool-input extraction, usage-cost recording through `trackedCreate`, and shared
   user-facing failures.
+- `models.ts` — per-operation Claude model selection (`modelFor`). Each operation reads its own
+  `MYLIBRARY_MODEL_<OP>` override at call time and otherwise keeps its historical model; the
+  global `MYLIBRARY_MODEL` reaches only profile and rerank.
 - `serialize.ts` and `rating.ts` — stable response/prompt serialization and the dependency-free
   half-star domain rules. These are behavior modules, not generic formatting conveniences.
 - `feedbackStatus.ts` — dependency-free feedback triage vocabulary shared by route handlers and

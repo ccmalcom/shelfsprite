@@ -4,7 +4,7 @@
  *
  * These live apart from recPrompts.ts because they ground in ONE anchor book
  * rather than the taste profile -- no traits, no loved books, no user steering.
- * Stage 1b reuses recPrompts' SEED_TOOL/SEED_MODEL/SEED_MAX_TOKENS verbatim,
+ * Stage 1b reuses recPrompts' SEED_TOOL/SEED_MAX_TOKENS and modelFor('seed') verbatim,
  * exactly as Python reuses _SEED_TOOL.
  *
  * Every string here is copied VERBATIM from Python and asserted byte-for-byte in
