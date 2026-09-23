@@ -1172,3 +1172,19 @@ export async function persistTitleResolution(
     resolvedAt: now,
   });
 }
+
+/**
+ * True when a write hit a title identity index: two requests raced past findIdentityClash.
+ * drizzle wraps the driver error, so the constraint name may sit on a cause.
+ */
+export function isTitleIdentityViolation(error: unknown): boolean {
+  for (let e: unknown = error; e instanceof Error; e = e.cause) {
+    if (
+      e.message.includes('uq_titles_user_wikidata_qid') ||
+      e.message.includes('uq_titles_user_tvmaze_id')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
