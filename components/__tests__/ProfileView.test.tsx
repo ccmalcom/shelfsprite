@@ -43,6 +43,8 @@ jest.mock('swr', () => ({
       'screen-settings': { enabled: screenEnabled, toggled_at: null, title_count: 1 },
       'screen-titles': [makeTitle({ id: 11, title: 'Heat', year: 1995 })],
       'profile-traits': [trait],
+      stats: { total: 3, rated: 2, unrated: 1, shelves: {}, mean_rating: 4, by_star: { '4': 2 } },
+      'profile-subjects': { overall: [{ subject: 'Gothic Fiction', count: 2 }], by_tier: {} },
     };
     return {
       data: key === null ? undefined : data[key],
@@ -54,10 +56,10 @@ jest.mock('swr', () => ({
   mutate: jest.fn(),
 }));
 
-function renderView() {
+function renderView(section: 'books' | 'screen' = 'books') {
   render(
     <ToastProvider>
-      <ProfileView />
+      <ProfileView section={section} />
     </ToastProvider>
   );
 }
@@ -80,5 +82,24 @@ describe('ProfileView', () => {
     expect(screen.queryByText('Heat (1995)')).toBeNull();
     expect(requested).not.toContain('screen-titles');
     expect(screen.getByText(/What your books have in common/)).toBeInTheDocument();
+  });
+
+  it('shows book stats in the books section', () => {
+    screenEnabled = true;
+    renderView('books');
+    expect(screen.getByText('Gothic Fiction')).toBeInTheDocument();
+    expect(screen.getByText(/2 rated books/)).toBeInTheDocument();
+    expect(screen.queryByText('Your screen library')).toBeNull();
+  });
+
+  it('shows screen stats and never requests book stats in the screen section', () => {
+    screenEnabled = true;
+    renderView('screen');
+    expect(requested).not.toContain('stats');
+    expect(requested).not.toContain('profile-subjects');
+    expect(screen.queryByText('Gothic Fiction')).toBeNull();
+    expect(screen.getByText('Your screen library')).toBeInTheDocument();
+    expect(screen.getByText(/1 rated title\b/)).toBeInTheDocument();
+    expect(screen.getByText('Crime')).toBeInTheDocument();
   });
 });
