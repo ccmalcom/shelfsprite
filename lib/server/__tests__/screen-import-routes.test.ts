@@ -6,6 +6,7 @@ import { _setDbForTests, schema, type Db } from '../db';
 import { _setDispatchForTests } from '../enrichmentDispatch';
 import { letterboxdZip } from './fixtures/letterboxd';
 import { makeTestDb } from './helpers/pglite';
+import { freezeInsideRateWindow } from './helpers/rateWindow';
 
 let db: Db;
 let close: () => Promise<void>;
@@ -100,6 +101,7 @@ describe('POST /api/screen/import', () => {
   });
 
   test('is rate limited per user', async () => {
+    freezeInsideRateWindow();
     const statuses: number[] = [];
     for (let i = 0; i < 6; i += 1) {
       statuses.push((await importRoute(upload('e.zip', letterboxdZip()))).status);

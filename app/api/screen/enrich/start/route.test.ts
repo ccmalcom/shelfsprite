@@ -14,6 +14,7 @@ vi.mock('@/lib/server/enrichmentJobs', async (importOriginal) => ({
 }));
 
 import { POST } from './route';
+import { freezeInsideRateWindow } from '@/lib/server/__tests__/helpers/rateWindow';
 
 let db: Db;
 let close: () => Promise<void>;
@@ -105,6 +106,7 @@ describe('POST /api/screen/enrich/start', () => {
   });
 
   it('is rate limited per user with the normal detail shape', async () => {
+    freezeInsideRateWindow();
     await enableScreen();
     const statuses: number[] = [];
     let last: Response | null = null;

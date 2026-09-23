@@ -5,6 +5,7 @@ import { _setDbForTests, type Db } from '@/lib/server/db';
 import { listInviteRequests } from '@/lib/server/inviteRequests';
 import { RATE_LIMITS } from '@/lib/server/ratelimit';
 import { POST } from './route';
+import { freezeInsideRateWindow } from '@/lib/server/__tests__/helpers/rateWindow';
 
 setupTestEnv();
 afterEach(() => vi.restoreAllMocks());
@@ -105,6 +106,7 @@ describe('POST /api/invite-requests', () => {
   });
 
   it('allows the 5th request and 429s the 6th, with the {detail} shape not {error}', async () => {
+    freezeInsideRateWindow();
     await withDb(async () => {
       const h = { 'x-forwarded-for': '198.51.100.4' };
       for (let i = 0; i < 5; i++) {
@@ -120,6 +122,7 @@ describe('POST /api/invite-requests', () => {
   });
 
   it('does not share a bucket between two x-forwarded-for values', async () => {
+    freezeInsideRateWindow();
     await withDb(async () => {
       for (let i = 0; i < 5; i++) {
         await POST(post({ email: `a${i}@example.com` }, { 'x-forwarded-for': '198.51.100.10' }));
@@ -137,6 +140,7 @@ describe('POST /api/invite-requests', () => {
   });
 
   it('still consumes a limit when x-forwarded-for is absent', async () => {
+    freezeInsideRateWindow();
     await withDb(async () => {
       for (let i = 0; i < 5; i++) {
         const ok = await POST(post({ email: `c${i}@example.com` }));

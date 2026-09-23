@@ -16,6 +16,7 @@ vi.mock('@/lib/server/screenEnrichment', async (importOriginal) => ({
 }));
 
 import { GET } from './route';
+import { freezeInsideRateWindow } from '@/lib/server/__tests__/helpers/rateWindow';
 
 let db: Db;
 let close: () => Promise<void>;
@@ -86,6 +87,7 @@ describe('GET /api/screen/search', () => {
   });
 
   it('is rate limited per user', async () => {
+    freezeInsideRateWindow();
     await enable();
     const statuses: number[] = [];
     for (let i = 0; i < 31; i += 1) statuses.push((await search('q=heat&type=movie')).status);

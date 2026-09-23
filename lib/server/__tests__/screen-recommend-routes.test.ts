@@ -7,6 +7,7 @@ import { SCREEN_REJECT_REASONS, titleRecOut } from '../screenRecs';
 import { REJECT_REASONS } from '../recs';
 import { POST as recommend } from '@/app/api/screen/recommend/route';
 import { GET as latest } from '@/app/api/screen/recommendations/route';
+import { freezeInsideRateWindow } from './helpers/rateWindow';
 
 const runReq = (body?: unknown) =>
   new Request('http://test/api/screen/recommend', {
@@ -86,6 +87,7 @@ describe('POST /api/screen/recommend', () => {
   });
 
   test('the fourth run in a minute answers 429 in the detail shape', async () => {
+    freezeInsideRateWindow();
     await withDb(async () => {
       for (let i = 0; i < 3; i++) expect((await recommend(runReq({}))).status).toBe(400);
       const res = await recommend(runReq({}));
