@@ -145,7 +145,7 @@ describe('runClaimedScreenChunk', () => {
   });
 
   it(`hands at most ${SCREEN_BATCH_SIZE} titles to each batch`, async () => {
-    await seedTitles('user-a', SCREEN_BATCH_SIZE + 10);
+    await seedTitles('user-a', SCREEN_BATCH_SIZE * 10 + 10);
     const job = await seedScreenJob('user-a');
     const runBatch = vi.fn(persistAll);
     const result = await runClaimedScreenChunk(db, job, {
@@ -153,8 +153,22 @@ describe('runClaimedScreenChunk', () => {
       runBatch,
       dispatch: noDispatch,
     });
-    expect(runBatch.mock.calls.map((call) => call[1].length)).toEqual([SCREEN_BATCH_SIZE, 10]);
+    expect(runBatch.mock.calls.map((call) => call[1].length)).toEqual([
+      ...Array<number>(10).fill(SCREEN_BATCH_SIZE),
+      10,
+    ]);
     expect(result.outcome).toBe('done');
+  });
+
+  it.each([
+    [9, [5, 4]],
+    [60, Array<number>(10).fill(6)],
+  ])('splits a library of %i titles so progress moves in steps', async (count, sizes) => {
+    await seedTitles('user-a', count);
+    const job = await seedScreenJob('user-a');
+    const runBatch = vi.fn(persistAll);
+    await runClaimedScreenChunk(db, job, { nowMs: () => 0, runBatch, dispatch: noDispatch });
+    expect(runBatch.mock.calls.map((call) => call[1].length)).toEqual(sizes);
   });
 
   it('gives each batch a deadline measured on the chunk clock', async () => {

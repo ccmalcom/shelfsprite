@@ -563,6 +563,15 @@ export async function runClaimedChunk(
  */
 export const SCREEN_BATCH_SIZE = 50;
 
+/**
+ * Progress is recounted per batch, so a small library resolved as one batch jumps from 0 to done.
+ * Split the run into about ten batches (never fewer than 5 titles each, never more than
+ * SCREEN_BATCH_SIZE) so the bar moves, at the cost of a few extra queries for a small library.
+ */
+export function screenBatchSize(total: number): number {
+  return Math.min(SCREEN_BATCH_SIZE, Math.max(5, Math.ceil(total / 10)));
+}
+
 export interface ScreenChunkDeps {
   nowMs: () => number;
   runBatch: (db: Db, titleIds: number[], options: JobOptions, deadline: Deadline) => Promise<void>;
@@ -598,10 +607,10 @@ export async function runClaimedScreenChunk(
       derive: async () => deriveFromRows(await screenCandidateRows(db, job.userId), options),
       runNext: async (deadline) => {
         const rows = await screenCandidateRows(db, job.userId);
-        const { remaining } = deriveFromRows(rows, options);
+        const { remaining, total } = deriveFromRows(rows, options);
         const batch = selectableRows(rows, options).slice(
           0,
-          Math.min(SCREEN_BATCH_SIZE, remaining)
+          Math.min(screenBatchSize(total), remaining)
         );
         if (batch.length === 0) return false;
         await deps.runBatch(
