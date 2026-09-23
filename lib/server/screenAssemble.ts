@@ -12,7 +12,9 @@
  * empty pool; the run serves whatever the other pools found.
  */
 import type { Db } from './db';
+import { authorExcluded, subjectExcluded } from './exclusions';
 import { logDebug } from './log';
+import { SEED_RESERVE_SHARE } from './recAssemble';
 import {
   tvmazeSingleSearch,
   wikidataSparql,
@@ -27,6 +29,7 @@ import {
   lovedGenresQuery,
   lovedPeopleQuery,
   metadataQuery,
+  POPULARITY_MIN_SITELINKS,
   qidOf,
   rowInt,
   rowLabel,
@@ -37,6 +40,8 @@ import {
   type LabelYear,
   type SparqlRow,
 } from './screenSparql';
+import { pyRoundHalfEven } from './serialize';
+import { normalizeTitleKey } from './titles';
 
 export type MediaFilter = 'both' | 'movie' | 'tv';
 export type RetrievalPool = 'adaptation' | 'metadata' | 'claude_seed';
@@ -477,4 +482,303 @@ export async function seedPool(
   }
 
   return [...byIndex.entries()].sort((a, b) => a[0] - b[0]).map(([, h]) => h);
+}
+
+// --- assembly ------------------------------------------------------------------------------
+
+/** Spec §6.3: the pool handed to the reranker is capped at 60 (token budget). */
+export const SCREEN_MAX_CANDIDATES = 60;
+/** Wikipedia summaries cost one fetch each; hydrate at most this many before filtering. */
+export const HYDRATE_CAP = 90;
+/** Adaptation candidates may take at most this share of the cap, so metadata keeps room. */
+export const ADAPTATION_MAX_SHARE = 0.4;
+/** Spec §6.3: cap 2 per director or creator. */
+export const MAX_PER_PERSON = 2;
+
+export type RetrievalPoolLabel = RetrievalPool | 'multiple';
+
+export interface MergedHit extends Omit<PoolHit, 'pool'> {
+  retrieval_pool: RetrievalPoolLabel;
+}
+
+export interface ScreenPoolCandidate extends ScreenCandidate {
+  retrieval_pool: RetrievalPoolLabel;
+  seed_reason: string;
+  adaptation: AdaptationProvenance | null;
+}
+
+export function passesFloor(h: { sitelinks: number; enwiki: boolean }): boolean {
+  return h.enwiki && h.sitelinks >= POPULARITY_MIN_SITELINKS;
+}
+
+/**
+ * Merge the pools in the given order (the first pool's reason wins), dropping anything below
+ * the popularity floor, any series without a TVmaze id, anything the reader owns or rejected
+ * (by QID, TVmaze id or normalized title + year), and a second item with the same title + year.
+ * The floor is enforced in every query too; this re-check keeps a future query edit honest.
+ */
+export function mergeHits(
+  pools: PoolHit[][],
+  owned: Pick<ScreenSignal, 'owned_qids' | 'owned_tvmaze_ids' | 'owned_keys'>
+): MergedHit[] {
+  const byQid = new Map<string, MergedHit & { pools: Set<RetrievalPool> }>();
+  const keys = new Set<string>();
+  for (const pool of pools) {
+    for (const h of pool) {
+      if (!passesFloor(h)) continue;
+      if (h.media_type === 'tv' && h.tvmaze_id === null) continue;
+      if (owned.owned_qids.has(h.qid)) continue;
+      if (h.tvmaze_id !== null && owned.owned_tvmaze_ids.has(h.tvmaze_id)) continue;
+      const key = h.label ? normalizeTitleKey(h.label, h.year) : null;
+      if (key && owned.owned_keys.has(key)) continue;
+
+      const existing = byQid.get(h.qid);
+      if (existing) {
+        existing.pools.add(h.pool);
+        if (!existing.adaptation && h.adaptation) existing.adaptation = h.adaptation;
+        if (!existing.label && h.label) existing.label = h.label;
+        if (existing.year === null && h.year !== null) existing.year = h.year;
+        continue;
+      }
+      if (key && keys.has(key)) continue;
+      if (key) keys.add(key);
+      const { pool, ...rest } = h;
+      byQid.set(h.qid, { ...rest, retrieval_pool: pool, pools: new Set([pool]) });
+    }
+  }
+  return [...byQid.values()].map(({ pools, ...rest }) => ({
+    ...rest,
+    retrieval_pool: pools.size > 1 ? 'multiple' : rest.retrieval_pool,
+  }));
+}
+
+/**
+ * capPool's screen twin (recAssemble.ts): multi-pool candidates first (most grounded), then a
+ * reserved seed share (SEED_RESERVE_SHARE -- we paid for those seeds), then adaptation up to
+ * ADAPTATION_MAX_SHARE, then metadata, then leftover adaptation and seeds as backfill.
+ */
+export function capHits<T extends { retrieval_pool: RetrievalPoolLabel }>(
+  hits: T[],
+  cap: number
+): T[] {
+  if (hits.length <= cap) return hits;
+  const of = (p: RetrievalPoolLabel) => hits.filter((h) => h.retrieval_pool === p);
+  const multiple = of('multiple');
+  const adaptation = of('adaptation');
+  const seed = of('claude_seed');
+  const meta = of('metadata');
+
+  let chosen = multiple.slice(0, cap);
+  if (chosen.length >= cap) return chosen;
+  const seedQuota = Math.min(
+    seed.length,
+    pyRoundHalfEven(cap * SEED_RESERVE_SHARE),
+    cap - chosen.length
+  );
+  chosen = chosen.concat(seed.slice(0, seedQuota));
+  const adaptQuota = Math.min(
+    adaptation.length,
+    pyRoundHalfEven(cap * ADAPTATION_MAX_SHARE),
+    cap - chosen.length
+  );
+  chosen = chosen.concat(adaptation.slice(0, adaptQuota));
+  chosen = chosen.concat(meta.slice(0, cap - chosen.length));
+  if (chosen.length < cap)
+    chosen = chosen.concat(adaptation.slice(adaptQuota, adaptQuota + cap - chosen.length));
+  if (chosen.length < cap)
+    chosen = chosen.concat(seed.slice(seedQuota, seedQuota + cap - chosen.length));
+  return chosen.slice(0, cap);
+}
+
+function minimalCandidate(h: MergedHit, title: string): ScreenCandidate {
+  return {
+    media_type: h.media_type,
+    title,
+    year: h.year,
+    wikidata_qid: h.qid,
+    tvmaze_id: h.tvmaze_id,
+    image_url: null,
+    description: null,
+    description_source: null,
+    description_url: null,
+    wikipedia_page: null,
+    genres: [],
+    directors: [],
+    creators: [],
+    writers: [],
+    countries: [],
+    original_language: null,
+    based_on: [],
+    main_subjects: [],
+    series: [],
+    production_companies: [],
+    sitelinks: h.sitelinks,
+  };
+}
+
+/**
+ * One fetchScreenMetadata call for the whole capped list (wave 5 batches wbgetentities and
+ * Wikipedia summaries, cached in catalog_cache). A retryable failure degrades to minimal
+ * candidates; a hit with neither metadata nor a label is dropped (nothing to show or rank).
+ */
+export async function hydrate(
+  port: ScreenCatalogPort,
+  hits: MergedHit[],
+  deadline: Deadline
+): Promise<ScreenPoolCandidate[]> {
+  let meta = new Map<string, ScreenCandidate>();
+  if (hits.length && deadline.remainingMs() > 0) {
+    const res = await port.fetchMetadata(hits.map((h) => h.qid));
+    if (res.kind === 'ok') meta = res.value;
+    else if (res.kind === 'retryable') {
+      logDebug('screen-recommend', 'metadata hydration skipped', { reason: res.reason });
+    }
+  }
+  const out: ScreenPoolCandidate[] = [];
+  for (const h of hits) {
+    const m = meta.get(h.qid);
+    const title = m?.title || h.label;
+    if (!title) continue;
+    const base = m ?? minimalCandidate(h, title);
+    out.push({
+      ...base,
+      media_type: h.media_type,
+      title,
+      year: base.year ?? h.year,
+      wikidata_qid: h.qid,
+      tvmaze_id: h.media_type === 'tv' ? (h.tvmaze_id ?? base.tvmaze_id) : null,
+      sitelinks: base.sitelinks ?? h.sitelinks,
+      retrieval_pool: h.retrieval_pool,
+      seed_reason: h.seed_reason,
+      adaptation: h.adaptation,
+    });
+  }
+  return out;
+}
+
+/** English labels Wikidata uses for P364 (original language), mapped to ISO 639-1. */
+const LANGUAGE_CODES: Record<string, string> = {
+  arabic: 'ar',
+  bengali: 'bn',
+  cantonese: 'zh',
+  chinese: 'zh',
+  czech: 'cs',
+  danish: 'da',
+  dutch: 'nl',
+  english: 'en',
+  finnish: 'fi',
+  french: 'fr',
+  german: 'de',
+  greek: 'el',
+  hebrew: 'he',
+  hindi: 'hi',
+  hungarian: 'hu',
+  icelandic: 'is',
+  indonesian: 'id',
+  irish: 'ga',
+  italian: 'it',
+  japanese: 'ja',
+  korean: 'ko',
+  malayalam: 'ml',
+  'mandarin chinese': 'zh',
+  mandarin: 'zh',
+  norwegian: 'no',
+  persian: 'fa',
+  polish: 'pl',
+  portuguese: 'pt',
+  romanian: 'ro',
+  russian: 'ru',
+  spanish: 'es',
+  swedish: 'sv',
+  tagalog: 'tl',
+  tamil: 'ta',
+  telugu: 'te',
+  thai: 'th',
+  turkish: 'tr',
+  ukrainian: 'uk',
+  vietnamese: 'vi',
+};
+
+/**
+ * The directive's `languages` are ISO 639-1 codes (recFilters.cleanConstraints). Wave 5 may
+ * store original_language as a code or as Wikidata's English label; accept both. Unknown
+ * values return null and therefore PASS the filter (spec §6.3: a missing value passes).
+ */
+export function languageCode(value: string | null): string | null {
+  if (!value) return null;
+  const v = value.trim().toLowerCase();
+  if (/^[a-z]{2}$/.test(v)) return v;
+  return LANGUAGE_CODES[v.replace(/ language$/, '')] ?? null;
+}
+
+/**
+ * The directive's hard constraints with spec §6.3's explicit mapping: year range -> release
+ * year; exclude_subjects -> genres and main subjects; exclude_authors -> adaptation source
+ * author; languages -> original language. A missing value always passes. Author and subject
+ * matching reuse exclusions.ts so screen and book exclusions behave identically (including the
+ * inherited surname quirk documented there).
+ */
+export function applyScreenDirective(
+  cands: ScreenPoolCandidate[],
+  constraints: Record<string, unknown>
+): ScreenPoolCandidate[] {
+  if (!constraints || Object.keys(constraints).length === 0) return cands;
+  const minYear = constraints.min_year as number | null | undefined;
+  const maxYear = constraints.max_year as number | null | undefined;
+  const languages = ((constraints.languages as string[] | null) ?? []).map((l) => l.toLowerCase());
+  return cands.filter((c) => {
+    if (typeof c.year === 'number' && Number.isInteger(c.year)) {
+      if (minYear != null && c.year < minYear) return false;
+      if (maxYear != null && c.year > maxYear) return false;
+    }
+    for (const subject of [...c.genres, ...c.main_subjects]) {
+      if (subjectExcluded(subject, constraints.exclude_subjects)) return false;
+    }
+    for (const source of c.based_on) {
+      if (source.author && authorExcluded(source.author, constraints.exclude_authors)) return false;
+    }
+    if (languages.length) {
+      const code = languageCode(c.original_language);
+      if (code !== null && !languages.includes(code)) return false;
+    }
+    return true;
+  });
+}
+
+/** At most MAX_PER_PERSON per first-listed director (films) or creator (series). */
+export function applyPersonCap(cands: ScreenPoolCandidate[]): ScreenPoolCandidate[] {
+  const counts = new Map<string, number>();
+  return cands.filter((c) => {
+    const person = (c.media_type === 'movie' ? c.directors : c.creators)[0]?.trim().toLowerCase();
+    if (!person) return true;
+    const n = counts.get(person) ?? 0;
+    if (n >= MAX_PER_PERSON) return false;
+    counts.set(person, n + 1);
+    return true;
+  });
+}
+
+export async function assembleScreenPool(
+  port: ScreenCatalogPort,
+  pools: PoolHit[][],
+  signal: Pick<
+    ScreenSignal,
+    'owned_qids' | 'owned_tvmaze_ids' | 'owned_keys' | 'directive_constraints'
+  >,
+  mediaFilter: MediaFilter,
+  deadline: Deadline
+): Promise<ScreenPoolCandidate[]> {
+  const merged = mergeHits(pools, signal).filter((h) => allows(mediaFilter, h.media_type));
+  const hydrated = await hydrate(port, capHits(merged, HYDRATE_CAP), deadline);
+  // Re-check after hydration: the Wikipedia title can differ from the pool's label.
+  const kept = hydrated.filter(
+    (c) =>
+      allows(mediaFilter, c.media_type) &&
+      !(c.media_type === 'tv' && c.tvmaze_id === null) &&
+      !signal.owned_keys.has(normalizeTitleKey(c.title, c.year))
+  );
+  return capHits(
+    applyPersonCap(applyScreenDirective(kept, signal.directive_constraints)),
+    SCREEN_MAX_CANDIDATES
+  );
 }
