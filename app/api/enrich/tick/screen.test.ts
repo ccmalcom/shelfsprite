@@ -20,6 +20,12 @@ import { POST } from './route';
 let db: Db;
 let close: () => Promise<void>;
 
+// Compare job ids, never raw call args: those hold the whole PGlite Db, and formatting one into a
+// failure message runs the worker out of memory instead of printing the assertion.
+function jobIds(mock: typeof runClaimedChunkMock): string[] {
+  return mock.mock.calls.map((call) => (call[1] as { jobId: string }).jobId);
+}
+
 const done = { outcome: 'done', progressBefore: 0, progressAfter: 1, remaining: 0, rearmed: false };
 
 function tick(jobId: string): Promise<Response> {
@@ -61,14 +67,19 @@ describe('POST /api/enrich/tick dispatches on kind', () => {
     });
     const response = await tick('screen-1');
     expect(await response.json()).toEqual({ claimed: true, outcome: 'done' });
-    expect(runClaimedChunkMock).not.toHaveBeenCalled();
-    expect(runClaimedScreenChunkMock.mock.calls).toEqual([
-      [
-        expect.anything(),
-        expect.objectContaining({ jobId: 'screen-1', kind: 'screen', userId: 'owner' }),
-        expect.objectContaining({ runBatch: expect.any(Function), dispatch: expect.any(Function) }),
-      ],
-    ]);
+    expect({
+      book: jobIds(runClaimedChunkMock),
+      screen: jobIds(runClaimedScreenChunkMock),
+    }).toEqual({
+      book: [],
+      screen: ['screen-1'],
+    });
+    const [, row, deps] = runClaimedScreenChunkMock.mock.calls[0];
+    expect({ kind: row.kind, userId: row.userId }).toEqual({ kind: 'screen', userId: 'owner' });
+    expect({ runBatch: typeof deps.runBatch, dispatch: typeof deps.dispatch }).toEqual({
+      runBatch: 'function',
+      dispatch: 'function',
+    });
   });
 
   it('runs the book chunk for a book job and never the screen chunk', async () => {
@@ -80,7 +91,12 @@ describe('POST /api/enrich/tick dispatches on kind', () => {
       total: 0,
     });
     await tick('book-1');
-    expect(runClaimedScreenChunkMock).not.toHaveBeenCalled();
-    expect(runClaimedChunkMock).toHaveBeenCalledTimes(1);
+    expect({
+      book: jobIds(runClaimedChunkMock),
+      screen: jobIds(runClaimedScreenChunkMock),
+    }).toEqual({
+      book: ['book-1'],
+      screen: [],
+    });
   });
 });
