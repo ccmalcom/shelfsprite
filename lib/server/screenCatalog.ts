@@ -11,6 +11,7 @@
  * requests; cross-request spacing is not attempted at invite-only scale. Requests are
  * strictly sequential, which satisfies Wikimedia's "concurrency 1" for the Action API.
  */
+import { sql } from 'drizzle-orm';
 import { cacheGet, cachePut } from './catalogCache';
 import type { Db } from './db';
 
@@ -465,4 +466,55 @@ export function sitelinkCount(entity: WikidataEntity): number {
 
 export function enwikiTitle(entity: WikidataEntity): string | null {
   return entity.sitelinks?.enwiki?.title ?? null;
+}
+
+// --- Cache retention (spec §4.2) -----------------------------------------------------
+
+export const SCREEN_CACHE_MAX_AGE_DAYS = 90;
+export const SCREEN_CACHE_MAX_ROWS = 50_000;
+
+export interface ScreenCachePrune {
+  expired: number;
+  overflow: number;
+}
+
+function countOf(result: unknown): number {
+  const rows = Array.isArray(result) ? result : (result as { rows: unknown[] }).rows;
+  return Number((rows[0] as { n?: number | string } | undefined)?.n ?? 0);
+}
+
+/**
+ * Bounds screen rows in catalog_cache by age and by count; book sources are never touched
+ * (their entries never expire, per catalogCache.ts). The cutoff uses the database's now(),
+ * the same clock cachePut stamps fetched_at with.
+ */
+export async function pruneScreenCache(
+  db: Db,
+  limits: { maxAgeDays?: number; maxRows?: number } = {}
+): Promise<ScreenCachePrune> {
+  const maxAgeDays = limits.maxAgeDays ?? SCREEN_CACHE_MAX_AGE_DAYS;
+  const maxRows = limits.maxRows ?? SCREEN_CACHE_MAX_ROWS;
+  const expired = await db.execute(sql`
+    with gone as (
+      delete from catalog_cache
+      where source like 'screen:%'
+        and fetched_at < now() - make_interval(days => ${maxAgeDays})
+      returning 1
+    )
+    select count(*)::int as n from gone
+  `);
+  const overflow = await db.execute(sql`
+    with gone as (
+      delete from catalog_cache
+      where cache_key in (
+        select cache_key from catalog_cache
+        where source like 'screen:%'
+        order by fetched_at desc nulls last, cache_key
+        offset ${maxRows}
+      )
+      returning 1
+    )
+    select count(*)::int as n from gone
+  `);
+  return { expired: countOf(expired), overflow: countOf(overflow) };
 }
