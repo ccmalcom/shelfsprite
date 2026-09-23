@@ -50,3 +50,23 @@ export async function readCsvUpload(
     throw new ApiError(422, 'File must be UTF-8 encoded CSV.');
   }
 }
+
+const ZIP_TOO_LARGE = 'Uploaded ZIP exceeds the 10 MiB limit.';
+
+/** The Letterboxd export upload: same 10 MiB in-memory bound and missing-file shape as CSV. */
+export async function readZipUpload(
+  request: Request
+): Promise<{ bytes: Uint8Array; filename: string }> {
+  const contentLength = request.headers.get('content-length');
+  if (/^\d+$/.test(contentLength ?? '') && Number(contentLength) > MAX_IMPORT_BYTES) {
+    throw new ApiError(413, ZIP_TOO_LARGE);
+  }
+  const form = await request.formData();
+  const file = form.get('file');
+  if (!(file instanceof File)) throw new MissingImportFileError();
+  if (!file.name.toLowerCase().endsWith('.zip')) {
+    throw new ApiError(422, 'Uploaded file must be a .zip');
+  }
+  if (file.size > MAX_IMPORT_BYTES) throw new ApiError(413, ZIP_TOO_LARGE);
+  return { bytes: new Uint8Array(await file.arrayBuffer()), filename: file.name };
+}
