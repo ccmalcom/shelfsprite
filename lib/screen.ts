@@ -17,6 +17,21 @@ export const TITLE_STATUS_LABELS: Record<TitleStatus, string> = {
   dropped: 'Dropped',
 };
 
+/** Only a title someone has started can carry a watch date. */
+export function hasWatchDate(status: TitleStatus): boolean {
+  return status !== 'want';
+}
+
+/** Today as YYYY-MM-DD in the reader's zone, the ceiling for a date input. */
+export function todayIso(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+/** The input's max only marks a typed future date invalid; the modals refuse it before saving. */
+export const FUTURE_WATCH_DATE_MESSAGE = 'The date watched cannot be in the future.';
+
 export function mediaLabel(type: MediaType): 'Film' | 'TV' {
   return type === 'tv' ? 'TV' : 'Film';
 }

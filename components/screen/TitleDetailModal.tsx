@@ -8,11 +8,14 @@ import TitleTile from '@/components/screen/TitleTile';
 import { DescriptionSource } from '@/components/screen/Attribution';
 import {
   errorMessage,
+  FUTURE_WATCH_DATE_MESSAGE,
+  hasWatchDate,
   mediaLabel,
   needsCorrection,
   titleLabel,
   TITLE_STATUSES,
   TITLE_STATUS_LABELS,
+  todayIso,
 } from '@/lib/screen';
 import { invalidateTitleEdits } from '@/lib/screenCache';
 
@@ -37,6 +40,7 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
   const [status, setStatus] = useState<TitleStatus>(title.status);
   const [rating, setRating] = useState<number>(title.rating ?? 0);
   const [review, setReview] = useState<string>(title.review ?? '');
+  const [watchedOn, setWatchedOn] = useState<string>(title.last_watched_on ?? '');
   const [favorite, setFavorite] = useState(title.is_favorite);
   const [exclude, setExclude] = useState(title.exclude_from_profile);
   const [saving, setSaving] = useState(false);
@@ -59,6 +63,10 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
     if (review.trim() !== (title.review ?? '').trim()) body.review = review.trim();
     if (favorite !== title.is_favorite) body.is_favorite = favorite;
     if (exclude !== title.exclude_from_profile) body.exclude_from_profile = exclude;
+    // No clear, as for a book's date read: an emptied input leaves the saved date alone.
+    if (hasWatchDate(status) && watchedOn !== '' && watchedOn !== (title.last_watched_on ?? '')) {
+      body.last_watched_on = watchedOn;
+    }
     return body;
   }
 
@@ -66,6 +74,10 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
     const body = changes();
     if (Object.keys(body).length === 0) {
       onClose();
+      return;
+    }
+    if (body.last_watched_on && body.last_watched_on > todayIso()) {
+      setError(FUTURE_WATCH_DATE_MESSAGE);
       return;
     }
     setSaving(true);
@@ -200,6 +212,20 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
               ))}
             </select>
           </label>
+
+          {hasWatchDate(status) && (
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-muted">Date watched</span>
+              <input
+                type="date"
+                aria-label="Date watched"
+                value={watchedOn}
+                max={todayIso()}
+                onChange={(e) => setWatchedOn(e.target.value)}
+                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent [color-scheme:dark]"
+              />
+            </label>
+          )}
 
           <div>
             <p className="mb-1 text-xs font-medium text-muted">Your rating</p>

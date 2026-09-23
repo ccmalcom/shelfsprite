@@ -96,7 +96,51 @@ describe('AddTitleModal', () => {
       status: 'watched',
       rating: null,
       review: null,
+      last_watched_on: null,
     });
+  });
+
+  it('sends a picked watch date', async () => {
+    renderAdd();
+    await pickHeat();
+    fireEvent.change(screen.getByLabelText('Date watched (optional)'), {
+      target: { value: '2025-06-14' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+    await waitFor(() =>
+      expect(addTitle).toHaveBeenCalledWith(
+        expect.objectContaining({ last_watched_on: '2025-06-14' })
+      )
+    );
+  });
+
+  it('refuses a future watch date without a request', async () => {
+    renderAdd();
+    await pickHeat();
+    fireEvent.change(screen.getByLabelText('Date watched (optional)'), {
+      target: { value: '2999-01-01' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The date watched cannot be in the future.'
+    );
+    expect(addTitle).not.toHaveBeenCalled();
+  });
+
+  it('drops a picked watch date when the add becomes want-to-watch', async () => {
+    renderAdd();
+    await pickHeat();
+    fireEvent.change(screen.getByLabelText('Date watched (optional)'), {
+      target: { value: '2025-06-14' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), {
+      target: { value: 'want' },
+    });
+    expect(screen.queryByLabelText('Date watched (optional)')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+    await waitFor(() =>
+      expect(addTitle).toHaveBeenCalledWith(expect.objectContaining({ last_watched_on: null }))
+    );
   });
 
   it('sends the rating and review together', async () => {
