@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getDb, schema } from '@/lib/server/db';
 import { ApiError, withApi } from '@/lib/server/http';
@@ -60,6 +60,8 @@ export const POST = withApi('/api/screen/titles/[id]/correct', async (req, ctx) 
           mediaType: candidate.media_type,
           wikidataQid: candidate.wikidata_qid,
           tvmazeId,
+          // A year-less import (Letterboxd omits some) takes the pick's year; a year it has stays.
+          year: sql`coalesce(${schema.titles.year}, ${candidate.year})`,
           updatedAt: now,
         })
         .where(and(eq(schema.titles.id, id), eq(schema.titles.userId, userId)))

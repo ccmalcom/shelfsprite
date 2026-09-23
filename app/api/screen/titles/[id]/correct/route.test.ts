@@ -127,6 +127,15 @@ describe('POST /api/screen/titles/[id]/correct', () => {
     expect(rows.map((r) => [r.titleId, r.confidenceLabel])).toEqual([[id, 'CORRECTED']]);
   });
 
+  it("fills a year-less title's year from the pick, but never replaces a year it has", async () => {
+    const yearless = await addTitle({ title: 'Paprika', year: null, letterboxdUri: 'u1' });
+    const pick = { title: 'Paprika', year: 2006, wikidata_qid: 'Q20' };
+    const filled = await (await correct(yearless, { candidate: candidate(pick) })).json();
+    const dated = await addTitle({ year: 1971, letterboxdUri: 'u2' });
+    const kept = await (await correct(dated, { candidate: candidate() })).json();
+    expect([filled.year, kept.year]).toEqual([2006, 1971]);
+  });
+
   it('turns a mis-typed movie into a show, and clears a duplicate marker', async () => {
     const id = await addTitle({ title: 'Chernobyl', year: 2019 });
     await lowEnrichment(id, { duplicateOfTitleId: 12345 });
