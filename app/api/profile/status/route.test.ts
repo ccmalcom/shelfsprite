@@ -6,6 +6,7 @@ import seedJson from '@/lib/server/__tests__/fixtures/seed.json';
 import { _setDbForTests, schema, type Db } from '@/lib/server/db';
 import {
   insertTitle,
+  insertTitleEnrichment,
   setLastProfiledAt,
   setScreen,
 } from '@/lib/server/__tests__/helpers/screenProfileFixtures';
@@ -127,6 +128,31 @@ describe('GET /api/profile/status with titles', () => {
       expect(body.dirty).toBe(true);
       expect(body.changed_titles).toBe(1);
       expect(body.changed_title_ids).toEqual([want]);
+    });
+  });
+
+  // Review finding: accepting a screen recommendation creates an unrated `want` title with a
+  // fresh enrichment row and no feedback stamp. That is not profile evidence, so status must
+  // agree with the recommend gate (blocksScreenRecs) and stay clean, or /screen stays blocked.
+  it('stays clean for an enrichment-only change to a title that is not evidence', async () => {
+    await withSeededDb(async (db) => {
+      await setScreen(db, true);
+      const want = await insertTitle(db, { title: 'Tenet', status: 'want' });
+      await insertTitleEnrichment(db, want, { resolvedAt: '2026-08-02 00:00:00' });
+      const body = await status();
+      expect(body.dirty).toBe(false);
+      expect(body.changed_titles).toBe(0);
+    });
+  });
+
+  it('reports an enrichment-only change to a rated title', async () => {
+    await withSeededDb(async (db) => {
+      await setScreen(db, true);
+      const rated = await insertTitle(db, { title: 'Heat', appRating: 4 });
+      await insertTitleEnrichment(db, rated, { resolvedAt: '2026-08-02 00:00:00' });
+      const body = await status();
+      expect(body.dirty).toBe(true);
+      expect(body.changed_title_ids).toEqual([rated]);
     });
   });
 

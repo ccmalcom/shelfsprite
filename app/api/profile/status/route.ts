@@ -4,6 +4,7 @@ import { getDb, schema } from '@/lib/server/db';
 import { effectiveRating, tsToIso } from '@/lib/server/serialize';
 import { isScreenEnabled } from '@/lib/server/screenSettings';
 import { titlesChangedSince } from '@/lib/server/screenProfile';
+import { blocksScreenRecs } from '@/lib/server/screenRecommendRun';
 
 /** Port of library.py::profile_status (read-only — see Interfaces note). */
 export const GET = withApi('/api/profile/status', async (_req, ctx) => {
@@ -41,7 +42,12 @@ export const GET = withApi('/api/profile/status', async (_req, ctx) => {
   // is enabled (a disabled user's titles never enter a build). updateTasteProfile applies the
   // same rule, so a dirty status always has an update that clears it.
   const screenEnabled = await isScreenEnabled(db, userId);
-  const changedTitles = screenEnabled ? await titlesChangedSince(db, since, userId) : [];
+  // A title that changed only through enrichment (accepting a recommendation creates one) counts
+  // only when it is profile evidence, the same predicate the recommend gate applies; otherwise
+  // "Want to watch" would block the next run behind a re-profile (w7 Review Focus 1).
+  const changedTitles = screenEnabled
+    ? await editedOrEvidence(db, userId, since, await titlesChangedSince(db, since, userId))
+    : [];
 
   const verdictWhere = since
     ? and(
@@ -82,3 +88,24 @@ export const GET = withApi('/api/profile/status', async (_req, ctx) => {
     rebuild_reason: rebuildReason,
   });
 });
+
+async function editedOrEvidence(
+  db: ReturnType<typeof getDb>,
+  userId: string,
+  since: string | null,
+  titles: Awaited<ReturnType<typeof titlesChangedSince>>
+) {
+  if (titles.length === 0) return titles;
+  const edited = await db
+    .select({ id: schema.titles.id })
+    .from(schema.titles)
+    .where(
+      and(
+        eq(schema.titles.userId, userId),
+        isNotNull(schema.titles.feedbackUpdatedAt),
+        since ? gt(schema.titles.feedbackUpdatedAt, since) : undefined
+      )
+    );
+  const editedIds = new Set(edited.map((row) => row.id));
+  return titles.filter((t) => editedIds.has(t.id) || blocksScreenRecs(t));
+}
