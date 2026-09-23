@@ -56,6 +56,44 @@ sitting unused in the address bar, and the failure is silent: no error, no faile
 - `lib/tasteAccent.ts` — maps 4-letter archetype code to one of 16 curated HSL colors (warm for Immersive types, cool for Reflective); falls back to hash-derived color.
 - `lib/useStickySort.ts` — `useStickySort(storageKey, fallback, allowed)`, a `useState` drop-in that persists a sort choice in `localStorage`. Built on `useSyncExternalStore` rather than `useState` + an effect: the server snapshot returns `fallback`, so the prerender and the hydrating render agree and React swaps the stored value in itself (reading storage during render is a hydration mismatch, and setting it from an effect trips `react-hooks/set-state-in-effect`). A stored value is only accepted if it is still in `allowed` — each caller's comparator is an exhaustive `switch` over its sort union, so a key left by a renamed option would fall through, return `undefined`, and throw inside `Array.prototype.sort`. Writes also land in a module-scoped map so the control keeps working where `setItem` throws (private browsing, disabled site data); the preference just doesn't outlive the session.
 
+## ScreenSprite (movies & TV)
+
+An opt-in section (spec `docs/superpowers/specs/2026-09-22-screen-media-design.md` §7). User-facing
+copy says ScreenSprite; code, routes and keys say `screen`.
+
+- **Navigation.** `lib/nav.ts#sectionFor(pathname)` derives the section from the URL (`/screen`
+  or `/screen/*`); it is never stored. `navRoutesFor(section)` picks `NAV_ROUTES` or
+  `SCREEN_NAV_ROUTES` (For you, Library, Profile) for the rail and the bottom nav.
+  `components/SectionSwitch.tsx` (Books | Screen) renders only while ScreenSprite is on, and the
+  wordmark (`components/Wordmark.tsx`) reads ScreenSprite inside the section. At 390 px the
+  account button drops to its icon and the logo narrows while the switch shows.
+- **The gate.** `app/(main)/screen/layout.tsx` is a server layout (`metadata.title`
+  `'ScreenSprite'`) wrapping `components/screen/ScreenGate.tsx`, which sends a reader without
+  ScreenSprite to `/settings#screen`. Screen reads pass `handleScreenError`
+  (`lib/screenCache.ts`) as SWR `onError`: a 403 re-reads the settings so the gate redirects
+  without a reload. Screen routes are not behind `LibraryGate`.
+- **Client.** `lib/api.ts#screenApi` throws `ApiRequestError(status, detail)`; show `message`,
+  which is the route's `detail`. Keys: `SCREEN_SETTINGS_KEY`, `SCREEN_TITLES_KEY`,
+  `SCREEN_RECS_KEY`, `SCREEN_ACTIVE_JOB_KEY`, `REVEAL_TITLES_KEY`, `BOOKS_ALL_KEY`.
+- **Invalidation (§7.7).** `invalidateTitleEdits()` after any title edit, correction, removal or
+  add (profile status goes dirty). `invalidateScreenState()` after turning ScreenSprite off or
+  deleting the screen library (traits, archetype, reveal, status, every screen key, in the
+  three-argument form). Neither blanks `SCREEN_SETTINGS_KEY`; callers write the fresh settings.
+- **Images.** `components/screen/TitleTile.tsx` hotlinks posters with `next/image`
+  `unoptimized`, so nothing is copied and `images.remotePatterns` stays limited to the book
+  cover hosts. A missing or failed image falls back to a typographic tile, remembered per URL.
+  Posters never appear on the marketing page.
+- **Attribution (§7.9).** Every shown description carries `DescriptionSource` (Wikipedia names
+  and links the article, CC BY-SA 4.0; TVmaze links back). Every `/screen` page ends with
+  `ScreenCredits`. Recommendation cards and search results show no description.
+- **Profile.** `components/profile/ProfileView.tsx` is the profile body; `/profile` and
+  `/screen/profile` both render it. It passes a title evidence map to `TraitsSection` only while
+  ScreenSprite is on; `TraitRow` and `lib/revealBeats.ts` put books first and let titles fill
+  the remaining evidence slots, so a books-only reader sees no change.
+- **Reject picker.** `components/RejectReasonPicker.tsx` is shared by `/swipe` (book vocabulary)
+  and `/screen` (`SCREEN_REJECT_REASONS`). An empty reason list is sent as a bare
+  `{status: 'rejected'}` to the screen route, which refuses an empty list.
+
 ## Routes (`app/`)
 
 - `/welcome` — the public marketing page, in the `(marketing)` route group. Served at `/` for
