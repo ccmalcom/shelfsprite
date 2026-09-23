@@ -123,9 +123,11 @@ const AXIS_META = [
 
 interface TasteHeroProps {
   compact?: boolean;
+  /** False on the screen profile, which never loads the book subject stats. */
+  bookSubjects?: boolean;
 }
 
-export function TasteHero({ compact = false }: TasteHeroProps) {
+export function TasteHero({ compact = false, bookSubjects = true }: TasteHeroProps) {
   const { mutate } = useSWRConfig();
   const toast = useToast();
   const [deriving, setDeriving] = useState(false);
@@ -143,7 +145,7 @@ export function TasteHero({ compact = false }: TasteHeroProps) {
     api.profile()
   );
   const { data: subjects, isLoading: subjectsLoading } = useSWR<SubjectBreakdown>(
-    SUBJECTS_KEY,
+    bookSubjects ? SUBJECTS_KEY : null,
     () => api.profileSubjects()
   );
   const { data: archetype, isLoading: archetypeLoading } = useSWR<ArchetypeOut | null>(
