@@ -11,6 +11,9 @@
  * All enrichment resolved and all feedback stamped BEFORE PROFILED_AT, so the gate is clean.
  */
 import { schema, type Db } from '../../db';
+import type { ScreenCandidate } from '../../screenEnrichment';
+import type { ScreenCatalogPort, TvmazeHit } from '../../screenAssemble';
+import type { SparqlRow } from '../../screenSparql';
 
 export const PROFILED_AT = '2026-09-10 00:00:00';
 export const BEFORE = '2026-09-01 00:00:00';
@@ -177,3 +180,85 @@ export async function seedScreenLibrary(db: Db, opts: { enabled?: boolean } = {}
   ]);
   await db.insert(schema.profileMeta).values([{ userId: 'local', lastProfiledAt: PROFILED_AT }]);
 }
+
+export const wd = (qid: string) => ({ value: `http://www.wikidata.org/entity/${qid}` });
+export const lit = (v: string | number) => ({ value: String(v) });
+
+/** A full ScreenCandidate with empty metadata, overridable per field. */
+export function candidate(
+  partial: Partial<ScreenCandidate> & { title: string; wikidata_qid: string }
+): ScreenCandidate {
+  return {
+    media_type: 'movie',
+    year: null,
+    tvmaze_id: null,
+    image_url: null,
+    description: null,
+    description_source: null,
+    description_url: null,
+    wikipedia_page: null,
+    genres: [],
+    directors: [],
+    creators: [],
+    writers: [],
+    countries: [],
+    original_language: null,
+    based_on: [],
+    main_subjects: [],
+    series: [],
+    production_companies: [],
+    sitelinks: 50,
+    ...partial,
+  };
+}
+
+export interface FakePortScript {
+  /** Keyed by the query's `# screen:<name>` marker; 'retryable' simulates a transport failure. */
+  sparql?: Record<string, SparqlRow[] | 'retryable'>;
+  tvmaze?: Record<string, TvmazeHit>;
+  metadata?: Record<string, ScreenCandidate>;
+  metadataRetryable?: boolean;
+}
+
+export type FakePort = ScreenCatalogPort & {
+  queries: string[];
+  tvmazeCalls: string[];
+  metadataCalls: string[][];
+};
+
+export function fakeScreenPort(script: FakePortScript = {}): FakePort {
+  const queries: string[] = [];
+  const tvmazeCalls: string[] = [];
+  const metadataCalls: string[][] = [];
+  return {
+    queries,
+    tvmazeCalls,
+    metadataCalls,
+    async sparql(query) {
+      queries.push(query);
+      const marker = /^# screen:([a-z-]+)/.exec(query)?.[1] ?? '';
+      const rows = script.sparql?.[marker];
+      if (rows === 'retryable') return { kind: 'retryable', reason: 'fake transport failure' };
+      if (!rows) return { kind: 'empty' };
+      return { kind: 'ok', value: rows };
+    },
+    async tvmazeSingleSearch(name) {
+      tvmazeCalls.push(name);
+      const hit = script.tvmaze?.[name];
+      return hit ? { kind: 'ok', value: hit } : { kind: 'empty' };
+    },
+    async fetchMetadata(qids) {
+      metadataCalls.push([...qids]);
+      if (script.metadataRetryable) return { kind: 'retryable', reason: 'fake transport failure' };
+      const out = new Map<string, ScreenCandidate>();
+      for (const q of qids) {
+        const c = script.metadata?.[q];
+        if (c) out.set(q, c);
+      }
+      return { kind: 'ok', value: out };
+    },
+  };
+}
+
+export const OPEN_DEADLINE = { remainingMs: () => 60_000 };
+export const SPENT_DEADLINE = { remainingMs: () => 0 };
