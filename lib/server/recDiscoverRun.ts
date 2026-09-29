@@ -8,7 +8,7 @@
  * directive does not steer this path at all, and there is no profile-missing/stale
  * gate. Results are NOT persisted, so this opens no transaction.
  */
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import { DISCOVER_EMPTY_QUERY_MESSAGE, RECOMMEND_NO_KEY_MESSAGE } from './claudeErrors';
 import type { Db } from './db';
@@ -157,7 +157,7 @@ async function interpretQuery(
   signal: RecSignal,
   userId: string
 ): Promise<Interpretation> {
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'discover_interpret' },
@@ -195,7 +195,7 @@ async function rerankDiscovery(
   userId: string,
   n: number
 ): Promise<RankedDiscovery[]> {
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'discover_rerank' },

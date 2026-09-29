@@ -5,7 +5,7 @@
  */
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { schema, type Db } from './db';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import { pyJsonDumps, pyRepr, utcnowTs } from './serialize';
 import { ApiError } from './errors';
@@ -258,7 +258,7 @@ export async function extractTasteProfile(
   const prompt = buildProfilePrompt(tiers, feedback);
   const model = profileModel();
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'profile_full' },
@@ -357,7 +357,7 @@ async function extractScreenTasteProfile(
   const prompt = buildScreenProfilePrompt(tiers, screen, feedback);
   const model = profileModel();
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'profile_full' },
