@@ -10,7 +10,7 @@ import { schema, type Db } from './db';
 import { ApiError } from './errors';
 import type { ClaudeClient } from './claude';
 import { toolInput } from './claude';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { utcnowTs } from './serialize';
 import { ARCHETYPES, scoresToCode } from './archetype';
 import { modelFor } from './models';
@@ -209,7 +209,7 @@ export async function deriveArchetype(
   }
 
   const prompt = buildArchetypePrompt(traits);
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'archetype' },

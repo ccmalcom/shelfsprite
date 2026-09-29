@@ -19,7 +19,7 @@ import { schema, type Db } from './db';
 import { ApiError } from './errors';
 import type { ClaudeClient } from './claude';
 import { toolInput } from './claude';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { pyJsonDumps } from './serialize';
 import { REVEAL_NO_KEY_MESSAGE } from './claudeErrors';
 import { modelFor } from './models';
@@ -171,7 +171,7 @@ export async function generateRevealLines(
     polarity: t.polarity,
   }));
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'reveal_lines' },

@@ -13,7 +13,7 @@
  * either, so the observable behavior matches.
  */
 import { randomUUID } from 'node:crypto';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import {
   NO_LOVED_BOOKS_MESSAGE,
@@ -222,7 +222,7 @@ async function claudeSeedQueries(
   userId: string,
   nQueries: number
 ): Promise<string[]> {
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'recommend_seed' },
@@ -254,7 +254,7 @@ async function claudeRerank(
   const validTraitIds = new Set(signal.traits.map((t) => t.id));
   const validBookIds = new Set(signal.loved.map((b) => b.id));
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'recommend_rerank' },

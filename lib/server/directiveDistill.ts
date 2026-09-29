@@ -7,7 +7,7 @@ import { and, asc, eq, inArray } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import type { ClaudeClient } from './claude';
 import { toolInput } from './claude';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { pyJsonDumps } from './serialize';
 import { cleanDirectiveConstraints } from './directive';
 import { modelFor } from './models';
@@ -180,7 +180,7 @@ export async function distillDirective(
   const signals = await existingSignals(db, opts.userId);
   const prompt = buildDistillPrompt(opts.currentText ?? null, signals, opts.message);
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId: opts.userId, operation: 'directive_distill' },
