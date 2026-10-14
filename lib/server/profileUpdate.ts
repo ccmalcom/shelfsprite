@@ -23,7 +23,7 @@ import {
   PROFILE_MAX_TOKENS,
 } from './profileBuild';
 import { ensureProfileMeta } from './profileMeta';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import { readScreenToggledAt, isScreenEnabled } from './screenSettings';
 import { screenVariantActive, titlesChangedSince } from './screenProfile';
@@ -374,7 +374,7 @@ export async function updateTasteProfile(
     feedback
   );
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'profile_update' },
@@ -444,7 +444,7 @@ async function reviseScreenProfile(
     feedback
   );
 
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'profile_update' },

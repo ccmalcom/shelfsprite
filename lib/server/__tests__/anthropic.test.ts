@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { makeTestDb } from './helpers/pglite';
-import { costUsd, recordUsage, trackedCreate } from '../anthropic';
+import { costUsd, recordUsage, trackedCreate, trackedToolCall } from '../anthropic';
+import { ApiError } from '../errors';
+import { fakeClaude } from './helpers/fakeClaude';
 import type { Db } from '../db';
 
 let db: Db;
@@ -41,6 +43,16 @@ describe('costUsd', () => {
       cache_read_input_tokens: 1_000_000,
     };
     expect(costUsd('claude-sonnet-5', usage)).toBeCloseTo(14.7, 6);
+  });
+
+  it('prices sonnet-5-5 the same as sonnet-5', () => {
+    const usage = {
+      input_tokens: 1_000_000,
+      output_tokens: 1_000_000,
+      cache_creation_input_tokens: 1_000_000,
+      cache_read_input_tokens: 1_000_000,
+    };
+    expect(costUsd('claude-sonnet-5-5', usage)).toBeCloseTo(14.7, 6);
   });
 
   it('falls back to the most expensive tier for unknown models', () => {
@@ -145,5 +157,97 @@ describe('trackedCreate', () => {
     expect(calls[0]).toHaveLength(2);
     expect((calls[0][1] as { signal: AbortSignal }).signal).toBe(controller.signal);
     expect(calls[1]).toHaveLength(1);
+  });
+});
+
+describe('trackedToolCall', () => {
+  const meta = { userId: 'local', operation: 'profile_full' };
+  const toolUse = { type: 'tool_use', name: 'record_taste_traits', input: { traits: [] } };
+  const params = (model: string) => ({
+    model,
+    max_tokens: 3000,
+    system: 'SYSTEM',
+    tools: [{ name: 'record_taste_traits' }],
+    tool_choice: { type: 'tool' as const, name: 'record_taste_traits' },
+    messages: [{ role: 'user', content: 'prompt' }],
+  });
+
+  it('sends a forced call unchanged to a model that accepts one', async () => {
+    const client = fakeClaude([{ content: [toolUse], stop_reason: 'tool_use' }]);
+    await trackedToolCall(client, db, meta, params('claude-sonnet-5'));
+    expect(client.calls).toHaveLength(1);
+    expect(client.calls[0].params).toEqual(params('claude-sonnet-5'));
+  });
+
+  it('does not retry a forced call that returns no tool_use', async () => {
+    const client = fakeClaude([{ content: [{ type: 'text' }], stop_reason: 'end_turn' }]);
+    const message = await trackedToolCall(client, db, meta, params('claude-haiku-4-5-20251001'));
+    expect(client.calls).toHaveLength(1);
+    expect(message.content).toEqual([{ type: 'text' }]);
+  });
+
+  it('rewrites the request for Sonnet 5.5, which rejects a forced tool_choice', async () => {
+    const client = fakeClaude([{ content: [toolUse], stop_reason: 'tool_use' }]);
+    await trackedToolCall(client, db, meta, params('claude-sonnet-5-5'));
+    expect(client.calls[0].params).toEqual({
+      ...params('claude-sonnet-5-5'),
+      system: 'SYSTEM\n\nRespond by calling the record_taste_traits tool.',
+      tool_choice: { type: 'auto' },
+      thinking: { type: 'between_tools' },
+    });
+  });
+
+  it('uses auto without between_tools on other models outside the forced list', async () => {
+    const client = fakeClaude([{ content: [toolUse], stop_reason: 'tool_use' }]);
+    await trackedToolCall(client, db, meta, params('claude-opus-5-5'));
+    expect(client.calls[0].params.tool_choice).toEqual({ type: 'auto' });
+    expect(client.calls[0].params).not.toHaveProperty('thinking');
+  });
+
+  it('retries once when an auto call skips the tool, recording usage for both', async () => {
+    const client = fakeClaude([
+      { content: [{ type: 'text' }], stop_reason: 'end_turn', usage: { output_tokens: 5 } },
+      { content: [toolUse], stop_reason: 'tool_use', usage: { output_tokens: 7 } },
+    ]);
+    const message = await trackedToolCall(client, db, meta, params('claude-sonnet-5-5'));
+    expect(client.calls).toHaveLength(2);
+    expect(message.content).toEqual([toolUse]);
+    expect(await usageRows()).toHaveLength(2);
+  });
+
+  it('fails loudly when the retry also skips the tool', async () => {
+    const noTool = { content: [{ type: 'text' }], stop_reason: 'end_turn' };
+    const client = fakeClaude([noTool, noTool]);
+    const call = trackedToolCall(client, db, meta, params('claude-sonnet-5-5'));
+    await expect(call).rejects.toBeInstanceOf(ApiError);
+    await expect(call).rejects.toMatchObject({ status: 502 });
+    expect(client.calls).toHaveLength(2);
+  });
+
+  it('does not retry a refusal', async () => {
+    const client = fakeClaude([{ content: [], stop_reason: 'refusal' }]);
+    await expect(
+      trackedToolCall(client, db, meta, params('claude-sonnet-5-5'))
+    ).rejects.toMatchObject({
+      status: 502,
+      detail: 'Claude declined this request. Try again.',
+    });
+    expect(client.calls).toHaveLength(1);
+  });
+
+  it('returns a max_tokens stop without retrying, as the forced path does', async () => {
+    const client = fakeClaude([{ content: [{ type: 'text' }], stop_reason: 'max_tokens' }]);
+    const message = await trackedToolCall(client, db, meta, params('claude-sonnet-5-5'));
+    expect(message.stop_reason).toBe('max_tokens');
+    expect(client.calls).toHaveLength(1);
+  });
+
+  it('forwards request options on the rewritten path', async () => {
+    const controller = new AbortController();
+    const client = fakeClaude([{ content: [toolUse], stop_reason: 'tool_use' }]);
+    await trackedToolCall(client, db, meta, params('claude-sonnet-5-5'), {
+      signal: controller.signal,
+    });
+    expect(client.calls[0].options).toEqual({ signal: controller.signal });
   });
 });

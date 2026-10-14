@@ -36,10 +36,17 @@ applied with drizzle-kit from `drizzle/`.
   encryption/decryption of stored user secrets.
 - `claude.ts`, `anthropic.ts`, `claudeErrors.ts` — per-user Anthropic key resolution, injectable
   Claude clients/tool-input extraction, usage-cost recording through `trackedCreate`, and shared
-  user-facing failures.
+  user-facing failures. Every call that must end in one named tool goes through
+  `trackedToolCall`: it sends the call site's forced `tool_choice` unchanged to models that
+  accept one, and rewrites the request for models that reject it (Sonnet 5.5, Opus 5.5,
+  Fable 5.1) to `tool_choice: auto` plus a system line naming the tool (and
+  `thinking: between_tools` on Sonnet 5.5), retrying once and then answering 502 if the tool is
+  still skipped. Call sites keep writing the forced choice; do not call `trackedCreate` directly
+  for a tool call, or switching a model to Sonnet 5.5 turns that call into a 400.
 - `models.ts` — per-operation Claude model selection (`modelFor`). Each operation reads its own
   `MYLIBRARY_MODEL_<OP>` override at call time and otherwise keeps its historical model; the
-  global `MYLIBRARY_MODEL` reaches only profile and rerank.
+  global `MYLIBRARY_MODEL` reaches only profile and rerank. `acceptsForcedToolChoice` is an
+  allowlist: a model id missing from it takes the `auto` path, which works on every model.
 - `serialize.ts` and `rating.ts` — stable response/prompt serialization and the dependency-free
   half-star domain rules. These are behavior modules, not generic formatting conveniences.
 - `feedbackStatus.ts` — dependency-free feedback triage vocabulary shared by route handlers and

@@ -6,6 +6,8 @@
  */
 import { sql } from 'drizzle-orm';
 import type { Db } from './db';
+import { ApiError } from './errors';
+import { acceptsForcedToolChoice } from './models';
 import { logDebug } from './log';
 
 export interface UsageLike {
@@ -24,6 +26,8 @@ type Pricing = [number, number, number, number]; // USD/1M: input, output, cache
 // Source: https://www.anthropic.com/pricing — last_verified 2026-09-23.
 const MODEL_PRICING: Record<string, Pricing> = {
   'claude-sonnet-5': [2.0, 10.0, 2.5, 0.2],
+  // Same list prices as Sonnet 5 (Claude API model table, cached 2026-09-25).
+  'claude-sonnet-5-5': [2.0, 10.0, 2.5, 0.2],
   'claude-sonnet-4-6': [3.0, 15.0, 3.75, 0.3],
   'claude-haiku-4-5-20251001': [1.0, 5.0, 1.25, 0.1],
   // Not used by default (spec 2026-09-22 §6.8). Present so a per-operation switch to Opus
@@ -111,4 +115,60 @@ export async function trackedCreate<T extends MessagesClient>(
     usage,
   });
   return message;
+}
+
+interface ToolCallParams extends Record<string, unknown> {
+  model: string;
+  system: unknown;
+  tool_choice: { type: 'tool'; name: string };
+}
+
+function calledTool(message: unknown): boolean {
+  const content = (message as { content?: Array<{ type?: string }> } | null)?.content ?? [];
+  return content.some((block) => block.type === 'tool_use');
+}
+
+/**
+ * trackedCreate for a call that must end in one named tool. Every call site states the forced
+ * `tool_choice` it wants, and on a model that accepts one the params go out unchanged.
+ *
+ * Newer models (Sonnet 5.5, Opus 5.5, Fable 5.1) reject a forced choice with a 400, so on those
+ * the request is rewritten: `tool_choice: auto`, a system-prompt line naming the tool, and on
+ * Sonnet 5.5 `thinking: between_tools` so extended thinking cannot eat the max_tokens budgets,
+ * which were sized for a direct tool call. `auto` does not guarantee the call, so a reply with
+ * no tool_use is retried once and then fails loudly; the callers read a missing payload as an
+ * empty result, which would otherwise persist an empty profile or recommendation list. A
+ * `max_tokens` stop is returned as-is, exactly as on the forced path.
+ */
+export async function trackedToolCall<T extends MessagesClient>(
+  client: T,
+  db: Db,
+  meta: { userId: string; operation: string },
+  params: ToolCallParams,
+  requestOptions?: RequestOptionsLike
+): Promise<Awaited<ReturnType<T['messages']['create']>>> {
+  if (acceptsForcedToolChoice(params.model)) {
+    return trackedCreate(client, db, meta, params, requestOptions);
+  }
+
+  const toolName = params.tool_choice.name;
+  const autoParams: { model: string } & Record<string, unknown> = {
+    ...params,
+    system:
+      typeof params.system === 'string'
+        ? `${params.system}\n\nRespond by calling the ${toolName} tool.`
+        : params.system,
+    tool_choice: { type: 'auto' },
+    ...(params.model === 'claude-sonnet-5-5' ? { thinking: { type: 'between_tools' } } : {}),
+  };
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const message = await trackedCreate(client, db, meta, autoParams, requestOptions);
+    const stop = (message as { stop_reason?: string | null })?.stop_reason;
+    if (stop === 'refusal') {
+      throw new ApiError(502, 'Claude declined this request. Try again.');
+    }
+    if (calledTool(message) || stop === 'max_tokens') return message;
+  }
+  throw new ApiError(502, `Claude response missing tool payload (${toolName}). Try again.`);
 }

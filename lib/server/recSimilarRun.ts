@@ -9,7 +9,7 @@
  * Same-author caps and language filtering still apply, reused unchanged from the
  * shared 3c-1 retrieval core.
  */
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import { RECOMMEND_NO_KEY_MESSAGE, SIMILAR_NOT_ENOUGH_METADATA_MESSAGE } from './claudeErrors';
 import type { Db } from './db';
@@ -123,7 +123,7 @@ async function bookFacetQueries(
   userId: string,
   nQueries: number
 ): Promise<string[]> {
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'similar_seed' },
@@ -152,7 +152,7 @@ async function rerankSimilar(
   userId: string,
   n: number
 ): Promise<RankedSimilar[]> {
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'similar_rerank' },

@@ -34,6 +34,28 @@ function envModel(name: string): string | null {
   return value ? value : null;
 }
 
+/**
+ * Models that accept a forced `tool_choice: { type: 'tool' }`. Claude Sonnet 5.5, Opus 5.5 and
+ * Fable 5.1 reject it with a 400. An id missing from this list takes the `auto` path in
+ * anthropic.ts#trackedToolCall, which works on every model, where a forced call fails outright
+ * on the newer ones.
+ */
+const FORCED_TOOL_CHOICE_MODELS: ReadonlySet<string> = new Set([
+  'claude-sonnet-5',
+  'claude-sonnet-4-6',
+  'claude-haiku-4-5',
+  'claude-haiku-4-5-20251001',
+  'claude-opus-5',
+  'claude-opus-4-8',
+  'claude-opus-4-7',
+  'claude-opus-4-6',
+  'claude-fable-5',
+]);
+
+export function acceptsForcedToolChoice(model: string): boolean {
+  return FORCED_TOOL_CHOICE_MODELS.has(model);
+}
+
 export function modelFor(op: ModelOperation): string {
   const override = envModel(MODEL_ENV[op]);
   if (override) return override;

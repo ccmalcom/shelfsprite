@@ -15,7 +15,7 @@
  * remainder minus a 20s persistence reserve.
  */
 import { randomUUID } from 'node:crypto';
-import { trackedCreate } from './anthropic';
+import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import {
   NO_PROFILE_MESSAGE,
@@ -147,7 +147,7 @@ async function claudeScreenSeeds(
   mediaFilter: MediaFilter,
   abortSignal: AbortSignal
 ): Promise<SeedProposal[]> {
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'screen_rec_seed' },
@@ -176,7 +176,7 @@ async function claudeScreenRerank(
   abortSignal: AbortSignal
 ): Promise<RankedScreenCandidate[]> {
   const ids = validEvidenceIds(signal, candidates);
-  const message = await trackedCreate(
+  const message = await trackedToolCall(
     client,
     db,
     { userId, operation: 'screen_rec_rank' },
