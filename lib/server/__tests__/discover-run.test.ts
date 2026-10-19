@@ -81,7 +81,7 @@ describe('runDiscover', () => {
 
       expect(out.query).toBe(DISCOVER_QUERY);
       expect(out.interpretation).toBe(CANNED_INTERPRETATION);
-      expect(out.model).toBe('claude-sonnet-5');
+      expect(out.model).toBe('claude-sonnet-5-5');
       // The blank query is dropped before retrieval.
       expect(out.queries).toEqual([
         'literary fantasy found family',
@@ -101,7 +101,7 @@ describe('runDiscover', () => {
       expect(rows).toHaveLength((seedJson as any).recommendations.length);
 
       expect(client.calls[0].model).toBe('claude-haiku-5-5');
-      expect(client.calls[1].model).toBe('claude-sonnet-5');
+      expect(client.calls[1].model).toBe('claude-sonnet-5-5');
     } finally {
       restore();
       await close();
@@ -157,7 +157,7 @@ describe('runDiscover', () => {
         query: 'gibberish',
         interpretation: 'nothing',
         count: 0,
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         queries: [],
         recommendations: [],
       });

@@ -82,7 +82,9 @@ describe('updateTasteProfile, screen variant', () => {
       const out = await updateTasteProfile(db, client, 'local');
 
       const params = client.calls[0].params;
-      expect(params.system).toBe(SCREEN_REVISE_SYSTEM);
+      expect(params.system).toBe(
+        `${SCREEN_REVISE_SYSTEM}\n\nRespond by calling the revise_taste_traits tool.`
+      );
       expect(params.tools).toEqual([SCREEN_REVISE_TOOL]);
       const prompt = promptOf(client);
       expect(prompt).toContain(

@@ -340,7 +340,7 @@ describe('runScreenRecommend happy path', () => {
       expect(client.calls[0].options?.signal).toBeInstanceOf(AbortSignal);
       expect(client.calls[1].params).toMatchObject({
         model: modelFor('rerank'),
-        tool_choice: { type: 'tool', name: 'rank_screen_recommendations' },
+        tool_choice: { type: 'auto' },
       });
 
       // Owned titles never reach the reranker; the adaptation carries its book.
