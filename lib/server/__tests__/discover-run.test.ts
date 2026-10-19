@@ -100,7 +100,7 @@ describe('runDiscover', () => {
       const rows = await db.select().from(schema.recommendations);
       expect(rows).toHaveLength((seedJson as any).recommendations.length);
 
-      expect(client.calls[0].model).toBe('claude-haiku-4-5-20251001');
+      expect(client.calls[0].model).toBe('claude-haiku-5-5');
       expect(client.calls[1].model).toBe('claude-sonnet-5');
     } finally {
       restore();

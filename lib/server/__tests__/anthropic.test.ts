@@ -55,6 +55,26 @@ describe('costUsd', () => {
     expect(costUsd('claude-sonnet-5-5', usage)).toBeCloseTo(14.7, 6);
   });
 
+  it('prices haiku-5-5 short prompts on the $0.10/$0.50 card', () => {
+    const usage = { input_tokens: 50_000, output_tokens: 10_000 };
+    expect(costUsd('claude-haiku-5-5', usage)).toBeCloseTo(0.01, 9);
+  });
+
+  it('keeps haiku-5-5 on the short card at exactly 100K prompt tokens', () => {
+    expect(costUsd('claude-haiku-5-5', { input_tokens: 100_000 })).toBeCloseTo(0.01, 9);
+  });
+
+  it('prices haiku-5-5 prompts over 100K on the $0.50/$2.50 card', () => {
+    const usage = { input_tokens: 200_000, output_tokens: 1_000_000 };
+    expect(costUsd('claude-haiku-5-5', usage)).toBeCloseTo(2.6, 9);
+  });
+
+  it('counts cached tokens toward the haiku-5-5 long-prompt threshold', () => {
+    // 120K prompt tokens, half of them cache reads: long card, 0.03 input + 0.003 cache read
+    const usage = { input_tokens: 60_000, cache_read_input_tokens: 60_000 };
+    expect(costUsd('claude-haiku-5-5', usage)).toBeCloseTo(0.033, 9);
+  });
+
   it('falls back to the most expensive tier for unknown models', () => {
     expect(costUsd('mystery-model', { output_tokens: 1_000_000 })).toBeCloseTo(15.0, 6);
   });
