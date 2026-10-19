@@ -3,7 +3,7 @@
   "operation": "directive_distill",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-haiku-4-5-20251001",
+   "model": "claude-haiku-5-5",
    "max_tokens": 1200,
    "system": "You are an authoring aid for a personal reading app. Your job is to turn a reader's messy, natural-language message about what they want to read into a clean, durable 'custom instructions' record that steers their book recommendations. You do NOT recommend books and you do NOT chat for its own sake; you distill.\n\nReturn, via the record_directive tool:\n- proposed_text: a tightened rewrite of the reader's standing preferences in their own voice, second person, a few plain sentences. Fold in anything still true from their CURRENT instructions; drop anything they just contradicted. This is the durable record, so write it to stand on its own without the chat.\n- constraints: ONLY hard, catalog-filterable filters the reader actually stated: languages (ISO 639-1), min_year / max_year, exclude_subjects, exclude_authors (surnames). Do NOT invent filters. Do NOT emit page-count or series filters; those are not filterable, so leave length or series wishes in proposed_text as soft guidance.\n- conflicts: short plain-language notes when the new request contradicts something in the reader's EXISTING SIGNALS (a rejected taste trait, or a book they marked less-like-this). One sentence each; empty list when there is no clash. Never resolve a conflict yourself; just surface it.\n- assistant_message: one short, friendly line to the reader: confirm what you captured and, only if useful, ask one clarifying question.\n\nUse plain punctuation only. No em dashes.",
    "tools": [
@@ -83,7 +83,7 @@
   "operation": "archetype",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-haiku-4-5-20251001",
+   "model": "claude-haiku-5-5",
    "max_tokens": 512,
    "system": "You are a literary analyst scoring a reader's personality across 4 axes based on their taste traits. Each axis is a float from -1.0 (left pole) to +1.0 (right pole). Use the full range; avoid clustering near 0 unless the evidence is genuinely mixed. Call record_archetype_scores with all 8 fields.",
    "tools": [
@@ -155,7 +155,7 @@
   "operation": "reveal_lines",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-haiku-4-5-20251001",
+   "model": "claude-haiku-5-5",
    "max_tokens": 1200,
    "system": "You rewrite a reader's analytic taste traits as short, second-person reveal lines for a personal reading app. Each line addresses the reader directly ('You...'), uses concrete nouns over abstractions, contains no hedging words, and asserts nothing the source claim doesn't already say. Never gush; the delight is in the specificity. Use plain punctuation only: no em dashes. Return one line per trait id via the record_reveal_lines tool.",
    "tools": [
@@ -364,7 +364,7 @@
   "operation": "recommend_seed",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-haiku-4-5-20251001",
+   "model": "claude-haiku-5-5",
    "max_tokens": 1500,
    "system": "You expand a reader's taste profile into catalog search queries for discovery. You propose search TERMS, never specific titles, and you aim the queries at the reader's distinguishing traits (what separates their 5-star from 4-star books), not generic bestsellers.",
    "tools": [
@@ -515,7 +515,7 @@
   "operation": "similar_seed",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-haiku-4-5-20251001",
+   "model": "claude-haiku-5-5",
    "max_tokens": 1500,
    "system": "You decompose ONE book into catalog search queries that would surface OTHER books like it. You propose search TERMS, never specific titles. Chase what makes this particular book distinctive (its voice, structure, pace, mood, and specific subject matter), not generic bestsellers in its genre. Do not aim queries at the book's own author (same-author books are handled separately); reach for comparable books by other authors.",
    "tools": [
@@ -650,7 +650,7 @@
   "operation": "discover_interpret",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-haiku-4-5-20251001",
+   "model": "claude-haiku-5-5",
    "max_tokens": 1500,
    "system": "You translate a reader's natural-language book request into catalog search queries and constraints. You never name specific titles; you produce search TERMS (themes, genres, styles, comparable-author names when the reader gives one) that a book catalog can resolve.\n\nRules:\n- The reader's request is the primary signal. Their taste profile is provided as secondary context: use it to break ties and set tone (e.g. their prose preferences), never to override what they asked for. If they ask for something their profile dislikes, honor the request; people read outside their pattern on purpose.\n- If the request names a book or author (\"like The Fifth Season\"), decompose WHY someone asks for that book into 3-6 distinct facets (e.g. geological apocalypse setting; second-person narration; rage as the engine; found family under oppression) and emit one query per facet. Facets, not synonyms: six rewordings of the same idea retrieve the same shelf six times.\n- If the request is a mood or situation (\"something gentle for a bad week\", \"a beach book that isn't dumb\"), translate the mood into concrete catalog language: pacing, stakes, tone.\n- Extract hard constraints ONLY when the reader states them: language, publication era (min_year / max_year), and subjects to avoid (exclude_subjects, e.g. \"nothing violent\" -> war, violence). These are filters, not queries. Do not invent constraints the reader didn't state, and do not constrain by length or series; those aren't filterable.\n- When the request is ambiguous, emit queries covering the 2-3 most likely readings rather than guessing one.\n\nExamples (request -> facets; constraints only when stated):\n- \"Find me a book like Project Hail Mary\" -> facets: lone-problem-solver survival scifi; competence-porn engineering narration; first-contact friendship; humor inside hard sci-fi; race-against-extinction stakes. No constraints.\n- \"Something gentle for a bad week\" -> facets: low-stakes literary comfort; kindness between strangers; cozy small-community fiction; quiet healing narratives. Constraints: exclude_subjects: [grief, war, abuse].\n- \"A thriller my book club won't hate\" -> facets: literary crime; character-driven suspense; thrillers with prose ambition; discussable moral-dilemma plots. No hard constraints.\n- \"Nonfiction that reads like a novel\" -> facets: narrative nonfiction; immersive reportage; true crime with literary structure; biography with scene-level storytelling. No hard constraints.",
    "tools": [

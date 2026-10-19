@@ -4,6 +4,7 @@ import {
   DEFAULT_HAIKU_MODEL,
   DEFAULT_SONNET_MODEL,
   MODEL_ENV,
+  acceptsForcedToolChoice,
   modelFor,
   type ModelOperation,
 } from '../models';
@@ -28,12 +29,12 @@ describe('modelFor', () => {
   it('defaults every operation to the model it used before this wave', () => {
     expect(modelFor('profile')).toBe('claude-sonnet-5');
     expect(modelFor('rerank')).toBe('claude-sonnet-5');
-    expect(modelFor('seed')).toBe('claude-haiku-4-5-20251001');
-    expect(modelFor('archetype')).toBe('claude-haiku-4-5-20251001');
-    expect(modelFor('distill')).toBe('claude-haiku-4-5-20251001');
-    expect(modelFor('reveal')).toBe('claude-haiku-4-5-20251001');
+    expect(modelFor('seed')).toBe('claude-haiku-5-5');
+    expect(modelFor('archetype')).toBe('claude-haiku-5-5');
+    expect(modelFor('distill')).toBe('claude-haiku-5-5');
+    expect(modelFor('reveal')).toBe('claude-haiku-5-5');
     expect(DEFAULT_SONNET_MODEL).toBe('claude-sonnet-5');
-    expect(DEFAULT_HAIKU_MODEL).toBe('claude-haiku-4-5-20251001');
+    expect(DEFAULT_HAIKU_MODEL).toBe('claude-haiku-5-5');
   });
 
   it('names one env var per operation', () => {
@@ -90,6 +91,13 @@ describe('modelFor', () => {
     expect(modelFor('reveal')).toBe(DEFAULT_HAIKU_MODEL);
     process.env.MYLIBRARY_MODEL_REVEAL = 'claude-sonnet-5';
     expect(modelFor('reveal')).toBe('claude-sonnet-5');
+  });
+});
+
+describe('acceptsForcedToolChoice', () => {
+  it('keeps the default Haiku on the forced path, where it skips thinking', () => {
+    expect(acceptsForcedToolChoice(DEFAULT_HAIKU_MODEL)).toBe(true);
+    expect(acceptsForcedToolChoice('claude-sonnet-5-5')).toBe(false);
   });
 });
 

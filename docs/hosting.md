@@ -36,10 +36,10 @@ Current source readers under `lib`, `app`, and `utils` use:
 | `MYLIBRARY_MODEL`                      | Profile and rerank model override; defaults to `claude-sonnet-5`. Never applies to the Haiku operations. |
 | `MYLIBRARY_MODEL_PROFILE`              | Profile build/update model; falls back to `MYLIBRARY_MODEL`.                                             |
 | `MYLIBRARY_MODEL_RERANK`               | Rerank model (recommend, similar, discover); falls back to `MYLIBRARY_MODEL`.                            |
-| `MYLIBRARY_MODEL_SEED`                 | Seed/interpret model; defaults to `claude-haiku-4-5-20251001`.                                           |
-| `MYLIBRARY_MODEL_ARCHETYPE`            | Archetype model; defaults to `claude-haiku-4-5-20251001`.                                                |
-| `MYLIBRARY_MODEL_DISTILL`              | Directive-distill model; defaults to `claude-haiku-4-5-20251001`.                                        |
-| `MYLIBRARY_MODEL_REVEAL`               | Reveal-line model; defaults to `claude-haiku-4-5-20251001`.                                              |
+| `MYLIBRARY_MODEL_SEED`                 | Seed/interpret model; defaults to `claude-haiku-5-5`.                                                    |
+| `MYLIBRARY_MODEL_ARCHETYPE`            | Archetype model; defaults to `claude-haiku-5-5`.                                                         |
+| `MYLIBRARY_MODEL_DISTILL`              | Directive-distill model; defaults to `claude-haiku-5-5`.                                                 |
+| `MYLIBRARY_MODEL_REVEAL`               | Reveal-line model; defaults to `claude-haiku-5-5`.                                                       |
 | `MYLIBRARY_REQ_PER_SEC`                | Catalog request-rate override.                                                                           |
 | `MYLIBRARY_MONTHLY_SOFT_CAP_USD`       | Per-user monthly visibility cap; warn-only.                                                              |
 | `MYLIBRARY_USAGE_WARN_THRESHOLD`       | Fraction of the soft cap at which the warning appears.                                                   |
