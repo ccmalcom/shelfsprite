@@ -15,9 +15,11 @@ import type { Db } from './db';
 import { ApiError } from './errors';
 import {
   assemble,
+  authorPool,
   discoveryPool,
   fillOlDescriptions,
   MAX_CANDIDATES,
+  PER_AUTHOR,
   PER_QUERY,
   type AssembledCandidate,
 } from './recAssemble';
@@ -34,10 +36,13 @@ import { rankModel, RANK_MAX_TOKENS, SEED_MAX_TOKENS } from './recPrompts';
 import { buildSignal, type RecSignal } from './recSignal';
 import { round2 } from './serialize';
 import { modelFor } from './models';
+import { surname } from './dedup';
 
 interface Interpretation {
   interpretation: string;
   queries: string[];
+  /** Authors whose own books the reader asked for ("my next Scalzi read"). */
+  authors: string[];
   constraints: Record<string, unknown>;
 }
 
@@ -71,7 +76,7 @@ export async function runDiscover(
   const interp = await interpretQuery(db, requireClient(), q, signal, userId);
   const model = rankModel();
 
-  if (interp.queries.length === 0) {
+  if (interp.queries.length === 0 && interp.authors.length === 0) {
     return {
       query: q,
       interpretation: interp.interpretation,
@@ -90,13 +95,26 @@ export async function runDiscover(
     signal = { ...signal, library_languages: new Set(statedLanguages) } as RecSignal;
   }
 
-  let pool = await discoveryPool(db, interp.queries, PER_QUERY);
-  // Filter the RAW pool, before the cap, so a constraint-violating book can never
-  // displace a valid one.
-  pool = applyDiscoveryConstraints(pool, interp.constraints);
-  // Discovery is purely query-driven: no metadata pool. The interpreted queries ARE
-  // the seed pool, so every candidate comes out tagged 'claude_seed'.
-  const candidates = assemble([], pool, signal, MAX_CANDIDATES);
+  // Books BY a named author are fetched directly and passed as the metadata pool (see
+  // authorPool), so they survive the cap ahead of the free-text hits. With no author
+  // named there is no metadata pool, and every candidate comes out tagged 'claude_seed'.
+  const byAuthor = await authorPool(db, interp.authors, PER_AUTHOR);
+  // Free-text search returns periodicals and catalogs (TV Guide, Library Journal) with no
+  // author; nothing author-less is a book to recommend.
+  const pool = (await discoveryPool(db, interp.queries, PER_QUERY)).filter(([c]) => c.author);
+  const requested = new Set(interp.authors.map(surname).filter(Boolean));
+  // Constraints filter the RAW pools, before the cap, so a constraint-violating book can
+  // never displace a valid one.
+  const candidates = assemble(
+    applyDiscoveryConstraints(byAuthor, interp.constraints),
+    applyDiscoveryConstraints(pool, interp.constraints),
+    signal,
+    MAX_CANDIDATES,
+    // Named authors skip both author caps: the library-author trim (they are often on
+    // the shelf already, which is the point of "my NEXT Scalzi read") and MAX_PER_AUTHOR.
+    requested,
+    requested
+  );
   await fillOlDescriptions(db, candidates);
 
   if (candidates.length === 0) {
@@ -174,12 +192,16 @@ async function interpretQuery(
   // Python matches the FIRST tool_use block without checking its name, and falls
   // back to a fully-empty interpretation when there is none.
   const input = toolInput(message as any, '');
-  if (!input) return { interpretation: '', queries: [], constraints: {} };
+  if (!input) return { interpretation: '', queries: [], authors: [], constraints: {} };
 
   const items = (input.queries as Array<{ query?: string }> | undefined) ?? [];
+  const authors = Array.isArray(input.authors) ? input.authors : [];
   return {
     interpretation: String(input.interpretation ?? '').trim(),
     queries: items.filter((x) => (x?.query ?? '').trim() !== '').map((x) => String(x.query).trim()),
+    authors: [
+      ...new Set(authors.filter((a): a is string => typeof a === 'string').map((a) => a.trim())),
+    ].filter(Boolean),
     constraints: cleanConstraints((input.constraints as Record<string, unknown>) ?? {}),
   };
 }

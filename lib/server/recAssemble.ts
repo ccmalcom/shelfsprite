@@ -10,6 +10,7 @@ import {
   googleBooksAuthor,
   googleBooksQuery,
   googleBooksSubject,
+  openlibraryAuthor,
   openlibraryQuery,
   openlibrarySubject,
   openlibraryWorkDescription,
@@ -22,6 +23,7 @@ import {
   dedupKey,
   EMPTY_DEDUP_KEY,
   fuzzyDuplicate,
+  isCollectionEdition,
   isLearnerEdition,
   languageOk,
   seriesOk,
@@ -35,6 +37,7 @@ export const PER_QUERY = 8; // catalog hits per subject/author/seed query
 export const SEED_QUERIES = 8; // search terms to ask Claude to propose
 export const MAX_CANDIDATES = 60; // cap on the pool handed to the reranker (token budget)
 export const SEED_RESERVE_SHARE = 0.3; // min share of the cap reserved for seed-only candidates
+export const PER_AUTHOR = 20; // books fetched per author a discovery request names
 
 /** Python's (candidate, reason) tuple. */
 export type PoolEntry = [Candidate, string];
@@ -192,6 +195,26 @@ export async function discoveryPool(
   return pool;
 }
 
+/**
+ * Books BY the authors a discovery request names ("my next Scalzi read", #52). It is
+ * deterministic expansion, not a Claude search term, so runDiscover passes it as the
+ * metadata pool: capPool then keeps these ahead of the free-text hits, and a book the
+ * queries also found comes out 'both'.
+ */
+export async function authorPool(
+  db: Db,
+  authors: string[],
+  perAuthor: number
+): Promise<PoolEntry[]> {
+  const pool: PoolEntry[] = [];
+  for (const author of authors) {
+    for (const c of await openlibraryAuthor(db, author, perAuthor)) {
+      pool.push([c, `author:${author}`]);
+    }
+  }
+  return pool;
+}
+
 type PendingCandidate = Omit<AssembledCandidate, 'retrieval_pool'> & { pools: Set<string> };
 
 /** Merge both pools, drop library books + duplicates, tag provenance, cap size. */
@@ -203,7 +226,9 @@ export function assemble(
   // NOT a field on AssembleSignal: adding one would force buildBookSignal to supply
   // it and drag /similar into directive scope. recommendRun is the only caller that
   // passes it; /similar and /discover keep the empty default.
-  preferredAuthorSurnames: Set<string> = new Set()
+  preferredAuthorSurnames: Set<string> = new Set(),
+  // Only /discover passes this: authors the request named, exempt from MAX_PER_AUTHOR.
+  uncappedAuthorSurnames: Set<string> = new Set()
 ): AssembledCandidate[] {
   const allowedLangs = allowedLanguages(signal.library_languages);
   // A Map, so values() yields Python's dict insertion order.
@@ -220,6 +245,7 @@ export function assemble(
     if (!seriesOk(title, signal.library_series)) return;
     if (fuzzyDuplicate(title, signal.library_titles)) return;
     if (isLearnerEdition(cand)) return;
+    if (isCollectionEdition(cand)) return;
 
     const existing = byKey.get(key);
     if (existing === undefined) {
@@ -255,7 +281,15 @@ export function assemble(
   for (const { pools, ...rest } of byKey.values()) {
     candidates.push({ ...rest, retrieval_pool: pools.size > 1 ? 'both' : [...pools][0] });
   }
-  return capPool(applyAuthorCaps(candidates, signal.library_authors, preferredAuthorSurnames), cap);
+  return capPool(
+    applyAuthorCaps(
+      candidates,
+      signal.library_authors,
+      preferredAuthorSurnames,
+      uncappedAuthorSurnames
+    ),
+    cap
+  );
 }
 
 /**

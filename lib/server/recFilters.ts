@@ -107,6 +107,36 @@ export function isLearnerEdition(cand: {
   return LEARNER_EDITION_MARKERS.some((marker) => haystack.includes(marker));
 }
 
+// Box sets, omnibuses and many-in-one ebook bundles. Free-text catalog search surfaces
+// them constantly (#52), and a 45-title bundle is never a book to recommend. Matched on
+// the title only: a subject like "Collections" would also flag real story collections.
+const COLLECTION_EDITION_MARKERS = [
+  'box set',
+  'boxed set',
+  'boxset',
+  'omnibus',
+  'titles in one',
+  'books in one',
+  'novels in one',
+  'complete works',
+  'complete series',
+  'ultimate collection',
+];
+// "(Book 1&2)", "Books 1-4", and "21 Time Travel & Dystopia Stories" / "17 Book Collection".
+const COLLECTION_EDITION_RES = [
+  /\bbooks?\s+\d+\s*(?:&|-|–|and|to)\s*\d+/,
+  /\b\d{2,}\+?\s+(?:[a-z&'-]+\s+){0,4}(?:stories|novels?|books?|titles|novellas?)\b/,
+];
+
+/** Drop box sets, omnibuses and multi-book bundles, which are never a recommendation. */
+export function isCollectionEdition(cand: { title?: string | null }): boolean {
+  const title = (cand.title || '').toLowerCase();
+  return (
+    COLLECTION_EDITION_MARKERS.some((marker) => title.includes(marker)) ||
+    COLLECTION_EDITION_RES.some((re) => re.test(title))
+  );
+}
+
 /**
  * recommend._apply_author_caps: cap per-author candidates and the overall share from
  * authors already in the library, so small libraries do not return same-author clones.
@@ -118,13 +148,17 @@ export function isLearnerEdition(cand: {
 export function applyAuthorCaps<T extends { author?: string | null }>(
   candidates: T[],
   libraryAuthors: Set<string>,
-  preferredAuthors: Set<string> = new Set()
+  preferredAuthors: Set<string> = new Set(),
+  // Authors the reader asked for BY NAME in a discovery request ("my next Scalzi read").
+  // Unlike a standing favorite, the request itself says the deck should be their books,
+  // so these skip MAX_PER_AUTHOR. Pass them as preferredAuthors too for the library trim.
+  uncappedAuthors: Set<string> = new Set()
 ): T[] {
   const perAuthor = new Map<string, number>();
   const kept: T[] = [];
   for (const c of candidates) {
     const a = surname(c.author ?? null);
-    if (a) {
+    if (a && !uncappedAuthors.has(a)) {
       const n = perAuthor.get(a) ?? 0;
       // MAX_PER_AUTHOR is a QUALITY guard, not a weak-inference crutch, so preferred
       // authors are deliberately NOT exempt from it: a favorite does not make ten

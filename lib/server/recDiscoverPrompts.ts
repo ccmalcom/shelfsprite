@@ -27,7 +27,14 @@ export const DISCOVER_SYSTEM =
   'secondary context: use it to break ties and set tone (e.g. their prose preferences), ' +
   'never to override what they asked for. If they ask for something their profile dislikes, ' +
   'honor the request; people read outside their pattern on purpose.\n' +
-  '- If the request names a book or author ("like The Fifth Season"), decompose WHY someone ' +
+  '- If the reader wants books BY an author ("my next Scalzi read", "more Le Guin", "what ' +
+  'else has Tana French written"), put the author\'s full name in AUTHORS: their books are ' +
+  'fetched directly. Also emit 2-4 facet queries for what the reader likely enjoys in that ' +
+  'author, as a backstop in case they have read everything. An author named only as a ' +
+  'comparison ("like Scalzi", "Scalzi-esque but darker") is NOT an author entry; the next ' +
+  'rule covers it.\n' +
+  '- If the request names a book or author as a comparison ("like The Fifth Season"), ' +
+  'decompose WHY someone ' +
   'asks for that book into 3-6 distinct facets (e.g. geological apocalypse setting; ' +
   'second-person narration; rage as the engine; found family under oppression) and emit one ' +
   'query per facet. Facets, not synonyms: six rewordings of the same idea retrieve the same ' +
@@ -44,6 +51,9 @@ export const DISCOVER_SYSTEM =
   '- "Find me a book like Project Hail Mary" -> facets: lone-problem-solver survival scifi; ' +
   'competence-porn engineering narration; first-contact friendship; humor inside hard sci-fi; ' +
   'race-against-extinction stakes. No constraints.\n' +
+  '- "Help me find my next John Scalzi read" -> authors: John Scalzi; facets: wisecracking ' +
+  'first-person science fiction; comic science fiction with big ideas; fast-paced military ' +
+  'space opera. No constraints.\n' +
   '- "Something gentle for a bad week" -> facets: low-stakes literary comfort; kindness between ' +
   'strangers; cozy small-community fiction; quiet healing narratives. Constraints: ' +
   'exclude_subjects: [grief, war, abuse].\n' +
@@ -58,13 +68,21 @@ export const DISCOVER_TOOL = {
   description:
     "Translate a reader's natural-language book request into catalog SEARCH queries " +
     '(search terms: themes, styles, comparable-author names, never specific titles), ' +
-    'the hard constraints they stated, and a one-sentence interpretation of what they want.',
+    'any authors whose own books they asked for, the hard constraints they stated, and a ' +
+    'one-sentence interpretation of what they want.',
   input_schema: {
     type: 'object',
     properties: {
       interpretation: {
         type: 'string',
         description: 'One sentence restating what the reader wants, in their own terms.',
+      },
+      authors: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          "Full names of authors whose OWN books the reader asked for ('my next Scalzi " +
+          "read'). Omit for authors named only as a comparison ('like Scalzi').",
       },
       queries: {
         type: 'array',
@@ -122,9 +140,9 @@ export function buildInterpretPrompt(query: string, signal: RecSignal): PromptBl
   // A query containing a `"` produces unbalanced quotes there too.
   const taskPrompt =
     `The reader asked: "${query}"\n\n` +
-    'Interpret this request. Emit search QUERIES (facets, not titles), any hard ' +
-    'CONSTRAINTS they stated (language, era, subjects to avoid; omit if unstated), and ' +
-    'a one-sentence INTERPRETATION of what they want.';
+    'Interpret this request. Emit search QUERIES (facets, not titles), any AUTHORS whose ' +
+    'own books they asked for, any hard CONSTRAINTS they stated (language, era, subjects ' +
+    'to avoid; omit if unstated), and a one-sentence INTERPRETATION of what they want.';
 
   return [
     { type: 'text', text: profileContext, cache_control: { type: 'ephemeral' } },
@@ -178,7 +196,11 @@ export const DISCOVER_RANK_SYSTEM =
   'of real catalog candidates by how well they answer THAT REQUEST, and you never invent ' +
   'books; you only rank the candidates given. Rank fit against the request first and the ' +
   "reader's taste profile second (use the profile only to break ties). You prefer specific " +
-  'fit (voice, structure, pace, mood, subject) over popularity.\n\n' +
+  'fit (voice, structure, pace, mood, subject) over popularity. If the reader asked for ' +
+  "an author's own books, that author's books rank first.\n\n" +
+  'Only rank books the reader could pick up and read to answer the request. Leave out ' +
+  'reference works, criticism or study guides about other books, periodicals and catalogs ' +
+  'unless the request asks for one: returning fewer than asked beats padding with them.\n\n' +
   'Write each rationale like a well-read friend pressing the book into their hands, in 1-2 ' +
   'sentences: lead with what the book does, then answer the request in its own terms: if ' +
   'they asked for "like The Fifth Season", say which facet of it this book delivers. Name ' +
