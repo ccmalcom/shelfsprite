@@ -26,14 +26,14 @@ const ALL_OPS: ModelOperation[] = ['profile', 'rerank', 'seed', 'archetype', 'di
 describe('modelFor', () => {
   setupTestEnv();
 
-  it('defaults every operation to the model it used before this wave', () => {
-    expect(modelFor('profile')).toBe('claude-sonnet-5');
-    expect(modelFor('rerank')).toBe('claude-sonnet-5');
+  it('defaults profile and rerank to Sonnet 5.5 and the rest to Haiku 5.5', () => {
+    expect(modelFor('profile')).toBe('claude-sonnet-5-5');
+    expect(modelFor('rerank')).toBe('claude-sonnet-5-5');
     expect(modelFor('seed')).toBe('claude-haiku-5-5');
     expect(modelFor('archetype')).toBe('claude-haiku-5-5');
     expect(modelFor('distill')).toBe('claude-haiku-5-5');
     expect(modelFor('reveal')).toBe('claude-haiku-5-5');
-    expect(DEFAULT_SONNET_MODEL).toBe('claude-sonnet-5');
+    expect(DEFAULT_SONNET_MODEL).toBe('claude-sonnet-5-5');
     expect(DEFAULT_HAIKU_MODEL).toBe('claude-haiku-5-5');
   });
 

@@ -77,7 +77,7 @@ describe('markProfiled stamps the start of the run', () => {
 
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('update');
-      expect((calls[0].tool_choice as { name: string }).name).toBe('revise_taste_traits');
+      expect((calls[0].tools as { name: string }[])[0].name).toBe('revise_taste_traits');
 
       const pending = await booksChangedSince(db, await lastProfiledAt(db), 'local');
       expect(pending.map((b) => b.id)).toEqual([5]);
@@ -176,10 +176,9 @@ describe('updateTasteProfile with a pending rebuild reason', () => {
       const out = await updateTasteProfile(db, client, 'local');
 
       expect(out.mode).toBe('full');
-      expect(client.calls[0].params.tool_choice).toEqual({
-        type: 'tool',
-        name: 'record_taste_traits',
-      });
+      expect((client.calls[0].params.tools as { name: string }[])[0].name).toBe(
+        'record_taste_traits'
+      );
       expect(await readRebuildReason(db, 'local')).toBeNull();
     } finally {
       await close();

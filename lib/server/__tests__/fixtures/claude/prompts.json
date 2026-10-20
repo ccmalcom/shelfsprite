@@ -208,9 +208,9 @@
   "operation": "profile_full",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-sonnet-5",
+   "model": "claude-sonnet-5-5",
    "max_tokens": 3000,
-   "system": "You are a literary taste analyst. You infer what drives a specific reader's ratings from their library metadata. You reason about CONTRAST between rating tiers, never asserting a trait without citing the books that evidence it. You only cite book ids that appear in the provided data.",
+   "system": "You are a literary taste analyst. You infer what drives a specific reader's ratings from their library metadata. You reason about CONTRAST between rating tiers, never asserting a trait without citing the books that evidence it. You only cite book ids that appear in the provided data.\n\nRespond by calling the record_taste_traits tool.",
    "tools": [
     {
      "name": "record_taste_traits",
@@ -271,24 +271,26 @@
     }
    ],
    "tool_choice": {
-    "type": "tool",
-    "name": "record_taste_traits"
+    "type": "auto"
    },
    "messages": [
     {
      "role": "user",
      "content": "Below is a reader's library, grouped by star rating and status. Each book has enriched metadata (subjects, year, length, series). Most books have no review text, so reason mainly from metadata + the rating tiers — but where a book carries a `review` field, those are the reader's own words: treat them as the strongest, most direct signal, above any metadata inference.\n\nTier sizes: {'5': 7, '4': 3, '3': 1, '<=2': 1, 'dnf': 1, 'rejected': 1}. Note the heavy positive skew — 'loved it' has low discriminative power, so focus on what is genuinely distinguishing.\n\nThe `dnf` tier contains books the reader abandoned before finishing. Treat these as the strongest possible aversion signal, even stronger than 1-2 star ratings, since the reader could not complete them. Any `review` field on a DNF book is direct first-person evidence explaining why they quit.\n\nThe `rejected` tier contains books the reader explicitly skipped when recommended, with a note explaining why. These are direct first-person statements of aversion — treat each `note` as reliable testimony about what this reader does NOT want, and use them to sharpen aversion traits.\n\nInfer the reader's taste traits. Prioritize, in order:\n  1. What separates the 5-star books from the 4-star books?\n  2. What do the lowest-rated books (<=2 and 3), DNF books, and rejected recommendations share? (these are 'aversion' traits)\n  3. Cross-cutting rewards visible across the high tiers.\n\nFor EACH trait, split the evidence into two fields:\n  - `exhibits`: the books that SHOW the trait. These MUST match the polarity — an aversion's exhibits are LOW-rated books, a reward's exhibits are HIGH-rated. Never put high-rated books in an aversion's exhibits.\n  - `contrasts`: the counter-examples that sharpen the distinction (e.g. for an aversion to X, similar books WITHOUT X that scored higher). May be empty.\n\nTemporal context: The `read_year` field shows when each book was read (or added to the shelf). Tastes evolve, so weight this accordingly:\n  - Recent reads (2020+) are the strongest signal of current preferences.\n  - Mid-era reads (2015-2019) are relevant but may reflect a transitional period.\n  - Older reads (pre-2015) may reflect a different life stage entirely — for example, a heavy YA phase in one's teens is not necessarily a current preference.\n  - Lower `inference_confidence` for traits supported only by older reads unless those same traits are echoed in more recent ones. If a trait is consistent across all eras, call it an enduring preference (and note that in the claim).\n  IMPORTANT EXCEPTION — do NOT apply temporal discounting to traits rooted in values or representation (e.g. LGBTQ+ themes, feminist perspectives, racial or political identity in fiction). A reader's core values rarely regress with age: the absence of such themes in recent reads more likely reflects the books available than a shift in the reader's preferences. If a value-based trait is consistent across any era of the library, treat it as enduring regardless of when those books were read. Only downweight it if recent reads actively contradict it (e.g. the reader started rating books with that theme *lower*).\n\nQuality rules:\n  - Use ONLY book ids from the data below.\n  - Make claims specific and falsifiable, not generic genre labels.\n  - Do NOT force a book into a trait it doesn't fit just to pad the evidence.\n  - Keep traits DISTINCT — don't emit two traits describing the same pattern.\n  - Distinguish genuine taste from mechanical rating drift (e.g. later books in a long series slipping a star is series fatigue, not a standalone taste trait).\n  - Lower your inference_confidence when a trait rests on very few books.\n  - Aim for 6-12 traits. Record them with the record_taste_traits tool.\n\nLIBRARY DATA (JSON):\n{\"5\": [{\"id\": 1, \"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965, \"pages\": 412, \"subjects\": [\"science fiction\", \"space opera\", \"politics\"], \"series\": null, \"read_year\": 2025}, {\"id\": 2, \"title\": \"The Dispossessed\", \"author\": \"Ursula K. Le Guin\", \"year\": 1974, \"pages\": 387, \"subjects\": [\"science fiction\", \"utopian fiction\", \"anarchism\"], \"series\": null, \"read_year\": null}, {\"id\": 3, \"title\": \"Project Hail Mary\", \"author\": \"Andy Weir\", \"year\": 2021, \"pages\": 476, \"subjects\": [\"science fiction\", \"space\", \"survival\"], \"series\": null, \"read_year\": null, \"review\": \"Loved the problem-solving.\"}, {\"id\": 7, \"title\": \"The Hobbit\", \"author\": \"J.R.R. Tolkien\", \"year\": 1937, \"pages\": 310, \"subjects\": [\"fantasy\", \"adventure\"], \"series\": null, \"read_year\": null}, {\"id\": 11, \"title\": \"Exhalation\", \"author\": \"Ted Chiang\", \"year\": 2019, \"pages\": 368, \"subjects\": [\"science fiction\", \"short stories\"], \"series\": null, \"read_year\": null}, {\"id\": 12, \"title\": \"The Fifth Season\", \"author\": \"N.K. Jemisin\", \"year\": 2015, \"pages\": 468, \"subjects\": [\"fantasy\", \"apocalyptic fiction\"], \"series\": \"The Broken Earth\", \"read_year\": null}, {\"id\": 13, \"title\": \"Kindred\", \"author\": \"Octavia E. Butler\", \"year\": 1979, \"pages\": null, \"subjects\": [\"science fiction\", \"time travel\"], \"series\": null, \"read_year\": null}], \"4\": [{\"id\": 4, \"title\": \"The Left Hand of Darkness\", \"author\": \"Ursula K. Le Guin\", \"year\": 1969, \"pages\": 304, \"subjects\": [\"science fiction\", \"gender\", \"anthropological sf\"], \"series\": null, \"read_year\": null}, {\"id\": 10, \"title\": \"The Emperor's Soul\", \"author\": \"Brandon Sanderson\", \"year\": 2012, \"pages\": 96, \"subjects\": [\"fantasy\", \"novellas\"], \"series\": null, \"read_year\": null}, {\"id\": 14, \"title\": \"Small Gods\", \"author\": \"Terry Pratchett\", \"year\": 1992, \"pages\": 389, \"subjects\": [], \"series\": null, \"read_year\": null}], \"3\": [{\"id\": 5, \"title\": \"Foundation\", \"author\": \"Isaac Asimov\", \"year\": 1951, \"pages\": 244, \"subjects\": [\"science fiction\", \"empires\"], \"series\": null, \"read_year\": null}], \"<=2\": [{\"id\": 6, \"title\": \"Gideon the Ninth\", \"author\": \"Tamsyn Muir\", \"year\": 2019, \"pages\": 448, \"subjects\": [\"fantasy\", \"necromancy\"], \"series\": null, \"read_year\": null}], \"dnf\": [{\"id\": 9, \"title\": \"Too Like the Lightning\", \"author\": \"Ada Palmer\", \"year\": 2016, \"pages\": 432, \"subjects\": [], \"series\": null, \"read_year\": null}], \"rejected\": [{\"title\": \"Blindsight\", \"author\": \"Peter Watts\", \"note\": \"not for me\"}]}\n\n## User Feedback\n- The following traits are already locked in by the user and are stored separately — do NOT output them (or reworded variants) in your trait list, and do not contradict them: Values competence and problem-solving protagonists.\n- The following traits were rejected by the user — do NOT re-derive or include variants of these: Avoids grimdark tone.\n- The following are the user's all-time favorite books — weight these as the strongest possible positive signal when deriving taste traits: The Dispossessed by Ursula K. Le Guin\n- The reader wrote these custom instructions about what they want to read next. Treat them as direct, high-priority guidance when deriving traits (honor them; do not contradict them): More literary sci-fi, no grimdark.\n"
     }
-   ]
+   ],
+   "thinking": {
+    "type": "between_tools"
+   }
   }
  },
  "profile_update": {
   "operation": "profile_update",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-sonnet-5",
+   "model": "claude-sonnet-5-5",
    "max_tokens": 3000,
-   "system": "You are a literary taste analyst maintaining a reader's evolving taste profile. You are given the profile you previously inferred plus the reader's most recent rating and review changes. You make the SMALLEST revision that honors the new evidence: keep what still holds, adjust confidence where the new data strengthens or weakens a claim, retire claims the new evidence contradicts, and add genuinely new traits. Review text is the reader's own words — weight it above metadata inference. Cite only book ids that appear in the provided data.",
+   "system": "You are a literary taste analyst maintaining a reader's evolving taste profile. You are given the profile you previously inferred plus the reader's most recent rating and review changes. You make the SMALLEST revision that honors the new evidence: keep what still holds, adjust confidence where the new data strengthens or weakens a claim, retire claims the new evidence contradicts, and add genuinely new traits. Review text is the reader's own words — weight it above metadata inference. Cite only book ids that appear in the provided data.\n\nRespond by calling the revise_taste_traits tool.",
    "tools": [
     {
      "name": "revise_taste_traits",
@@ -349,15 +351,17 @@
     }
    ],
    "tool_choice": {
-    "type": "tool",
-    "name": "revise_taste_traits"
+    "type": "auto"
    },
    "messages": [
     {
      "role": "user",
      "content": "The reader has updated some ratings and/or written new reviews since this profile was last built. Revise the profile accordingly — do NOT re-derive it from scratch.\n\nYou are NOT given the whole library, only the books needed to reason about the change: the books that changed, plus the books the current traits already cite. Cite book ids only from the BOOKS map below.\n\nHow to revise:\n  - Keep traits that still hold. Raise/lower `inference_confidence` if the new evidence strengthens or weakens them, and add/remove cited book ids as fitting.\n  - Drop a trait whose evidence the changes now contradict (e.g. the reader re-rated its key exhibit, or a new review states the opposite).\n  - Add new traits the changes reveal — especially anything stated outright in a review.\n  - A new/edited `review` is direct testimony; prefer it over metadata guesses.\n  - Return the COMPLETE revised trait set (the unchanged traits too), 6-12 traits, via the revise_taste_traits tool.\n\nCHANGED BOOK IDS (the edits driving this update): [2, 3, 9]\n\nCURRENT TRAITS (JSON):\n[{\"id\": 1, \"claim\": \"Drawn to idea-driven science fiction that interrogates political systems.\", \"polarity\": \"positive\", \"inference_confidence\": 0.95, \"exhibits\": [1, 2], \"contrasts\": []}, {\"id\": 3, \"claim\": \"Prefers standalone novels over long series commitments.\", \"polarity\": \"positive\", \"inference_confidence\": 0.8, \"exhibits\": [2, 13], \"contrasts\": [12]}]\n\nBOOKS (id -> metadata; the only books you may cite) (JSON):\n{\"1\": {\"id\": 1, \"title\": \"Dune\", \"author\": \"Frank Herbert\", \"year\": 1965, \"pages\": 412, \"subjects\": [\"science fiction\", \"space opera\", \"politics\"], \"series\": null, \"read_year\": 2025, \"rating\": 5}, \"2\": {\"id\": 2, \"title\": \"The Dispossessed\", \"author\": \"Ursula K. Le Guin\", \"year\": 1974, \"pages\": 387, \"subjects\": [\"science fiction\", \"utopian fiction\", \"anarchism\"], \"series\": null, \"read_year\": null, \"rating\": 5}, \"3\": {\"id\": 3, \"title\": \"Project Hail Mary\", \"author\": \"Andy Weir\", \"year\": 2021, \"pages\": 476, \"subjects\": [\"science fiction\", \"space\", \"survival\"], \"series\": null, \"read_year\": null, \"review\": \"Loved the problem-solving.\", \"rating\": 5}, \"9\": {\"id\": 9, \"title\": \"Too Like the Lightning\", \"author\": \"Ada Palmer\", \"year\": 2016, \"pages\": 432, \"subjects\": [], \"series\": null, \"read_year\": null, \"rating\": null}, \"12\": {\"id\": 12, \"title\": \"The Fifth Season\", \"author\": \"N.K. Jemisin\", \"year\": 2015, \"pages\": 468, \"subjects\": [\"fantasy\", \"apocalyptic fiction\"], \"series\": \"The Broken Earth\", \"read_year\": null, \"rating\": 5}, \"13\": {\"id\": 13, \"title\": \"Kindred\", \"author\": \"Octavia E. Butler\", \"year\": 1979, \"pages\": null, \"subjects\": [\"science fiction\", \"time travel\"], \"series\": null, \"read_year\": null, \"rating\": 5}}\n\n## User Feedback\n- The following traits are already locked in by the user and are stored separately — do NOT output them (or reworded variants) in your trait list, and do not contradict them: Values competence and problem-solving protagonists.\n- The following traits were rejected by the user — do NOT re-derive or include variants of these: Avoids grimdark tone.\n- The following are the user's all-time favorite books — weight these as the strongest possible positive signal when deriving taste traits: The Dispossessed by Ursula K. Le Guin\n- The reader wrote these custom instructions about what they want to read next. Treat them as direct, high-priority guidance when deriving traits (honor them; do not contradict them): More literary sci-fi, no grimdark.\n"
     }
-   ]
+   ],
+   "thinking": {
+    "type": "between_tools"
+   }
   }
  },
  "recommend_seed": {
@@ -429,9 +433,9 @@
   "operation": "recommend_rerank",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-sonnet-5",
+   "model": "claude-sonnet-5-5",
    "max_tokens": 4000,
-   "system": "You are a book recommender. You rank a fixed list of real catalog candidates against a reader's evidence-backed taste profile. You never invent books; you only rank the candidates given. Every pick cites the trait ids and library book ids it is grounded in, drawn only from the provided data. You prefer specific fit over popularity, and you respect aversion traits (penalize candidates that trip them).\n\nWrite each rationale like a well-read friend pressing the book into their hands, in 1-2 sentences: lead with what the book does, then anchor it to at most two of their library books by title. Name the mechanism of the fit (pace, voice, structure, mood: whatever the trait actually is), never just shared genre. If the pick is a stretch, say so honestly and name what still connects. Use plain punctuation only: no em dashes. Never write \"you'll love this\", generic praise, or clinical trait language.\n\nExamples of the target voice:\n- Technically sci-fi, but it moves like the quiet family novels you rate highest: one household, twenty years, every chapter a knife slid in slowly.\n- A reach: you rarely go for war fiction. But it's told in the clipped, unsentimental voice that carried The Remains of the Day for you, and it's short enough to bail on cheap.\n- Romance-adjacent without the love-triangle stall you keep one-starring: the couple is together by chapter three, and the book is about what happens after.",
+   "system": "You are a book recommender. You rank a fixed list of real catalog candidates against a reader's evidence-backed taste profile. You never invent books; you only rank the candidates given. Every pick cites the trait ids and library book ids it is grounded in, drawn only from the provided data. You prefer specific fit over popularity, and you respect aversion traits (penalize candidates that trip them).\n\nWrite each rationale like a well-read friend pressing the book into their hands, in 1-2 sentences: lead with what the book does, then anchor it to at most two of their library books by title. Name the mechanism of the fit (pace, voice, structure, mood: whatever the trait actually is), never just shared genre. If the pick is a stretch, say so honestly and name what still connects. Use plain punctuation only: no em dashes. Never write \"you'll love this\", generic praise, or clinical trait language.\n\nExamples of the target voice:\n- Technically sci-fi, but it moves like the quiet family novels you rate highest: one household, twenty years, every chapter a knife slid in slowly.\n- A reach: you rarely go for war fiction. But it's told in the clipped, unsentimental voice that carried The Remains of the Day for you, and it's short enough to bail on cheap.\n- Romance-adjacent without the love-triangle stall you keep one-starring: the couple is together by chapter three, and the book is about what happens after.\n\nRespond by calling the rank_recommendations tool.",
    "tools": [
     {
      "name": "rank_recommendations",
@@ -488,8 +492,7 @@
     }
    ],
    "tool_choice": {
-    "type": "tool",
-    "name": "rank_recommendations"
+    "type": "auto"
    },
    "messages": [
     {
@@ -508,7 +511,10 @@
       }
      ]
     }
-   ]
+   ],
+   "thinking": {
+    "type": "between_tools"
+   }
   }
  },
  "similar_seed": {
@@ -580,9 +586,9 @@
   "operation": "similar_rerank",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-sonnet-5",
+   "model": "claude-sonnet-5-5",
    "max_tokens": 4000,
-   "system": "You recommend books similar to ONE specific book the reader already knows. You rank a fixed list of real catalog candidates by how much they resemble that seed book, and you never invent books; you only rank the candidates given. You prefer specific resemblance (voice, structure, pace, mood, subject) over shared genre or popularity.\n\nWrite each rationale like a well-read friend pressing the book into their hands, in 1-2 sentences: lead with what the book does, then name exactly how it echoes the seed book. If a pick is a stretch, say so honestly and name what still connects. Use plain punctuation only: no em dashes. Never write \"you'll love this\", generic praise, or clinical genre-speak.",
+   "system": "You recommend books similar to ONE specific book the reader already knows. You rank a fixed list of real catalog candidates by how much they resemble that seed book, and you never invent books; you only rank the candidates given. You prefer specific resemblance (voice, structure, pace, mood, subject) over shared genre or popularity.\n\nWrite each rationale like a well-read friend pressing the book into their hands, in 1-2 sentences: lead with what the book does, then name exactly how it echoes the seed book. If a pick is a stretch, say so honestly and name what still connects. Use plain punctuation only: no em dashes. Never write \"you'll love this\", generic praise, or clinical genre-speak.\n\nRespond by calling the rank_similar_books tool.",
    "tools": [
     {
      "name": "rank_similar_books",
@@ -623,8 +629,7 @@
     }
    ],
    "tool_choice": {
-    "type": "tool",
-    "name": "rank_similar_books"
+    "type": "auto"
    },
    "messages": [
     {
@@ -643,7 +648,10 @@
       }
      ]
     }
-   ]
+   ],
+   "thinking": {
+    "type": "between_tools"
+   }
   }
  },
  "discover_interpret": {
@@ -748,9 +756,9 @@
   "operation": "discover_rerank",
   "user_id": "local",
   "kwargs": {
-   "model": "claude-sonnet-5",
+   "model": "claude-sonnet-5-5",
    "max_tokens": 4000,
-   "system": "You are a book recommender answering a reader's specific request. You rank a fixed list of real catalog candidates by how well they answer THAT REQUEST, and you never invent books; you only rank the candidates given. Rank fit against the request first and the reader's taste profile second (use the profile only to break ties). You prefer specific fit (voice, structure, pace, mood, subject) over popularity.\n\nWrite each rationale like a well-read friend pressing the book into their hands, in 1-2 sentences: lead with what the book does, then answer the request in its own terms: if they asked for \"like The Fifth Season\", say which facet of it this book delivers. Name the mechanism of the fit, never just shared genre. If a pick is a stretch, say so honestly and name what still connects. Use plain punctuation only: no em dashes. Never write \"you'll love this\", generic praise, or clinical trait language.",
+   "system": "You are a book recommender answering a reader's specific request. You rank a fixed list of real catalog candidates by how well they answer THAT REQUEST, and you never invent books; you only rank the candidates given. Rank fit against the request first and the reader's taste profile second (use the profile only to break ties). You prefer specific fit (voice, structure, pace, mood, subject) over popularity.\n\nWrite each rationale like a well-read friend pressing the book into their hands, in 1-2 sentences: lead with what the book does, then answer the request in its own terms: if they asked for \"like The Fifth Season\", say which facet of it this book delivers. Name the mechanism of the fit, never just shared genre. If a pick is a stretch, say so honestly and name what still connects. Use plain punctuation only: no em dashes. Never write \"you'll love this\", generic praise, or clinical trait language.\n\nRespond by calling the rank_discovery tool.",
    "tools": [
     {
      "name": "rank_discovery",
@@ -791,8 +799,7 @@
     }
    ],
    "tool_choice": {
-    "type": "tool",
-    "name": "rank_discovery"
+    "type": "auto"
    },
    "messages": [
     {
@@ -811,7 +818,10 @@
       }
      ]
     }
-   ]
+   ],
+   "thinking": {
+    "type": "between_tools"
+   }
   }
  }
 }

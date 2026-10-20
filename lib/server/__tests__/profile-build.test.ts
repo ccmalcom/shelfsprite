@@ -363,7 +363,7 @@ describe('extractTasteProfile', () => {
 
       expect(out.mode).toBe('full');
       expect(out.traits_saved).toBe(1);
-      expect(out.model).toBe('claude-sonnet-5');
+      expect(out.model).toBe('claude-sonnet-5-5');
       expect(out.rated_books).toBe(13); // every tier except `rejected`
 
       const rows = await db
