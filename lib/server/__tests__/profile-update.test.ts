@@ -127,10 +127,9 @@ describe('updateTasteProfile', () => {
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       // The full builder must have been the one that called Claude.
-      expect(client.calls[0].params.tool_choice).toEqual({
-        type: 'tool',
-        name: 'record_taste_traits',
-      });
+      expect((client.calls[0].params.tools as { name: string }[])[0].name).toBe(
+        'record_taste_traits'
+      );
     } finally {
       await close();
     }
@@ -149,10 +148,9 @@ describe('updateTasteProfile', () => {
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       // The full builder must have been the one that called Claude, not the revise path.
-      expect(client.calls[0].params.tool_choice).toEqual({
-        type: 'tool',
-        name: 'record_taste_traits',
-      });
+      expect((client.calls[0].params.tools as { name: string }[])[0].name).toBe(
+        'record_taste_traits'
+      );
     } finally {
       await close();
     }
@@ -177,7 +175,7 @@ describe('updateTasteProfile', () => {
         traits_before: 2,
         traits_after: 2,
         note: 'Profile already up to date — no rating/review changes since last build.',
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
       });
       expect('books_sent' in out).toBe(false);
       expect(client.calls).toHaveLength(0);
@@ -205,10 +203,9 @@ describe('updateTasteProfile', () => {
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       // The full builder must have been the one that called Claude, not the revise path.
-      expect(client.calls[0].params.tool_choice).toEqual({
-        type: 'tool',
-        name: 'record_taste_traits',
-      });
+      expect((client.calls[0].params.tools as { name: string }[])[0].name).toBe(
+        'record_taste_traits'
+      );
     } finally {
       await close();
     }
@@ -233,10 +230,9 @@ describe('updateTasteProfile', () => {
       expect(out.changed_books).toBe(0);
       // Must have fallen through to the Claude call (not the early-return note path).
       expect(client.calls).toHaveLength(1);
-      expect(client.calls[0].params.tool_choice).toEqual({
-        type: 'tool',
-        name: 'revise_taste_traits',
-      });
+      expect((client.calls[0].params.tools as { name: string }[])[0].name).toBe(
+        'revise_taste_traits'
+      );
       const messages = client.calls[0].params.messages as { content: string }[];
       expect(messages[0].content).toContain('CHANGED BOOK IDS (the edits driving this update): []');
     } finally {

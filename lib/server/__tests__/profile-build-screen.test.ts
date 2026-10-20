@@ -56,9 +56,11 @@ describe('extractTasteProfile, screen variant', () => {
       const client = fakeClaude([toolResponse('record_taste_traits', { traits: [] })]);
       const out = await extractTasteProfile(db, client, 'local');
       const params = client.calls[0].params;
-      expect(params.system).toBe(SCREEN_PROFILE_SYSTEM);
+      expect(params.system).toBe(
+        `${SCREEN_PROFILE_SYSTEM}\n\nRespond by calling the record_taste_traits tool.`
+      );
       expect(params.tools).toEqual([SCREEN_PROFILE_TOOL]);
-      expect(params.tool_choice).toEqual({ type: 'tool', name: 'record_taste_traits' });
+      expect(params.tool_choice).toEqual({ type: 'auto' });
       const prompt = (params.messages as { content: string }[])[0].content;
       const screenJson = prompt.slice(prompt.indexOf('SCREEN DATA (JSON):'));
       expect(screenJson).toContain(`"id": ${t.arrival}, "type": "movie", "title": "Arrival"`);
