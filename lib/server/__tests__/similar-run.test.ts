@@ -76,7 +76,7 @@ describe('runSimilar', () => {
 
       expect(out.anchor_book_id).toBe(1);
       expect(out.anchor_title).toBe('Dune');
-      expect(out.model).toBe('claude-sonnet-5');
+      expect(out.model).toBe('claude-sonnet-5-5');
       expect(out.seed_queries).toEqual(CANNED_SIMILAR_QUERIES); // blank query dropped
       expect(out.count).toBe(2);
       expect(out.recommendations).toHaveLength(2);
@@ -109,8 +109,8 @@ describe('runSimilar', () => {
       expect(rows).toHaveLength((seedJson as any).recommendations.length);
 
       // Stage order and models.
-      expect(client.calls[0].model).toBe('claude-haiku-4-5-20251001');
-      expect(client.calls[1].model).toBe('claude-sonnet-5');
+      expect(client.calls[0].model).toBe('claude-haiku-5-5');
+      expect(client.calls[1].model).toBe('claude-sonnet-5-5');
     } finally {
       restore();
       await close();

@@ -323,6 +323,29 @@ export async function openlibraryTitle(
   return (data.docs ?? []).slice(0, maxResults).map(olDocToCandidate);
 }
 
+/**
+ * Books BY an author, for discovery requests like "my next Scalzi read". Open Library's
+ * author= search, because Google's inauthor: operator stopped working: since at least
+ * 2026-10-20 it answers with totalItems 0 and no error, alone or combined with free text.
+ * The default relevance order puts an author's best-known works first.
+ */
+export async function openlibraryAuthor(
+  db: Db,
+  author: string,
+  maxResults = 20
+): Promise<Candidate[]> {
+  const a = (author ?? '').trim();
+  if (!a) return [];
+  const params = new URLSearchParams({ author: a, limit: String(maxResults), fields: OL_FIELDS });
+  const data = (await getJson(
+    db,
+    `https://openlibrary.org/search.json?${params}`,
+    'openlibrary'
+  )) as any;
+  if (!data) return [];
+  return (data.docs ?? []).slice(0, maxResults).map(olDocToCandidate);
+}
+
 export async function openlibraryByIsbn(
   db: Db,
   isbn: string

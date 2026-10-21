@@ -2,22 +2,21 @@
  * Per-operation Claude model selection (spec 2026-09-22 §6.8, decision 10).
  *
  * Each operation reads its own override at CALL time (never at module load: CI runs with no
- * environment at all, see docs/conventions.md). With no override, every operation keeps the
- * model it used before per-operation settings existed, so a deploy changes nothing:
+ * environment at all, see docs/conventions.md). With no override, operations use:
  *
- *   profile, rerank  -> MYLIBRARY_MODEL -> claude-sonnet-5
- *   seed, archetype, distill, reveal -> claude-haiku-4-5-20251001
+ *   profile, rerank  -> MYLIBRARY_MODEL -> claude-sonnet-5-5
+ *   seed, archetype, distill, reveal -> claude-haiku-5-5
  *
  * MYLIBRARY_MODEL deliberately does NOT apply to the four Haiku operations. Before this module
  * they were hardcoded to Haiku; letting the old global override reach them would silently move
- * four cheap calls to a model twice the price.
+ * four cheap calls to a much pricier model.
  *
  * Kept dependency-free on purpose, like rating.ts: it is pure configuration.
  */
 export type ModelOperation = 'profile' | 'rerank' | 'seed' | 'archetype' | 'distill' | 'reveal';
 
-export const DEFAULT_SONNET_MODEL = 'claude-sonnet-5';
-export const DEFAULT_HAIKU_MODEL = 'claude-haiku-4-5-20251001';
+export const DEFAULT_SONNET_MODEL = 'claude-sonnet-5-5';
+export const DEFAULT_HAIKU_MODEL = 'claude-haiku-5-5';
 
 export const MODEL_ENV: Readonly<Record<ModelOperation, string>> = {
   profile: 'MYLIBRARY_MODEL_PROFILE',
@@ -38,11 +37,13 @@ function envModel(name: string): string | null {
  * Models that accept a forced `tool_choice: { type: 'tool' }`. Claude Sonnet 5.5, Opus 5.5 and
  * Fable 5.1 reject it with a 400. An id missing from this list takes the `auto` path in
  * anthropic.ts#trackedToolCall, which works on every model, where a forced call fails outright
- * on the newer ones.
+ * on the newer ones. Claude Haiku 5.5 accepts a forced choice (and skips thinking on it), so it
+ * stays on the forced path.
  */
 const FORCED_TOOL_CHOICE_MODELS: ReadonlySet<string> = new Set([
   'claude-sonnet-5',
   'claude-sonnet-4-6',
+  'claude-haiku-5-5',
   'claude-haiku-4-5',
   'claude-haiku-4-5-20251001',
   'claude-opus-5',

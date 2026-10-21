@@ -5,6 +5,7 @@ import {
   googleBooksSubject,
   googleBooksAuthor,
   openlibrarySubject,
+  openlibraryAuthor,
   openlibraryWorkDescription,
 } from '../catalog';
 
@@ -42,6 +43,37 @@ describe('googleBooksSubject / googleBooksAuthor', () => {
       expect((await googleBooksSubject(db, 'space opera', 3))[0].resolved_id).toBe('g1');
       expect((await googleBooksAuthor(db, 'Ursula K. Le Guin', 3))[0].resolved_id).toBe('g2');
       expect(seen).toHaveLength(2);
+    } finally {
+      restore();
+      await close();
+    }
+  });
+});
+
+describe('openlibraryAuthor', () => {
+  // Open Library's author= search, not Google's inauthor: operator: since at least
+  // 2026-10-20 Google answers inauthor:"X" with totalItems 0 and no error.
+  test('searches by author and maps docs to candidates', async () => {
+    const { db, close } = await makeTestDb();
+    const restore = installHttpReplay({
+      'https://openlibrary.org/search.json?author=John+Scalzi&limit=2&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
+        {
+          status: 200,
+          body: {
+            docs: [
+              { key: '/works/OL1W', title: "Old Man's War", author_name: ['John Scalzi'] },
+              { key: '/works/OL2W', title: 'Redshirts', author_name: ['John Scalzi'] },
+            ],
+          },
+        },
+    });
+    try {
+      const out = await openlibraryAuthor(db, '  John Scalzi ', 2);
+      expect(out.map((c) => [c.title, c.author, c.source, c.resolved_id])).toEqual([
+        ["Old Man's War", 'John Scalzi', 'openlibrary', '/works/OL1W'],
+        ['Redshirts', 'John Scalzi', 'openlibrary', '/works/OL2W'],
+      ]);
+      expect(await openlibraryAuthor(db, '   ', 2)).toEqual([]);
     } finally {
       restore();
       await close();

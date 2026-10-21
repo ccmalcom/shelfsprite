@@ -30,16 +30,31 @@ const MODEL_PRICING: Record<string, Pricing> = {
   'claude-sonnet-5-5': [2.0, 10.0, 2.5, 0.2],
   'claude-sonnet-4-6': [3.0, 15.0, 3.75, 0.3],
   'claude-haiku-4-5-20251001': [1.0, 5.0, 1.25, 0.1],
+  // Prompts of 100K tokens or fewer; longer ones use LONG_PROMPT_PRICING below.
+  'claude-haiku-5-5': [0.1, 0.5, 0.125, 0.01],
   // Not used by default (spec 2026-09-22 §6.8). Present so a per-operation switch to Opus
   // records its real cost instead of the $3/$15 fallback, which would under-report it.
   // Cache hits are 0.05x base input on Opus 5.5 ($0.20), not the usual 0.1x.
   'claude-opus-5-5': [4.0, 20.0, 5.0, 0.2],
 };
+// Models with a second rate card for long prompts. A prompt counts every input token,
+// cached or not, and switches cards only when it is strictly over `overTokens`.
+const LONG_PROMPT_PRICING: Record<string, { overTokens: number; pricing: Pricing }> = {
+  'claude-haiku-5-5': { overTokens: 100_000, pricing: [0.5, 2.5, 0.625, 0.05] },
+};
 // Unknown models bill at the priciest tier we know, so a missed table entry
 // over-reports rather than hiding spend.
 const DEFAULT_PRICING: Pricing = [3.0, 15.0, 3.75, 0.3];
 
-function pricing(model: string): Pricing {
+function pricing(model: string, usage: UsageLike | null): Pricing {
+  const long = LONG_PROMPT_PRICING[model];
+  if (long) {
+    const prompt =
+      tok(usage, 'input_tokens') +
+      tok(usage, 'cache_creation_input_tokens') +
+      tok(usage, 'cache_read_input_tokens');
+    if (prompt > long.overTokens) return long.pricing;
+  }
   return MODEL_PRICING[model] ?? DEFAULT_PRICING;
 }
 
@@ -49,7 +64,7 @@ function tok(usage: UsageLike | null, name: keyof UsageLike): number {
 }
 
 export function costUsd(model: string, usage: UsageLike | null): number {
-  const [inRate, outRate, cwRate, crRate] = pricing(model);
+  const [inRate, outRate, cwRate, crRate] = pricing(model, usage);
   return (
     (tok(usage, 'input_tokens') * inRate +
       tok(usage, 'output_tokens') * outRate +

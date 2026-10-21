@@ -81,7 +81,7 @@ describe('runDiscover', () => {
 
       expect(out.query).toBe(DISCOVER_QUERY);
       expect(out.interpretation).toBe(CANNED_INTERPRETATION);
-      expect(out.model).toBe('claude-sonnet-5');
+      expect(out.model).toBe('claude-sonnet-5-5');
       // The blank query is dropped before retrieval.
       expect(out.queries).toEqual([
         'literary fantasy found family',
@@ -100,8 +100,118 @@ describe('runDiscover', () => {
       const rows = await db.select().from(schema.recommendations);
       expect(rows).toHaveLength((seedJson as any).recommendations.length);
 
-      expect(client.calls[0].model).toBe('claude-haiku-4-5-20251001');
-      expect(client.calls[1].model).toBe('claude-sonnet-5');
+      expect(client.calls[0].model).toBe('claude-haiku-5-5');
+      expect(client.calls[1].model).toBe('claude-sonnet-5-5');
+    } finally {
+      restore();
+      await close();
+    }
+  });
+
+  test('a request for an author fetches their books directly and drops junk editions', async () => {
+    // #52: "my next John Scalzi read" used to become "books like Scalzi", so no query
+    // ever fetched his books, and the per-author cap would have kept at most two anyway.
+    const OL_FIELDS =
+      'fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage';
+    const restore = installHttpReplay({
+      [`https://openlibrary.org/search.json?author=John+Scalzi&limit=20&${OL_FIELDS}`]: {
+        status: 200,
+        body: {
+          docs: [
+            { title: "Old Man's War", author_name: ['John Scalzi'] }, // already read
+            { title: 'Redshirts', author_name: ['John Scalzi'] },
+            { title: "The Android's Dream", author_name: ['John Scalzi'] },
+            { title: 'Lock In', author_name: ['John Scalzi'] },
+            { title: 'Starter Villain', author_name: ['John Scalzi'] },
+            { title: 'The Interdependency Boxed Set', author_name: ['John Scalzi'] },
+          ],
+        },
+      },
+      'https://www.googleapis.com/books/v1/volumes?q=witty+military+science+fiction&maxResults=8': {
+        status: 200,
+        body: {
+          items: [
+            { id: 'g1', volumeInfo: { title: 'Library Journal' } }, // a periodical: no author
+            {
+              id: 'g2',
+              volumeInfo: { title: 'Deathworld (Book 1&2)', authors: ['Harry Harrison'] },
+            },
+            { id: 'g3', volumeInfo: { title: "Ocean's Echo", authors: ['Everina Maxwell'] } },
+            { id: 'g4', volumeInfo: { title: 'Redshirts', authors: ['John Scalzi'] } },
+          ],
+        },
+      },
+      [`https://openlibrary.org/search.json?q=witty+military+science+fiction&limit=8&${OL_FIELDS}`]:
+        { status: 200, body: { docs: [] } },
+    });
+    const { db, close } = await makeTestDb();
+    try {
+      const seed = seedJson as any;
+      await loadSeed(db, {
+        ...seed,
+        books: [
+          ...seed.books,
+          {
+            ...seed.books[0],
+            id: 901,
+            title: "Old Man's War",
+            author: 'John Scalzi',
+            isbn13: null,
+            goodreads_book_id: 'gr-901',
+          },
+        ],
+      });
+      const client = fakeClient(
+        {
+          interpretation: 'Books by John Scalzi the reader has not read yet.',
+          authors: ['John Scalzi'],
+          queries: [{ query: 'witty military science fiction', rationale: 'backup' }],
+        },
+        [0, 1, 2, 3, 4].map((i) => ({ candidate_index: i, score: 0.9 - i / 10, rationale: 'r' }))
+      );
+      const out: any = await runDiscover(db, client, 'local', 'my next John Scalzi read', 5);
+
+      const text = client.calls[1].messages[0].content[1].text as string;
+      const seen = JSON.parse(text.slice(text.indexOf('CANDIDATES (JSON):') + 19)) as any[];
+      expect(seen.map((c) => c.title).sort()).toEqual([
+        'Lock In',
+        "Ocean's Echo",
+        'Redshirts',
+        'Starter Villain',
+        "The Android's Dream",
+      ]);
+      const pools = Object.fromEntries(
+        out.recommendations.map((r: any) => [r.title, r.retrieval_pool])
+      );
+      // Requested-author books are a deterministic pool; one the queries also found is 'both'.
+      expect(pools).toEqual({
+        Redshirts: 'both',
+        "The Android's Dream": 'metadata',
+        'Lock In': 'metadata',
+        'Starter Villain': 'metadata',
+        "Ocean's Echo": 'claude_seed',
+      });
+    } finally {
+      restore();
+      await close();
+    }
+  });
+
+  test('an author request with no facet queries still retrieves', async () => {
+    const restore = installHttpReplay({
+      'https://openlibrary.org/search.json?author=John+Scalzi&limit=20&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
+        { status: 200, body: { docs: [{ title: 'Redshirts', author_name: ['John Scalzi'] }] } },
+    });
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as any);
+      const client = fakeClient(
+        { interpretation: 'By Scalzi.', authors: ['John Scalzi'], queries: [] },
+        [{ candidate_index: 0, score: 0.9, rationale: 'r' }]
+      );
+      const out: any = await runDiscover(db, client, 'local', 'more Scalzi', 5);
+      expect(out.recommendations.map((r: any) => r.title)).toEqual(['Redshirts']);
+      expect(client.calls).toHaveLength(2);
     } finally {
       restore();
       await close();
@@ -157,7 +267,7 @@ describe('runDiscover', () => {
         query: 'gibberish',
         interpretation: 'nothing',
         count: 0,
-        model: 'claude-sonnet-5',
+        model: 'claude-sonnet-5-5',
         queries: [],
         recommendations: [],
       });

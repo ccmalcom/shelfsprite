@@ -8,6 +8,7 @@ import {
   seriesOk,
   fuzzyDuplicate,
   isLearnerEdition,
+  isCollectionEdition,
   applyAuthorCaps,
   MAX_PER_AUTHOR,
   subjectHits,
@@ -87,6 +88,40 @@ describe('isLearnerEdition', () => {
   });
 });
 
+describe('isCollectionEdition', () => {
+  test('flags box sets, omnibuses and many-in-one editions by title', () => {
+    for (const title of [
+      'SCIENCE FICTION Ultimate Box Set: 170+ Dystopian Novels',
+      'The Expanse Boxed Set',
+      'The Wheel of Time Omnibus',
+      'MURRAY LEINSTER: The Ultimate Sci-Fi & Fantasy Collection (45 Titles in One Edition)',
+      'Deathworld (Book 1&2)',
+      'The Murderbot Diaries, Books 1-4',
+      'Sci-Fi Classics of Fritz Leiber – 21 Time Travel & Dystopia Stories (Annotated)',
+      'Golden Age Sci-Fi Series – Malcolm Jameson 17 Book Collection',
+      'H. G. Wells: The Complete Works',
+      'Arcot, Morey & Wade - Complete Series',
+    ]) {
+      expect(isCollectionEdition({ title }), title).toBe(true);
+    }
+  });
+
+  test('passes ordinary titles, including single-author story collections', () => {
+    for (const title of [
+      "Old Man's War",
+      'The Collected Stories of Ursula K. Le Guin',
+      'Stories of Your Life and Others',
+      'Fahrenheit 451',
+      'The 39 Steps',
+      'Book of the New Sun',
+      'Lock In (Lock In, #1)',
+    ]) {
+      expect(isCollectionEdition({ title }), title).toBe(false);
+    }
+    expect(isCollectionEdition({ title: null })).toBe(false);
+  });
+});
+
 describe('applyAuthorCaps', () => {
   const c = (title: string, author: string | null) => ({ title, author });
 
@@ -120,6 +155,23 @@ describe('applyAuthorCaps', () => {
     );
     expect(out.map((x) => x.title)).toEqual(['lib1']); // trunc(2*0.4)=0 -> max(1,0)=1
     expect(applyAuthorCaps([], new Set())).toEqual([]);
+  });
+
+  test('an uncapped author escapes the per-author cap; others keep it', () => {
+    const out = applyAuthorCaps(
+      [
+        c('s1', 'John Scalzi'),
+        c('s2', 'John Scalzi'),
+        c('s3', 'John Scalzi'),
+        c('h1', 'Harry Harrison'),
+        c('h2', 'Harry Harrison'),
+        c('h3', 'Harry Harrison'),
+      ],
+      new Set(),
+      new Set(),
+      new Set(['scalzi'])
+    );
+    expect(out.map((x) => x.title)).toEqual(['s1', 's2', 's3', 'h1', 'h2']);
   });
 });
 
