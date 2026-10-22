@@ -18,6 +18,12 @@ scripts/benchmark.mjs
 # `next dev` ran last, so formatting it just creates churn.
 next-env.d.ts
 
+# Project continuity state. The agent-config SessionEnd hook appends Open items
+# rows unpadded, so the first merged row breaks Prettier's table alignment and
+# fails the format check on whatever branch picks it up. Machine-written, same
+# as the fixtures below: ignore rather than fight the writer.
+STATE.md
+
 # Recorded parity fixtures, written by scripts/gen_claude_fixtures.py with
 # json.dumps(indent=1). Prettier wants 2-space, so formatting them is undone by
 # the very next re-record -- and these files are only ever read via JSON.parse,

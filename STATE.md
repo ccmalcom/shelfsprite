@@ -7,12 +7,12 @@ Last reviewed: 2026-10-22
 ## Open items
 
 | Item | State | Who decides | Evidence |
-|---|---|---|---|
+| ---- | ----- | ----------- | -------- |
 
 ## Closed questions, do not reopen
 
 | Question | Verdict | Date | Record |
-|---|---|---|---|
+| -------- | ------- | ---- | ------ |
 
 ## Plans and records
 
