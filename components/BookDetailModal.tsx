@@ -1,11 +1,11 @@
 'use client';
 
-import Image from 'next/image';
-import { ExternalLink, BookOpen, Sparkles, X } from 'lucide-react';
+import { ExternalLink, Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui';
 import { bookLinks } from '@/lib/bookLinks';
 import SimilarBooksModal from '@/components/SimilarBooksModal';
+import BookCover from '@/components/BookCover';
 import { api, type Book, type Shelf } from '@/lib/api';
 
 interface Props {
@@ -105,21 +105,7 @@ export default function BookDetailModal({
         {/* Header: cover + metadata */}
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           {/* Cover */}
-          <div className="relative h-40 w-28 shrink-0 overflow-hidden rounded-lg bg-elevated">
-            {book.cover_url ? (
-              <Image
-                src={book.cover_url}
-                alt={`Cover of ${book.title}`}
-                fill
-                className="object-cover"
-                unoptimized
-              />
-            ) : (
-              <div className="flex h-full items-center justify-center text-faint">
-                <BookOpen className="h-8 w-8" />
-              </div>
-            )}
-          </div>
+          <BookCover book={book} className="h-40 w-28 rounded-lg" />
 
           {/* Title / author / meta */}
           <div className="min-w-0 text-center sm:text-left">
