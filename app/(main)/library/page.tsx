@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useStickySort } from '@/lib/useStickySort';
 import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -14,7 +14,7 @@ import {
   type Recommendation,
   type Shelf,
 } from '@/lib/api';
-import { Button, Badge, Card, Modal } from '@/components/ui';
+import { Button, Badge, Card, Modal, useToast } from '@/components/ui';
 import { inStarBand } from '@/lib/server/rating';
 import BookEditModal from '@/components/BookEditModal';
 import BookDetailModal from '@/components/BookDetailModal';
@@ -124,6 +124,7 @@ const READ_SORT_OPTIONS: { value: ReadSort; label: string }[] = [
 const READ_SORT_VALUES = sortValues(READ_SORT_OPTIONS);
 
 function ReadTab({ books }: { books: Book[] }) {
+  const toast = useToast();
   const [filterStar, setFilterStar] = useState<number | null>(null);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [search, setSearch] = useState('');
@@ -290,6 +291,11 @@ function ReadTab({ books }: { books: Book[] }) {
                       })
                       .catch((e) => {
                         console.error('favorite toggle failed', e);
+                        toast.error(
+                          next
+                            ? 'That favorite didn’t save. Try again.'
+                            : 'That book is still a favorite. Try again.'
+                        );
                         void mutate(READ_KEY);
                       });
                   }}
@@ -1081,6 +1087,8 @@ function LibraryInner() {
   const [lcQueue, setLcQueue] = useState<Book[] | null>(null);
   const [lcIndex, setLcIndex] = useState(0);
 
+  const shelvesRef = useRef<HTMLDivElement>(null);
+
   function setTab(tab: Tab) {
     const params = new URLSearchParams(searchParams.toString());
     params.set('tab', tab);
@@ -1191,6 +1199,20 @@ function LibraryInner() {
     { id: 'rejected', label: 'Rejected', short: 'Rejected', count: rejectedRecs.length },
   ];
 
+  const tabCounts = tabs.map((t) => t.count).join(',');
+  // On a phone the shelf strip scrolls sideways, so a deep link to DNF or Rejected opened
+  // with the active tab past the right edge. Bring it into view within the strip only, again once
+  // the counts land, since they widen every tab.
+  useEffect(() => {
+    const strip = shelvesRef.current;
+    const tab = strip?.querySelector<HTMLElement>('[aria-current="true"]');
+    if (!strip || !tab) return;
+    const stripBox = strip.getBoundingClientRect();
+    const tabBox = tab.getBoundingClientRect();
+    if (tabBox.right > stripBox.right) strip.scrollLeft += tabBox.right - stripBox.right + 16;
+    else if (tabBox.left < stripBox.left) strip.scrollLeft -= stripBox.left - tabBox.left + 16;
+  }, [activeTab, tabCounts]);
+
   const isLoading =
     readLoading ||
     toReadLoading ||
@@ -1233,6 +1255,7 @@ function LibraryInner() {
 
       {/* Shelf navigation scrolls locally on phones, keeping all shelves reachable. */}
       <div
+        ref={shelvesRef}
         className="library-shelves flex gap-1 border-b border-border"
         aria-label="Library shelves"
       >
@@ -1270,7 +1293,8 @@ function LibraryInner() {
       {lowConfidenceBooks.length > 0 && (
         <details className="text-sm text-muted">
           <summary className="cursor-pointer py-2">
-            Library care · {lowConfidenceBooks.length} match checks
+            Library care · {lowConfidenceBooks.length}{' '}
+            {lowConfidenceBooks.length === 1 ? 'match check' : 'match checks'}
           </summary>
           <Button variant="ghost" size="sm" onClick={startLowConfidenceQueue}>
             {lowConfidenceBooks.length === 1
