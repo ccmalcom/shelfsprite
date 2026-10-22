@@ -4,6 +4,8 @@
 
 :root {
   /* Ink & Paper structure with Ember & Ivory colors, shared by every route. */
+  /* Dark-only: native controls (date pickers, checkboxes, search clear, scrollbars) follow. */
+  color-scheme: dark;
   --bg: #191613;
   --bg-rgb: 25 22 19;
   --surface: #24201c;
