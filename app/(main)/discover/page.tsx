@@ -175,7 +175,7 @@ export default function DiscoverPage() {
                     <p className="truncate text-sm font-semibold text-text">{rec.title}</p>
                     <p className="truncate text-xs text-muted">{rec.author ?? 'Unknown author'}</p>
                     {rec.rationale && (
-                      <p className="mt-1 text-xs leading-relaxed text-muted">{rec.rationale}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-muted">{rec.rationale}</p>
                     )}
                     <button
                       type="button"
