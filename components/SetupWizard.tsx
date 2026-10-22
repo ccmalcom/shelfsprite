@@ -267,7 +267,11 @@ function ApiKeyStep({ onDone }: { onDone: () => void }) {
             )}
           </Field>
         </div>
-        {error && <p className="text-sm text-danger">{error}</p>}
+        {error && (
+          <p role="alert" className="text-sm text-danger">
+            {error}
+          </p>
+        )}
         {saved && <p className="text-sm text-success">Key saved. Moving on...</p>}
         <Button
           type="submit"
@@ -350,7 +354,11 @@ function UploadStep({
         }}
         className={[
           'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-6 sm:p-10 text-center transition-colors',
-          file ? 'border-success bg-success/5' : 'border-border hover:border-muted bg-elevated/40',
+          // The input itself is sr-only, so the label has to show keyboard focus for it.
+          'focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2 focus-within:ring-offset-surface',
+          file
+            ? 'border-success bg-success/5'
+            : 'border-border-strong hover:border-muted bg-elevated/40',
         ].join(' ')}
       >
         <input
@@ -377,7 +385,11 @@ function UploadStep({
         )}
       </label>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       <form onSubmit={handleSubmit}>
         <Button
@@ -612,7 +624,11 @@ function EnrichStep({ ingestResult, onDone }: { ingestResult: IngestResult; onDo
         </div>
       )}
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       {!running && !jobId && (
         <Button size="lg" className="w-full" onClick={() => void handleEnrich()}>
@@ -690,7 +706,11 @@ function ProfileStep({ onDone }: { onDone: () => void }) {
         </div>
       )}
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && (
+        <p role="alert" className="text-sm text-danger">
+          {error}
+        </p>
+      )}
 
       <Button
         size="lg"
