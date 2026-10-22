@@ -87,15 +87,17 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
   const isLoading = traitsLoading || (isScreen ? titlesLoading : statsLoading || subjectsLoading);
   const [revealOpen, setRevealOpen] = useState(false);
 
-  // post-first-profile feedback prompt: fire once when profile data first loads
+  // post-first-profile feedback prompt: fire once when a built profile first loads. A reader
+  // with no traits yet has no profile to judge, and the prompt would cover Build profile.
   const { fire: fireProfilePrompt, modal: profileModal } = useFeedbackPrompt('post-first-profile');
   const profileFiredRef = useRef(false);
+  const hasTraits = traits.length > 0;
   useEffect(() => {
-    if (!traitsLoading && !profileFiredRef.current) {
+    if (!traitsLoading && hasTraits && !profileFiredRef.current) {
       profileFiredRef.current = true;
       fireProfilePrompt();
     }
-  }, [traitsLoading, fireProfilePrompt]);
+  }, [traitsLoading, hasTraits, fireProfilePrompt]);
 
   async function handleBuildProfile() {
     await api.runProfile();

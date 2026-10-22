@@ -137,8 +137,8 @@ export default function EnrichmentCorrectionModal({
             placeholder="Search by title, author, or ISBN..."
             aria-label="Search for the correct book by title or author"
             className={[
-              'w-full rounded-lg border border-border bg-base px-3 py-2 text-sm text-text',
-              'placeholder-faint focus:border-accent focus:outline-none',
+              'w-full rounded-lg border border-border-strong bg-base px-3 py-2 text-sm text-text',
+              'placeholder-faint focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               'focus-visible:ring-1 focus-visible:ring-accent',
             ].join(' ')}
           />

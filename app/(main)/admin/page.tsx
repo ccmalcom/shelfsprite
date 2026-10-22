@@ -181,7 +181,7 @@ export default function AdminPage() {
                   <button
                     type="button"
                     onClick={() => setShowExtra(true)}
-                    className="text-xs font-medium text-accent hover:underline"
+                    className="block py-2 text-sm font-medium text-accent hover:underline"
                   >
                     + Set name / API key for them
                   </button>

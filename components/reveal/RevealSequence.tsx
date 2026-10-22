@@ -53,7 +53,7 @@ export default function RevealSequence({
     setVerdicts((prev) => ({ ...prev, [id]: v }));
 
   // Fetch every input in parallel. reveal-lines POST also generates any missing lines.
-  const { data: stats } = useSWR<Stats>('reveal-stats', () => api.stats());
+  const { data: stats, error: statsErr } = useSWR<Stats>('reveal-stats', () => api.stats());
   const { data: traits, error: traitsErr } = useSWR<Trait[]>('reveal-traits', () =>
     api.generateRevealLines()
   );
@@ -63,10 +63,13 @@ export default function RevealSequence({
     ARCHETYPE_KEY,
     async () => (await api.getArchetype()) ?? api.deriveArchetype()
   );
-  const { data: highlights } = useSWR<ProfileHighlights>('reveal-highlights', () =>
-    api.profileHighlights()
+  const { data: highlights, error: highlightsErr } = useSWR<ProfileHighlights>(
+    'reveal-highlights',
+    () => api.profileHighlights()
   );
-  const { data: books } = useSWR<Book[]>('reveal-books', () => api.books({ limit: 500 }));
+  const { data: books, error: booksErr } = useSWR<Book[]>('reveal-books', () =>
+    api.books({ limit: 500 })
+  );
   // Not part of the `ready` gate: a reader may legitimately have no directive yet.
   const { data: directive } = useSWR<Directive>(DIRECTIVE_KEY, () => getDirective());
   // Title evidence only while ScreenSprite is on (spec §7.5); see titlesSettled.
@@ -104,9 +107,10 @@ export default function RevealSequence({
   const accent = archetype ? tasteAccent(archetype.code).vivid : 'var(--accent)';
 
   // ── Error state ─────────────────────────────────────────────────────────────
-  if (traitsErr || archetypeErr) {
+  // Every input in the `ready` gate needs a way out here, or its failure is an endless loader.
+  if (traitsErr || archetypeErr || statsErr || highlightsErr || booksErr) {
     return (
-      <RevealFrame accent={accent}>
+      <RevealFrame accent={accent} onEscape={onClose}>
         <div className="space-y-4">
           <h2 className="font-display text-2xl font-bold text-text">
             The reveal tripped on something.
@@ -121,7 +125,7 @@ export default function RevealSequence({
   // ── Loading state ───────────────────────────────────────────────────────────
   if (!ready || beats.length === 0) {
     return (
-      <RevealFrame accent={accent}>
+      <RevealFrame accent={accent} onSkip={onClose} onEscape={onClose}>
         <p className="font-mono text-sm text-muted motion-safe:animate-pulse">
           Reading between your lines…
         </p>
@@ -133,7 +137,12 @@ export default function RevealSequence({
   const next = () => setIndex((i) => Math.min(i + 1, beats.length - 1));
 
   return (
-    <RevealFrame accent={accent} progress={{ index, total: beats.length }} onSkip={onClose}>
+    <RevealFrame
+      accent={accent}
+      progress={{ index, total: beats.length }}
+      onSkip={onClose}
+      onEscape={onClose}
+    >
       <Stagger reduced={reduced} key={index}>
         {renderBeat(beat, {
           next,
