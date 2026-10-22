@@ -93,7 +93,7 @@ export default function DiscoverPage() {
             aria-label="Describe the book you want"
             className={[
               'w-full min-w-0 rounded-xl border border-border-strong bg-surface py-4 pl-9 pr-4 text-sm text-text',
-              'placeholder:text-faint focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+              'placeholder:text-faint focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
             ].join(' ')}
           />
         </div>
@@ -103,7 +103,8 @@ export default function DiscoverPage() {
           className={[
             'inline-flex items-center gap-1.5 justify-center rounded-xl bg-accent px-6 py-4 text-sm font-semibold text-base',
             'transition hover:opacity-90 disabled:opacity-50',
-            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+            // A ring flush on the accent fill is invisible; the offset puts it on the page.
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
           ].join(' ')}
         >
           <Sparkles className="h-4 w-4" aria-hidden="true" />

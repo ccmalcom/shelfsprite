@@ -51,7 +51,7 @@ export function UsageTab() {
               {...p}
               value={operation}
               onChange={(e) => handleFilterChange(e.target.value)}
-              className="rounded-lg border border-border bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none"
+              className="rounded-lg border border-border-strong bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base"
             >
               <option value="">All operations</option>
               <option value="profile_full">profile_full</option>

@@ -69,9 +69,9 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
       value={value}
       onChange={(e) => onChange(e.target.value)}
       className={[
-        'flex-1 min-w-0 rounded-lg border border-border bg-elevated px-3 py-2',
+        'flex-1 min-w-0 rounded-lg border border-border-strong bg-elevated px-3 py-2',
         'text-sm text-text placeholder-faint',
-        'focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+        'focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
       ].join(' ')}
     />
   );
@@ -98,8 +98,8 @@ function SortSelect<T extends string>({
       value={value}
       onChange={(e) => onChange(e.target.value as T)}
       className={[
-        'rounded-lg border border-border bg-elevated px-3 py-2',
-        'text-sm text-muted focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+        'rounded-lg border border-border-strong bg-elevated px-3 py-2',
+        'text-sm text-muted focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
       ].join(' ')}
     >
       {options.map((o) => (
@@ -187,7 +187,7 @@ function ReadTab({ books }: { books: Book[] }) {
         <SearchInput value={search} onChange={setSearch} />
         <SortSelect value={sort} onChange={setSort} options={READ_SORT_OPTIONS} />
         <details className="library-filters">
-          <summary className="cursor-pointer rounded-lg border border-border px-3 py-2 text-sm text-muted">
+          <summary className="cursor-pointer rounded-lg border border-border-strong px-3 py-2 text-sm text-muted">
             Filters{filterStar !== null || favoritesOnly ? ' \u2022' : ''}
           </summary>
           <div className="filter-panel">
@@ -200,7 +200,7 @@ function ReadTab({ books }: { books: Book[] }) {
                   aria-label={`Filter by ${star} stars`}
                   aria-pressed={filterStar === star}
                   onClick={() => setFilterStar(filterStar === star ? null : star)}
-                  className={`min-h-10 rounded border border-border px-3 text-sm ${filterStar === star ? 'bg-accent text-[color:var(--bg)]' : 'text-muted'}`}
+                  className={`min-h-10 rounded border border-border-strong px-3 text-sm ${filterStar === star ? 'bg-accent text-[color:var(--bg)]' : 'text-muted'}`}
                 >
                   {star} ★
                 </button>

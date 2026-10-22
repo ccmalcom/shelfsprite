@@ -222,9 +222,9 @@ function ScreenLibraryInner() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={[
-                'min-w-[12rem] flex-1 rounded-lg border border-border bg-elevated px-3 py-2',
+                'min-w-[12rem] flex-1 rounded-lg border border-border-strong bg-elevated px-3 py-2',
                 'text-sm text-text placeholder-faint',
-                'focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             />
             <div
@@ -254,8 +254,8 @@ function ScreenLibraryInner() {
               value={sort}
               onChange={(e) => setSort(e.target.value as TitleSort)}
               className={[
-                'rounded-lg border border-border bg-elevated px-3 py-2',
-                'text-sm text-muted focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'rounded-lg border border-border-strong bg-elevated px-3 py-2',
+                'text-sm text-muted focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
               {TITLE_SORTS.map((s) => (

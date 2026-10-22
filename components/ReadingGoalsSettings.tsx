@@ -15,7 +15,7 @@ const KIND_OPTIONS: { value: GoalKind; label: string }[] = [
 // Copied from components/admin/UsageTab.tsx:50 -- the established raw-<select> pattern,
 // since components/ui has no Select.
 const SELECT_CLASS =
-  'rounded-lg border border-border bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none';
+  'rounded-lg border border-border-strong bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
 
 function goalLabel(g: Goal): string {
   if (g.kind === 'genre') return g.subject ?? 'Genre';
