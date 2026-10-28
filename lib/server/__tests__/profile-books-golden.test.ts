@@ -44,8 +44,9 @@ async function capture(
     await loadSeed(db, seedJson as Seed);
     if (setup) await setup(db);
     const client = fakeClaude([
+      // An escalated update runs a full build, which refuses an empty reply, so return one trait.
       toolResponse(kind === 'full' ? 'record_taste_traits' : 'revise_taste_traits', {
-        traits: [],
+        traits: [{ claim: 'Rewards careful world-building.', polarity: 'reward', exhibits: [1] }],
       }),
     ]);
     if (kind === 'full') await extractTasteProfile(db, client, 'local');

@@ -114,27 +114,22 @@ describe('call sites honour their operation override', () => {
     const { db, close } = await makeTestDb();
     try {
       await loadSeed(db, seedJson as Seed);
-      const full = fakeClaude([emptyTool('record_taste_traits', { traits: [] })]);
+      const full = fakeClaude([
+        emptyTool('record_taste_traits', {
+          traits: [{ claim: 'Rewards dense prose.', polarity: 'reward', exhibits: [1] }],
+        }),
+      ]);
       const out = await extractTasteProfile(db, full, 'local');
       expect(full.calls[0].params.model).toBe('claude-opus-5-5');
       expect(out.model).toBe('claude-opus-5-5');
 
       // extractTasteProfile just stamped last_profiled_at; move it back so the seeded book
       // changes (2, 3, 9 at 2026-07-15..20) count as changed and the update path calls Claude.
-      // The update path also needs at least one proposed trait (the empty build left none).
+      // The update path also needs at least one proposed trait, which the full build saved.
       await db
         .update(schema.profileMeta)
         .set({ lastProfiledAt: '2026-07-01 12:00:00' })
         .where(eq(schema.profileMeta.userId, 'local'));
-      await db.insert(schema.tasteTraits).values({
-        userId: 'local',
-        claim: 'Rewards dense prose.',
-        polarity: 'reward',
-        exhibits: [1],
-        contrasts: [],
-        inferenceConfidence: 0.8,
-        status: 'proposed',
-      });
       const upd = fakeClaude([emptyTool('revise_taste_traits', { traits: [] })]);
       const updOut = await updateTasteProfile(db, upd, 'local');
       expect(updOut.mode).toBe('update');

@@ -640,7 +640,10 @@ function EnrichStep({ ingestResult, onDone }: { ingestResult: IngestResult; onDo
 
 // ── Step: Profile ─────────────────────────────────────────────────────────────
 
-function ProfileStep({ onDone }: { onDone: () => void }) {
+const EMPTY_PROFILE_MESSAGE =
+  "Claude didn't find any taste traits that time. Your library is fine; try building again.";
+
+export function ProfileStep({ onDone }: { onDone: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -648,7 +651,13 @@ function ProfileStep({ onDone }: { onDone: () => void }) {
     setLoading(true);
     setError(null);
     try {
-      await api.runProfile();
+      const result = await api.runProfile();
+      // A 200 with no traits is still a failed build: the reveal and recommendations need traits.
+      if (result.traits_saved === 0) {
+        setError(EMPTY_PROFILE_MESSAGE);
+        setLoading(false);
+        return;
+      }
       await Promise.all([
         mutate('profile', api.profile(), { revalidate: false }),
         mutate(PROFILE_STATUS_KEY, api.profileStatus(), { revalidate: false }),
@@ -727,8 +736,13 @@ function DoneStep({ profiled, onComplete }: { profiled: boolean; onComplete?: ()
     router.push('/swipe');
   }
 
+  function goProfile() {
+    onComplete?.();
+    router.push('/profile');
+  }
+
   if (revealOpen) {
-    return <RevealSequence onClose={goHome} onFinish={goRecommend} />;
+    return <RevealSequence onClose={goHome} onFinish={goRecommend} onSeeProfile={goProfile} />;
   }
 
   return (

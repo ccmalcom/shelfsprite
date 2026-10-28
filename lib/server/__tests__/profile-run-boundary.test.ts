@@ -10,7 +10,13 @@ import { readRebuildReason, setRebuildReason } from '../profileMeta';
 import { utcnowTs } from '../serialize';
 import { fakeClaude } from './helpers/fakeClaude';
 
-const tool = (name: string, traits: unknown[] = []): ClaudeMessage => ({
+// A full build must return at least one trait; an incremental revise may legitimately return none.
+const A_TRAIT = { claim: 'Rewards careful world-building.', polarity: 'reward', exhibits: [1] };
+
+const tool = (
+  name: string,
+  traits: unknown[] = name === 'record_taste_traits' ? [A_TRAIT] : []
+): ClaudeMessage => ({
   content: [{ type: 'tool_use', name, input: { traits } }],
   usage: { input_tokens: 1, output_tokens: 1 },
 });

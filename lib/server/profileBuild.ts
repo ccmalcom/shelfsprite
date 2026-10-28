@@ -6,7 +6,7 @@
 import { and, eq, isNull, lt, or } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import { trackedToolCall } from './anthropic';
-import { toolInput, type ClaudeClient } from './claude';
+import { toolInput, type ClaudeClient, type ClaudeMessage } from './claude';
 import { pyJsonDumps, pyRepr, utcnowTs } from './serialize';
 import { ApiError } from './errors';
 import { buildTiers, type Tiers } from './profileTiers';
@@ -16,7 +16,11 @@ import {
   removeRejectedClaims,
   type FeedbackContext,
 } from './profileFeedback';
-import { NO_RATED_BOOKS_MESSAGE, NO_RATED_EVIDENCE_MESSAGE } from './claudeErrors';
+import {
+  NO_RATED_BOOKS_MESSAGE,
+  NO_RATED_EVIDENCE_MESSAGE,
+  PROFILE_EMPTY_MESSAGE,
+} from './claudeErrors';
 import { modelFor } from './models';
 import { readRebuildReason } from './profileMeta';
 import { readScreenToggledAt } from './screenSettings';
@@ -227,6 +231,19 @@ export async function markProfiled(
  * Claude call runs with no transaction open, and all writes land in one transaction
  * afterwards. Python writes nothing before the call either, so this is equivalent.
  */
+/**
+ * The raw traits of a full build's reply. A full build replaces every proposed trait and marks
+ * the profile built, so a truncated or empty reply must fail before anything is written:
+ * otherwise it wipes the profile and still answers 200.
+ */
+function fullBuildTraits(message: ClaudeMessage): Record<string, unknown>[] {
+  if (message.stop_reason === 'max_tokens') throw new ApiError(502, PROFILE_EMPTY_MESSAGE);
+  const input = toolInput(message, '');
+  const traits = Array.isArray(input?.traits) ? (input.traits as Record<string, unknown>[]) : [];
+  if (traits.length === 0) throw new ApiError(502, PROFILE_EMPTY_MESSAGE);
+  return traits;
+}
+
 export async function extractTasteProfile(
   db: Db,
   client: ClaudeClient,
@@ -273,8 +290,7 @@ export async function extractTasteProfile(
   );
 
   // Python breaks on the FIRST tool_use block regardless of its name.
-  const input = toolInput(message, '');
-  let traits = (Array.isArray(input?.traits) ? input.traits : []) as Record<string, unknown>[];
+  let traits = fullBuildTraits(message);
 
   traits = removeRejectedClaims(traits, feedback.rejected);
   traits = removeRejectedClaims(traits, [...feedback.confirmed, ...feedback.edited]);
@@ -371,8 +387,7 @@ async function extractScreenTasteProfile(
     }
   );
 
-  const input = toolInput(message, '');
-  let traits = (Array.isArray(input?.traits) ? input.traits : []) as Record<string, unknown>[];
+  let traits = fullBuildTraits(message);
   traits = removeRejectedClaims(traits, feedback.rejected);
   traits = removeRejectedClaims(traits, [...feedback.confirmed, ...feedback.edited]);
 

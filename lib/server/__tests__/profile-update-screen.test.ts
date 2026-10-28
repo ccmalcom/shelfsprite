@@ -126,7 +126,11 @@ describe('updateTasteProfile, screen variant', () => {
   it('escalates to a full build when the only title change is an exclusion', async () => {
     await withScreen(async (db, t) => {
       await stamp(db, t.dune, { excludeFromProfile: true });
-      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [] })]);
+      const client = fakeClaude([
+        toolResponse('record_taste_traits', {
+          traits: [{ claim: 'Rewards dense prose.', polarity: 'reward', exhibits: [1] }],
+        }),
+      ]);
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       expect(out.variant).toBe('screen');
