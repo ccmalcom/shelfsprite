@@ -21,6 +21,7 @@ import {
   allowedLanguages,
   applyAuthorCaps,
   dedupKey,
+  descriptionSeriesOk,
   EMPTY_DEDUP_KEY,
   fuzzyDuplicate,
   isCollectionEdition,
@@ -283,7 +284,8 @@ export function assemble(
   }
   return capPool(
     applyAuthorCaps(
-      candidates,
+      // After the merge, so a description that arrived on a duplicate counts.
+      candidates.filter((c) => descriptionSeriesOk(c, signal.library_authors)),
       signal.library_authors,
       preferredAuthorSurnames,
       uncappedAuthorSurnames
@@ -323,6 +325,17 @@ export function capPool(candidates: AssembledCandidate[], cap: number): Assemble
     chosen = chosen.concat(seed.slice(seedQuota, seedQuota + (cap - chosen.length)));
   }
   return chosen.slice(0, cap);
+}
+
+/**
+ * Re-run the description series check once fillOlDescriptions has fetched the Open
+ * Library descriptions that assemble() could not see (#136).
+ */
+export function dropUnstartedLaterSeries(
+  candidates: AssembledCandidate[],
+  libraryAuthors: Set<string>
+): AssembledCandidate[] {
+  return candidates.filter((c) => descriptionSeriesOk(c, libraryAuthors));
 }
 
 /**

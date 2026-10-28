@@ -6,6 +6,8 @@ import {
   languageOk,
   seriesInfo,
   seriesOk,
+  descriptionSeriesPosition,
+  descriptionSeriesOk,
   fuzzyDuplicate,
   isLearnerEdition,
   isCollectionEdition,
@@ -65,6 +67,43 @@ describe('series', () => {
     expect(seriesOk('Elantris (Elantris, #2)', owned)).toBe(false);
     expect(seriesOk('Elantris (Elantris, #1)', owned)).toBe(true); // position <= 1
     expect(seriesOk('An Unmarked Standalone', owned)).toBe(true); // no marker -> pass
+  });
+});
+
+describe('description series position (#136)', () => {
+  test('reads the position a description states', () => {
+    expect(descriptionSeriesPosition('The war comes home in book 2 of the Ascension saga.')).toBe(
+      2
+    );
+    expect(descriptionSeriesPosition('Book Three of the Kingkiller Chronicle.')).toBe(3);
+    expect(descriptionSeriesPosition('The second book in the bestselling series.')).toBe(2);
+    expect(descriptionSeriesPosition('This third installment of the trilogy...')).toBe(3);
+    expect(descriptionSeriesPosition('The #4 in the series everyone is reading.')).toBe(4);
+    expect(descriptionSeriesPosition('The long-awaited sequel to Red Rising.')).toBe(2);
+    expect(descriptionSeriesPosition('Book 1 of a new series.')).toBe(1);
+  });
+
+  test("ignores an author's own book count and plain descriptions", () => {
+    expect(descriptionSeriesPosition('Her second novel is a quiet triumph.')).toBeNull();
+    expect(descriptionSeriesPosition('A standalone story of first contact.')).toBeNull();
+    expect(descriptionSeriesPosition(null)).toBeNull();
+  });
+
+  test('blocks a later book unless the reader has the author', () => {
+    const later = { title: 'Insurrection', author: 'C. J. Korryn', description: 'Book 2.' };
+    expect(descriptionSeriesOk(later, new Set())).toBe(false);
+    expect(descriptionSeriesOk(later, new Set(['korryn']))).toBe(true);
+    expect(descriptionSeriesOk({ ...later, description: 'Book 1.' }, new Set())).toBe(true);
+    expect(descriptionSeriesOk({ ...later, description: null }, new Set())).toBe(true);
+  });
+
+  test('a title series marker wins over the description', () => {
+    const cand = {
+      title: 'Elantris (Elantris, #1)',
+      author: 'Brandon Sanderson',
+      description: 'Book 2.',
+    };
+    expect(descriptionSeriesOk(cand, new Set())).toBe(true);
   });
 });
 

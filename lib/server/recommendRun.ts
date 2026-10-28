@@ -29,6 +29,7 @@ import { ensureProfileMeta } from './profileMeta';
 import { booksChangedSince } from './profileUpdate';
 import {
   assemble,
+  dropUnstartedLaterSeries,
   fillOlDescriptions,
   metadataPool,
   seedPool,
@@ -128,6 +129,7 @@ export async function runRecommend(
   let candidates = assemble(metaPool, seedEntries, signal, MAX_CANDIDATES, preferredSurnames);
   candidates = applyDirectiveConstraints(candidates, directiveConstraints);
   await fillOlDescriptions(db, candidates);
+  candidates = dropUnstartedLaterSeries(candidates, signal.library_authors);
 
   if (candidates.length === 0) {
     return {
