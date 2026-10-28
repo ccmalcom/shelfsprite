@@ -28,6 +28,7 @@ export default function SwipePage() {
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
   const [reviewing, setReviewing] = useState<Book | null>(null);
   const [pendingRejectId, setPendingRejectId] = useState<number | null>(null);
+  const [rerolling, setRerolling] = useState(false);
 
   const {
     data: recs,
@@ -115,6 +116,27 @@ export default function SwipePage() {
     },
     [pendingRejectId, toast]
   );
+
+  // #135: swap the rest of the deck for a fresh batch instead of swiping through it.
+  // Unswiped picks are skipped by the new run but not recorded as rejections.
+  async function handleReroll() {
+    setRerolling(true);
+    try {
+      const run = await api.rerollRecommend(10);
+      // Same guard as the home page (issue #64): a zero-served run leaves the old deck
+      // as the latest run, so keep showing it rather than claiming a new batch.
+      if (!run.run_id || run.served === 0) {
+        toast.error(run.note ?? 'That reroll turned up no new picks. Try again in a moment.');
+        return;
+      }
+      await mutate('recommendations');
+      setDismissed(new Set());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'The reroll hit a snag. Try again in a moment.');
+    } finally {
+      setRerolling(false);
+    }
+  }
 
   if (recsLoading) {
     return (
@@ -300,6 +322,10 @@ export default function SwipePage() {
               </button>
             </div>
           )}
+
+          <Button variant="ghost" size="sm" loading={rerolling} onClick={handleReroll}>
+            {rerolling ? 'Choosing fresh picks\u2026' : 'Reroll the rest of this batch'}
+          </Button>
         </div>
       </div>
       {reviewing && (

@@ -21,6 +21,7 @@ import {
   allowedLanguages,
   applyAuthorCaps,
   dedupKey,
+  descriptionSeriesOk,
   EMPTY_DEDUP_KEY,
   fuzzyDuplicate,
   isCollectionEdition,
@@ -159,6 +160,11 @@ export async function metadataPool(
     TOP_AUTHORS
   )) {
     const reason = `${preferred ? 'preferred_author' : 'author'}:${author}`;
+    // Open Library first, as for subjects: Google's inauthor: operator has answered
+    // totalItems 0 with no error since at least 2026-10-20 (#123), which left author
+    // expansion, explicit favorites included, with no candidates at all. Google stays
+    // in case the operator comes back.
+    for (const c of await openlibraryAuthor(db, author, perQuery)) pool.push([c, reason]);
     for (const c of await googleBooksAuthor(db, author, perQuery)) pool.push([c, reason]);
   }
   return pool;
@@ -283,7 +289,8 @@ export function assemble(
   }
   return capPool(
     applyAuthorCaps(
-      candidates,
+      // After the merge, so a description that arrived on a duplicate counts.
+      candidates.filter((c) => descriptionSeriesOk(c, signal.library_authors)),
       signal.library_authors,
       preferredAuthorSurnames,
       uncappedAuthorSurnames
@@ -323,6 +330,17 @@ export function capPool(candidates: AssembledCandidate[], cap: number): Assemble
     chosen = chosen.concat(seed.slice(seedQuota, seedQuota + (cap - chosen.length)));
   }
   return chosen.slice(0, cap);
+}
+
+/**
+ * Re-run the description series check once fillOlDescriptions has fetched the Open
+ * Library descriptions that assemble() could not see (#136).
+ */
+export function dropUnstartedLaterSeries(
+  candidates: AssembledCandidate[],
+  libraryAuthors: Set<string>
+): AssembledCandidate[] {
+  return candidates.filter((c) => descriptionSeriesOk(c, libraryAuthors));
 }
 
 /**

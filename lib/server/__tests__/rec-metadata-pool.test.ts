@@ -13,6 +13,10 @@ vi.mock('../catalog', () => ({
     calls.push(`gb_subject:${s}`);
     return [{ title: `S ${s}`, author: 'A B', subjects: [], raw: {} }];
   },
+  openlibraryAuthor: async (_db: unknown, a: string) => {
+    calls.push(`ol_author:${a}`);
+    return [];
+  },
   googleBooksAuthor: async (_db: unknown, a: string) => {
     calls.push(`gb_author:${a}`);
     return [{ title: `A ${a}`, author: a, subjects: [], raw: {} }];
@@ -42,6 +46,7 @@ describe('metadataPool without preferences', () => {
       'gb_subject:a',
       'ol_subject:b',
       'gb_subject:b',
+      'ol_author:X Y',
       'gb_author:X Y',
     ]);
     expect(out.map(([, reason]) => reason)).toEqual(['subject:a', 'subject:b', 'author:X Y']);
@@ -88,7 +93,7 @@ describe('metadataPool with preferences', () => {
       prefer_subjects: [],
       prefer_authors: ['Gene Wolfe'],
     });
-    expect(calls).toEqual(['gb_author:Gene Wolfe']);
+    expect(calls).toEqual(['ol_author:Gene Wolfe', 'gb_author:Gene Wolfe']);
     expect(out.map(([, r]) => r)).toEqual(['preferred_author:Gene Wolfe']);
   });
 

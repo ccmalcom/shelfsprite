@@ -16,6 +16,7 @@ import type { Db } from './db';
 import { ApiError } from './errors';
 import {
   assemble,
+  dropUnstartedLaterSeries,
   fillOlDescriptions,
   metadataPool,
   seedPool,
@@ -71,8 +72,9 @@ export async function runSimilar(
   const seedQueries = await bookFacetQueries(db, requireClient(), anchor, userId, SEED_QUERIES);
   const seedEntries = await seedPool(db, seedQueries, PER_QUERY);
 
-  const candidates = assemble(metaPool, seedEntries, signal, MAX_CANDIDATES);
+  let candidates = assemble(metaPool, seedEntries, signal, MAX_CANDIDATES);
   await fillOlDescriptions(db, candidates);
+  candidates = dropUnstartedLaterSeries(candidates, signal.library_authors);
   const model = rankModel();
 
   if (candidates.length === 0) {

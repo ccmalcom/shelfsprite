@@ -69,6 +69,76 @@ export function seriesOk(title: string | null, librarySeries: Map<string, Set<nu
   return false;
 }
 
+const SERIES_NUMBER_WORDS: Record<string, number> = {
+  one: 1,
+  two: 2,
+  three: 3,
+  four: 4,
+  five: 5,
+  six: 6,
+  seven: 7,
+  eight: 8,
+  nine: 9,
+  ten: 10,
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  fifth: 5,
+  sixth: 6,
+  seventh: 7,
+  eighth: 8,
+  ninth: 9,
+  tenth: 10,
+};
+const SERIES_NUMBER = '(\\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)';
+const SERIES_ORDINAL = '(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)';
+const SERIES_ENTRY = '(?:book|novel|installment|instalment|volume|entry|title)';
+// Each pattern's group 1 is the position. The ordinal form insists on a following
+// "in"/"of" so "her second novel" (the author's, not the series') does not match.
+const DESCRIPTION_SERIES_RES = [
+  new RegExp(`\\bbook\\s+${SERIES_NUMBER}\\b`, 'i'),
+  new RegExp(`\\b${SERIES_ORDINAL}\\s+${SERIES_ENTRY}\\s+(?:in|of)\\b`, 'i'),
+  new RegExp(`#\\s?(\\d{1,2})\\s+in\\b`, 'i'),
+  /\b(sequel)\s+to\b/i,
+];
+
+/**
+ * The series position a catalog description states ("Book 2", "the third installment
+ * in", "sequel to"), or null. Catalog titles rarely carry the Goodreads "(Series, #2)"
+ * marker that seriesInfo reads, so the description is often the only place it shows.
+ */
+export function descriptionSeriesPosition(description: string | null): number | null {
+  if (!description) return null;
+  for (const re of DESCRIPTION_SERIES_RES) {
+    const m = re.exec(description);
+    if (!m) continue;
+    const token = m[1].toLowerCase();
+    if (token === 'sequel') return 2;
+    const n = SERIES_NUMBER_WORDS[token] ?? parseInt(token, 10);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/**
+ * #136: block a candidate whose description says it is a later book in a series when
+ * the reader has no book by that author, so they cannot have started it. Only consulted
+ * when the title has no series marker; seriesOk decides those. With no series name to
+ * match, the author is the best available stand-in, so a reader who knows the author
+ * still sees the book.
+ */
+export function descriptionSeriesOk(
+  cand: { title?: string | null; author?: string | null; description?: string | null },
+  libraryAuthors: Set<string>
+): boolean {
+  if (seriesInfo(cand.title ?? null) !== null) return true;
+  const position = descriptionSeriesPosition(cand.description ?? null);
+  if (position === null || position <= 1) return true;
+  const last = surname(cand.author ?? null);
+  return last !== '' && libraryAuthors.has(last);
+}
+
 /**
  * recommend._fuzzy_duplicate: catches same-work editions that survive the exact
  * (title, author) dedup key -- an abridged or reissued edition credited to a
