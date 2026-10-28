@@ -369,13 +369,15 @@ function ToReadTab({ books }: { books: Book[] }) {
     .sort((a, b) => {
       switch (sort) {
         case 'date-desc': {
-          if (a.date_added && b.date_added) return b.date_added.localeCompare(a.date_added);
+          if (a.date_added && b.date_added)
+            return b.date_added.localeCompare(a.date_added) || b.id - a.id;
           if (a.date_added) return -1;
           if (b.date_added) return 1;
           return (a.title ?? '').localeCompare(b.title ?? '');
         }
         case 'date-asc': {
-          if (a.date_added && b.date_added) return a.date_added.localeCompare(b.date_added);
+          if (a.date_added && b.date_added)
+            return a.date_added.localeCompare(b.date_added) || a.id - b.id;
           if (a.date_added) return 1;
           if (b.date_added) return -1;
           return (a.title ?? '').localeCompare(b.title ?? '');
@@ -535,13 +537,15 @@ function CurrentlyReadingTab({ books }: { books: Book[] }) {
     .sort((a, b) => {
       switch (sort) {
         case 'date-desc': {
-          if (a.date_added && b.date_added) return b.date_added.localeCompare(a.date_added);
+          if (a.date_added && b.date_added)
+            return b.date_added.localeCompare(a.date_added) || b.id - a.id;
           if (a.date_added) return -1;
           if (b.date_added) return 1;
           return (a.title ?? '').localeCompare(b.title ?? '');
         }
         case 'date-asc': {
-          if (a.date_added && b.date_added) return a.date_added.localeCompare(b.date_added);
+          if (a.date_added && b.date_added)
+            return a.date_added.localeCompare(b.date_added) || a.id - b.id;
           if (a.date_added) return 1;
           if (b.date_added) return -1;
           return (a.title ?? '').localeCompare(b.title ?? '');
@@ -702,7 +706,8 @@ function DnfTab({ books }: { books: Book[] }) {
     .sort((a, b) => {
       switch (sort) {
         case 'date-desc': {
-          if (a.date_added && b.date_added) return b.date_added.localeCompare(a.date_added);
+          if (a.date_added && b.date_added)
+            return b.date_added.localeCompare(a.date_added) || b.id - a.id;
           if (a.date_added) return -1;
           if (b.date_added) return 1;
           return (a.title ?? '').localeCompare(b.title ?? '');

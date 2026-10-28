@@ -1,6 +1,6 @@
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { schema, type Db } from './db';
-import { tsToIso } from './serialize';
+import { todayIsoDate, tsToIso } from './serialize';
 import { sameWork } from './dedup';
 
 /** Port of schemas.py::RecommendationOut (note: no reject_reasons field). */
@@ -67,6 +67,9 @@ export async function ensureLibraryBook(db: Db, rec: RecRow, shelf: string, user
       isbn13: rec.isbn13,
       yearPublished: rec.year,
       exclusiveShelf: shelf,
+      // Without it a swiped book has no date added, so it sinks below every imported
+      // book in the to-read shelf's "Date added" sort (#138).
+      dateAdded: todayIsoDate(),
       source: 'recommendation',
       goodreadsRating: 0,
     })
