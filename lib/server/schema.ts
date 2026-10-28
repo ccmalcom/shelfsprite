@@ -31,7 +31,7 @@ import { sql } from 'drizzle-orm';
 
 export const alembicVersion = pgTable('alembic_version', {
   versionNum: varchar('version_num', { length: 32 }).primaryKey().notNull(),
-});
+}).enableRLS();
 
 export const tasteTraits = pgTable(
   'taste_traits',
@@ -58,7 +58,7 @@ export const tasteTraits = pgTable(
   (table) => [
     index('ix_taste_traits_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
   ]
-);
+).enableRLS();
 
 export const profileMeta = pgTable(
   'profile_meta',
@@ -84,7 +84,7 @@ export const profileMeta = pgTable(
       table.userId.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
 
 export const books = pgTable(
   'books',
@@ -139,7 +139,7 @@ export const books = pgTable(
       sql`${table.goodreadsRating} = 0 or (${table.goodreadsRating} >= 0.5 and ${table.goodreadsRating} <= 5.0 and (${table.goodreadsRating} * 2) % 1 = 0)`
     ),
   ]
-);
+).enableRLS();
 
 export const userSettings = pgTable(
   'user_settings',
@@ -161,7 +161,7 @@ export const userSettings = pgTable(
       table.userId.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
 
 export const recommendations = pgTable(
   'recommendations',
@@ -197,7 +197,7 @@ export const recommendations = pgTable(
       table.userId.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
 
 export const tasteSignal = pgTable(
   'taste_signal',
@@ -216,7 +216,7 @@ export const tasteSignal = pgTable(
   (table) => [
     index('ix_taste_signal_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
   ]
-);
+).enableRLS();
 
 export const enrichment = pgTable(
   'enrichment',
@@ -248,7 +248,7 @@ export const enrichment = pgTable(
       name: 'enrichment_book_id_fkey',
     }),
   ]
-);
+).enableRLS();
 
 export const enrichJobs = pgTable(
   'enrich_jobs',
@@ -308,7 +308,7 @@ export const enrichJobs = pgTable(
       .on(table.userId, table.kind)
       .where(sql`${table.status} in ('pending', 'running')`),
   ]
-);
+).enableRLS();
 
 export const readerArchetypes = pgTable(
   'reader_archetypes',
@@ -329,7 +329,7 @@ export const readerArchetypes = pgTable(
     derivedAt: timestamp('derived_at', { mode: 'string' }).notNull(),
   },
   (table) => [unique('uq_reader_archetype_user').on(table.userId)]
-);
+).enableRLS();
 
 export const invites = pgTable(
   'invites',
@@ -352,7 +352,7 @@ export const invites = pgTable(
       table.supabaseUserId.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
 
 /**
  * Waitlist requests from the public marketing page.
@@ -389,7 +389,7 @@ export const inviteRequests = pgTable(
       table.email.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
 
 export const usageEvents = pgTable(
   'usage_events',
@@ -430,7 +430,7 @@ export const usageEvents = pgTable(
     ),
     index('ix_usage_events_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
   ]
-);
+).enableRLS();
 
 export const feedback = pgTable(
   'feedback',
@@ -451,7 +451,7 @@ export const feedback = pgTable(
   (table) => [
     index('ix_feedback_user_id').using('btree', table.userId.asc().nullsLast().op('text_ops')),
   ]
-);
+).enableRLS();
 
 export const feedbackPromptState = pgTable(
   'feedback_prompt_state',
@@ -465,7 +465,7 @@ export const feedbackPromptState = pgTable(
     updatedAt: timestamp('updated_at', { mode: 'string' }).defaultNow().notNull(),
   },
   (table) => [unique('uq_feedback_prompt_state').on(table.userId, table.trigger, table.runId)]
-);
+).enableRLS();
 
 export const userDirective = pgTable(
   'user_directive',
@@ -485,20 +485,20 @@ export const userDirective = pgTable(
       table.userId.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
 
 export const catalogCache = pgTable('catalog_cache', {
   cacheKey: varchar('cache_key').primaryKey().notNull(),
   source: varchar().notNull(),
   payload: jsonb().notNull(),
   fetchedAt: timestamp('fetched_at', { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
-});
+}).enableRLS();
 
 export const appConfig = pgTable('app_config', {
   key: varchar().primaryKey().notNull(),
   value: jsonb().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'string' }).default(sql`CURRENT_TIMESTAMP`),
-});
+}).enableRLS();
 
 export const rateLimits = pgTable(
   'rate_limits',
@@ -510,7 +510,7 @@ export const rateLimits = pgTable(
   (table) => [
     primaryKey({ columns: [table.bucketKey, table.windowStart], name: 'rate_limits_pkey' }),
   ]
-);
+).enableRLS();
 
 export const readingGoals = pgTable(
   'reading_goals',
@@ -548,7 +548,7 @@ export const readingGoals = pgTable(
       sql`(${table.kind} = 'genre') = (${table.subject} is not null)`
     ),
   ]
-);
+).enableRLS();
 
 /**
  * ScreenSprite tables (spec §3.2, §3.3, §6.6). Hand-added and owned by ShelfSprite alone, like
@@ -604,7 +604,7 @@ export const titles = pgTable(
       sql`${table.appRating} is null or (${table.appRating} >= 0.5 and ${table.appRating} <= 5.0 and (${table.appRating} * 2) % 1 = 0)`
     ),
   ]
-);
+).enableRLS();
 
 export const titleEnrichment = pgTable(
   'title_enrichment',
@@ -648,7 +648,7 @@ export const titleEnrichment = pgTable(
       name: 'title_enrichment_title_id_fkey',
     }),
   ]
-);
+).enableRLS();
 
 export const titleRecommendations = pgTable(
   'title_recommendations',
@@ -688,4 +688,4 @@ export const titleRecommendations = pgTable(
       table.runId.asc().nullsLast().op('text_ops')
     ),
   ]
-);
+).enableRLS();
