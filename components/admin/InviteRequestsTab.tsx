@@ -17,7 +17,7 @@ const STATUS_VARIANT: Record<string, 'default' | 'success' | 'danger' | 'warning
 };
 
 const selectClasses =
-  'rounded-lg border border-border bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none';
+  'rounded-lg border border-border-strong bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
 
 /**
  * Waitlist triage. Volume is expected to be small, so the list is unpaginated — Pagination.tsx is

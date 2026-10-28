@@ -61,8 +61,12 @@ function DangerAction({
     <div className="flex flex-col gap-3 rounded-lg border border-danger/30 bg-danger/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
         <p className="text-sm font-medium text-text">{title}</p>
-        <p className="text-xs text-faint">{description}</p>
-        {error && <p className="mt-1 text-xs text-danger">{error}</p>}
+        <p className="text-sm text-faint">{description}</p>
+        {error && (
+          <p role="alert" className="mt-1 text-sm text-danger">
+            {error}
+          </p>
+        )}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         {confirming ? (

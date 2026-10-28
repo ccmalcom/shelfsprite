@@ -30,8 +30,19 @@ export default function BottomNav() {
                 active ? 'text-accent' : 'text-muted hover:text-text',
               ].join(' ')}
             >
-              <Icon size={20} aria-hidden="true" />
-              <span className="text-[11px] font-medium">{label}</span>
+              {/* The current tab gets the rail's filled pill and a heavier label, so it is
+                  not marked by hue alone (accent and muted sit at near-equal lightness). */}
+              <span
+                className={[
+                  'flex items-center justify-center rounded-full px-3 py-0.5',
+                  active ? 'bg-elevated' : '',
+                ].join(' ')}
+              >
+                <Icon size={20} aria-hidden="true" />
+              </span>
+              <span className={['text-xs', active ? 'font-semibold' : 'font-medium'].join(' ')}>
+                {label}
+              </span>
             </Link>
           );
         })}

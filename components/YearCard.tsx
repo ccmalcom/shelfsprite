@@ -37,19 +37,31 @@ function Figure({ value, label }: { value: string; label: string }) {
 }
 
 export default function YearCard({ compact = false }: { compact?: boolean }) {
-  const { data, isLoading, error } = useSWR<GoalsResponse>(GOALS_KEY, () => api.listGoals());
+  const { data, isLoading, error, mutate } = useSWR<GoalsResponse>(GOALS_KEY, () =>
+    api.listGoals()
+  );
 
-  if (isLoading) {
+  // Error first: SWR's retry of a failed fetch reports isLoading again and would hide it.
+  if (error && !data) {
     return (
       <Card>
-        <div className="h-24 rounded bg-elevated motion-safe:animate-pulse" />
+        <p className="text-sm text-danger">
+          Your goals didn&apos;t load.{' '}
+          <button type="button" className="underline" onClick={() => void mutate()}>
+            Retry
+          </button>
+        </p>
       </Card>
     );
   }
-  if (error) {
+  if (isLoading) {
     return (
       <Card>
-        <p className="text-sm text-danger">Your goals didn&apos;t load. Refresh to retry.</p>
+        <div
+          className="h-24 rounded bg-elevated motion-safe:animate-pulse"
+          role="status"
+          aria-label="Loading your goals"
+        />
       </Card>
     );
   }
