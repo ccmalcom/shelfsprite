@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:stamp-baseline": "npx tsx scripts/stamp-baseline.ts",
+    "db:rotate-encryption-key": "npx tsx scripts/rotate-encryption-key.ts",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:server": "vitest run",
