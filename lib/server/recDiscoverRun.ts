@@ -17,6 +17,7 @@ import {
   assemble,
   authorPool,
   discoveryPool,
+  dropUnstartedLaterSeries,
   fillOlDescriptions,
   MAX_CANDIDATES,
   PER_AUTHOR,
@@ -105,7 +106,7 @@ export async function runDiscover(
   const requested = new Set(interp.authors.map(surname).filter(Boolean));
   // Constraints filter the RAW pools, before the cap, so a constraint-violating book can
   // never displace a valid one.
-  const candidates = assemble(
+  let candidates = assemble(
     applyDiscoveryConstraints(byAuthor, interp.constraints),
     applyDiscoveryConstraints(pool, interp.constraints),
     signal,
@@ -116,6 +117,7 @@ export async function runDiscover(
     requested
   );
   await fillOlDescriptions(db, candidates);
+  candidates = dropUnstartedLaterSeries(candidates, signal.library_authors);
 
   if (candidates.length === 0) {
     // NOTE: unlike the no-queries return above, this one carries the queries.

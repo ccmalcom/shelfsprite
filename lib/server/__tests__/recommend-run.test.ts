@@ -254,3 +254,58 @@ describe('runRecommend happy path', () => {
     }
   });
 });
+
+describe('runRecommend reroll (#135)', () => {
+  setupTestEnv();
+
+  async function titlesOf(db: Awaited<ReturnType<typeof seeded>>['db'], runId: string) {
+    const rows = await db
+      .select()
+      .from(schema.recommendations)
+      .where(eq(schema.recommendations.runId, runId));
+    return rows.map((r) => r.title);
+  }
+
+  test("keeps the replaced deck's unswiped picks out of the new batch", async () => {
+    const { db, close } = await seeded();
+    const restore = installHttpReplay(httpFixtures as any);
+    const client = fakeClaude([
+      seedResponse,
+      rerankResponse([0, 1, 2]),
+      seedResponse,
+      rerankResponse([0, 1, 2]),
+      seedResponse,
+      rerankResponse([0, 1, 2]),
+    ] as any);
+    const rejectedCount = async () =>
+      (
+        await db
+          .select()
+          .from(schema.recommendations)
+          .where(eq(schema.recommendations.status, 'rejected'))
+      ).length;
+    try {
+      const rejectedBefore = await rejectedCount();
+      const first = (await runRecommend(db, client, 'local', opts())) as any;
+      const firstTitles = await titlesOf(db, first.run_id);
+
+      // Control: an ordinary run over the same catalog serves the same picks again.
+      const plain = (await runRecommend(db, client, 'local', opts())) as any;
+      expect(await titlesOf(db, plain.run_id)).toEqual(expect.arrayContaining(firstTitles));
+
+      const rerolled = (await runRecommend(db, client, 'local', {
+        ...opts(),
+        reroll: true,
+      })) as any;
+      expect(rerolled.served).toBeGreaterThan(0);
+      const rerolledTitles = await titlesOf(db, rerolled.run_id);
+      expect(rerolledTitles.filter((t) => firstTitles.includes(t))).toEqual([]);
+
+      // Skipped picks are not rejections, so they leave no trace in the taste signal.
+      expect(await rejectedCount()).toBe(rejectedBefore);
+    } finally {
+      restore();
+      await close();
+    }
+  });
+});

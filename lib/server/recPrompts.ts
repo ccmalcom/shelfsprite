@@ -38,9 +38,12 @@ export const SEED_TOOL = {
             query: {
               type: 'string',
               description:
-                "A catalog search query, e.g. 'literary science fiction " +
-                "first contact' or 'inauthor:\"Ursula K. Le Guin\"'. Avoid " +
-                'naming books the reader already owns.',
+                // Plain words only: Google's field operators (inauthor:, subject:) now
+                // return nothing (#123), so the old inauthor: example invited dead queries.
+                "A plain-words catalog search query, e.g. 'literary science fiction " +
+                "first contact' or 'Ursula K. Le Guin anthropological'. Do not use " +
+                'field operators like inauthor: or subject:. Avoid naming books the ' +
+                'reader already owns.',
             },
             reason: {
               type: 'string',

@@ -13,6 +13,7 @@ const Body = z.object({
   n: z.number().int().default(10),
   use_metadata: z.boolean().default(true),
   use_claude_seeds: z.boolean().default(true),
+  reroll: z.boolean().default(false),
 });
 
 /** Port of api.py::make_recommendations (918-929): RuntimeError -> 400. */
@@ -46,6 +47,7 @@ export const POST = withApi('/api/recommend', async (req, ctx) => {
     n: parsed.data.n,
     useMetadata: parsed.data.use_metadata,
     useClaudeSeeds: parsed.data.use_claude_seeds,
+    reroll: parsed.data.reroll,
   });
   ctx.timer.mark('claude');
   return Response.json(out);
