@@ -10,7 +10,7 @@ interface StarRatingProps {
   label?: string;
   readOnly?: boolean;
   size?: number;
-  /** Enable half-star selection: left half of a star picks the .5 value. */
+  /** Enable half-star selection: a click on the left half of a star picks the .5 value. */
   allowHalf?: boolean;
 }
 
@@ -35,9 +35,12 @@ export function StarRating({
   /** Which value a pointer at `e` over star `star` represents. */
   function valueAt(e: MouseEvent<HTMLButtonElement>, star: number) {
     if (!allowHalf) return star;
+    // Enter or Space fires a click with no pointer position (detail 0): pick the whole star.
+    if (e.type === 'click' && e.detail === 0) return star;
     const rect = e.currentTarget.getBoundingClientRect();
     const fraction = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 1;
-    return fraction <= 0.5 ? star - 0.5 : star;
+    // Only the left half picks .5; the exact centre counts as the whole star.
+    return fraction < 0.5 ? star - 0.5 : star;
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>) {

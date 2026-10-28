@@ -14,6 +14,8 @@ import {
 } from '../profileFeedback';
 import { extractTasteProfile } from '../profileBuild';
 import { schema } from '../db';
+import { ApiError } from '../errors';
+import { PROFILE_EMPTY_MESSAGE } from '../claudeErrors';
 
 describe('tierFor', () => {
   it('buckets ratings the way profile._tier does', () => {
@@ -442,9 +444,47 @@ describe('extractTasteProfile', () => {
     const { db, close } = await makeTestDb();
     try {
       await loadSeed(db, seedJson as Seed);
-      await extractTasteProfile(db, fakeClaude([traitsResponse([])]), 'local');
+      const client = fakeClaude([
+        traitsResponse([{ claim: 'Rewards dense world-building.', polarity: 'reward' }]),
+      ]);
+      await extractTasteProfile(db, client, 'local');
       const events = await db.select().from(schema.usageEvents);
       expect(events.some((e) => e.operation === 'profile_full' && e.userId === 'local')).toBe(true);
+    } finally {
+      await close();
+    }
+  });
+
+  it.each([
+    ['returns no traits', traitsResponse([])],
+    [
+      'is cut off at max_tokens',
+      {
+        ...traitsResponse([{ claim: 'Rewards dense world-building.', polarity: 'reward' }]),
+        stop_reason: 'max_tokens',
+      },
+    ],
+  ])('fails with a 502 and changes nothing when Claude %s', async (_label, response) => {
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as Seed);
+      const before = await db.select().from(schema.tasteTraits).orderBy(asc(schema.tasteTraits.id));
+      const metaBefore = await db.select().from(schema.profileMeta);
+
+      const err = await extractTasteProfile(db, fakeClaude([response]), 'local').catch(
+        (e: unknown) => e
+      );
+      expect(err).toBeInstanceOf(ApiError);
+      expect((err as ApiError).status).toBe(502);
+      expect((err as ApiError).detail).toBe(PROFILE_EMPTY_MESSAGE);
+
+      // The seeded proposed traits survive and the profile is not marked built.
+      const after = await db.select().from(schema.tasteTraits).orderBy(asc(schema.tasteTraits.id));
+      expect(after).toEqual(before);
+      expect(await db.select().from(schema.profileMeta)).toEqual(metaBefore);
+      // The paid call is still tracked.
+      const events = await db.select().from(schema.usageEvents);
+      expect(events.some((e) => e.operation === 'profile_full')).toBe(true);
     } finally {
       await close();
     }

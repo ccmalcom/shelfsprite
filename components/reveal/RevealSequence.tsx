@@ -42,9 +42,12 @@ function Stagger({ children, reduced }: { children: React.ReactNode; reduced: bo
 export default function RevealSequence({
   onClose,
   onFinish,
+  onSeeProfile,
 }: {
   onClose: () => void;
   onFinish: () => void;
+  /** Where the error state's "See it here" goes; defaults to onClose (already on /profile). */
+  onSeeProfile?: () => void;
 }) {
   const reduced = useReducedMotion() ?? false;
   const [index, setIndex] = useState(0);
@@ -116,7 +119,7 @@ export default function RevealSequence({
             The reveal tripped on something.
           </h2>
           <p className="text-sm text-muted">Your profile is safe.</p>
-          <RevealButton onClick={onClose}>See it here</RevealButton>
+          <RevealButton onClick={onSeeProfile ?? onClose}>See it here</RevealButton>
         </div>
       </RevealFrame>
     );

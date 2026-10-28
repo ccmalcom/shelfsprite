@@ -71,6 +71,20 @@ function reviseResponse(traits: unknown[]) {
   };
 }
 
+/** What the escalated full build gets back: a full build refuses an empty reply. */
+function fullBuildResponse() {
+  return {
+    content: [
+      {
+        type: 'tool_use',
+        name: 'record_taste_traits',
+        input: { traits: [{ claim: 'Rewards dense prose.', polarity: 'reward', exhibits: [1] }] },
+      },
+    ],
+    usage: { input_tokens: 5, output_tokens: 5 },
+  };
+}
+
 describe('updateTasteProfile', () => {
   it('revises the trait set from the seeded changes', async () => {
     const { db, close } = await makeTestDb();
@@ -123,7 +137,7 @@ describe('updateTasteProfile', () => {
           and(eq(schema.tasteTraits.userId, 'local'), eq(schema.tasteTraits.status, 'proposed'))
         );
 
-      const client = fakeClaude([reviseResponse([])]);
+      const client = fakeClaude([fullBuildResponse()]);
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       // The full builder must have been the one that called Claude.
@@ -144,7 +158,7 @@ describe('updateTasteProfile', () => {
         .set({ enrichmentCorrectedAt: '2026-07-25 12:00:00' })
         .where(eq(schema.profileMeta.userId, 'local'));
 
-      const client = fakeClaude([reviseResponse([])]);
+      const client = fakeClaude([fullBuildResponse()]);
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       // The full builder must have been the one that called Claude, not the revise path.
@@ -199,7 +213,7 @@ describe('updateTasteProfile', () => {
         .set({ excludeFromProfile: true, feedbackUpdatedAt: '2027-02-01 00:00:00' })
         .where(eq(schema.books.id, 3));
 
-      const client = fakeClaude([reviseResponse([])]);
+      const client = fakeClaude([fullBuildResponse()]);
       const out = await updateTasteProfile(db, client, 'local');
       expect(out.mode).toBe('full');
       // The full builder must have been the one that called Claude, not the revise path.

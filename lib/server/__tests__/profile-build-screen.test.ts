@@ -8,6 +8,7 @@ import { extractTasteProfile } from '../profileBuild';
 import { SCREEN_PROFILE_SYSTEM, SCREEN_PROFILE_TOOL } from '../screenProfilePrompts';
 import { schema, type Db } from '../db';
 import { ApiError } from '../errors';
+import { PROFILE_EMPTY_MESSAGE } from '../claudeErrors';
 import {
   seedScreenLibrary,
   setScreen,
@@ -53,7 +54,7 @@ async function proposed(db: Db) {
 describe('extractTasteProfile, screen variant', () => {
   it('sends SCREEN DATA with the screen system prompt and tool', async () => {
     await withScreen(async (db, t) => {
-      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [] })]);
+      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [trait({})] })]);
       const out = await extractTasteProfile(db, client, 'local');
       const params = client.calls[0].params;
       expect(params.system).toBe(
@@ -117,7 +118,7 @@ describe('extractTasteProfile, screen variant', () => {
         .update(schema.titles)
         .set({ isFavorite: true })
         .where(eq(schema.titles.id, t.arrival));
-      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [] })]);
+      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [trait({})] })]);
       await extractTasteProfile(db, client, 'local');
       const prompt = (client.calls[0].params.messages as { content: string }[])[0].content;
       expect(prompt).toContain('favorite films and shows');
@@ -130,7 +131,7 @@ describe('extractTasteProfile, screen variant', () => {
     try {
       await setScreen(db, true);
       await seedScreenLibrary(db);
-      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [] })]);
+      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [trait({})] })]);
       const out = await extractTasteProfile(db, client, 'local');
       expect(out.rated_books).toBe(0);
       expect(out.rated_titles).toBe(4);
@@ -138,6 +139,15 @@ describe('extractTasteProfile, screen variant', () => {
     } finally {
       await close();
     }
+  });
+
+  it('refuses an empty reply without touching the proposed traits', async () => {
+    await withScreen(async (db) => {
+      const before = await proposed(db);
+      const client = fakeClaude([toolResponse('record_taste_traits', { traits: [] })]);
+      await expect(extractTasteProfile(db, client, 'local')).rejects.toThrow(PROFILE_EMPTY_MESSAGE);
+      expect(await proposed(db)).toEqual(before);
+    });
   });
 });
 

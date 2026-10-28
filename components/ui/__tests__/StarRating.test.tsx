@@ -16,7 +16,8 @@ function halfClick(el: Element, fraction: number) {
     y: 0,
     toJSON: () => ({}),
   } as DOMRect);
-  fireEvent.click(el, { clientX: 20 * fraction });
+  // A pointer click reports a click count; a keyboard-activated click reports detail 0.
+  fireEvent.click(el, { clientX: 20 * fraction, detail: 1 });
 }
 
 describe('StarRating', () => {
@@ -34,6 +35,25 @@ describe('StarRating', () => {
     render(<StarRating value={0} onChange={onChange} allowHalf />);
 
     halfClick(screen.getAllByRole('radio')[3], 0.75);
+
+    expect(onChange).toHaveBeenCalledWith(4);
+  });
+
+  it('reports 4 when clicking the exact centre of the fourth star', () => {
+    const onChange = jest.fn();
+    render(<StarRating value={0} onChange={onChange} allowHalf />);
+
+    halfClick(screen.getAllByRole('radio')[3], 0.5);
+
+    expect(onChange).toHaveBeenCalledWith(4);
+  });
+
+  it('reports the whole star when Enter or Space activates it', () => {
+    const onChange = jest.fn();
+    render(<StarRating value={0} onChange={onChange} allowHalf />);
+
+    // Keyboard activation fires a click with no pointer position and a click count of 0.
+    fireEvent.click(screen.getAllByRole('radio')[3], { clientX: 0, detail: 0 });
 
     expect(onChange).toHaveBeenCalledWith(4);
   });
