@@ -538,6 +538,8 @@ export const api = {
   profileHighlights: () => get<ProfileHighlights>('/profile/highlights'),
 
   runRecommend: (n = 10) => post<RecommendRunResult>('/recommend', { n }),
+  /** Replace the swipe deck with a fresh batch that skips its unswiped picks (#135). */
+  rerollRecommend: (n = 10) => post<RecommendRunResult>('/recommend', { n, reroll: true }),
 
   /** Build the initial taste profile (required before first recommendations). */
   runProfile: () => post<Record<string, unknown>>('/profile'),
