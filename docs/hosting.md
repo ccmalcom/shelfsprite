@@ -115,6 +115,28 @@ At the 2026-08-14 retirement capture, `FRONTEND_URL` was absent from Vercel. The
 is recorded in `todo.md`; do not assume an external setting changed merely because the code is
 correct.
 
+### Rotating ENCRYPTION_KEY
+
+`ENCRYPTION_KEY` encrypts every user's saved Anthropic key (`user_settings.anthropic_api_key_encrypted`).
+Swapping it alone strands those rows: `resolveAnthropicKey` silently falls back to the server key
+and `GET /api/settings/api-key/status` answers 500. Re-encrypt first with
+`scripts/rotate-encryption-key.ts`, which reads `ENCRYPTION_KEY_OLD`, `ENCRYPTION_KEY_NEW` and
+`DATABASE_URL`, is a dry run unless given `--apply`, writes in one transaction, skips rows already
+on the new key (so it is safe to rerun), and prints counts and row ids only.
+
+1. Generate the new key: `openssl rand -base64 32`.
+2. Dry run against production and check the printed host and counts:
+   `ENCRYPTION_KEY_OLD=… ENCRYPTION_KEY_NEW=… npm run db:rotate-encryption-key`.
+3. Apply: the same command with `-- --apply`.
+4. Set `ENCRYPTION_KEY` to the new value in every Vercel environment that has it, and in the
+   local `.env`.
+5. Redeploy production.
+6. Rerun step 3. A key saved through the old deployment between steps 3 and 5 was written under the
+   old key; the rerun re-encrypts it and reports everything else as already on the new key.
+
+Between steps 3 and 5 the live deployment cannot read the rotated rows, so keep that window short.
+A non-zero "unreadable" count names rows that decrypt under neither key; they are left untouched.
+
 ## Railway's environment, recorded at retirement (2026-08-14)
 
 Railway's variable set was captured before the service disappeared. Only names were recorded;
