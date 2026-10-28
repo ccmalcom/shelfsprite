@@ -22,8 +22,8 @@ const SHELF_OPTIONS: { value: Shelf; label: string }[] = [
 type SearchOutcome = { query: string; hits: CatalogResult[] } | { query: string; error: string };
 
 const inputClass = [
-  'w-full rounded-lg border border-border bg-base px-3 py-2 text-sm text-text',
-  'placeholder-faint focus:border-accent focus:outline-none',
+  'w-full rounded-lg border border-border-strong bg-base px-3 py-2 text-sm text-text',
+  'placeholder-faint focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
   'focus-visible:ring-1 focus-visible:ring-accent',
 ].join(' ');
 

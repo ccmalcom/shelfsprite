@@ -55,19 +55,19 @@ export default function CurrentReads() {
           {actionError}
         </p>
       )}
-      {isLoading ? (
-        <div
-          className="h-32 rounded-xl bg-surface motion-safe:animate-pulse"
-          role="status"
-          aria-label="Loading current reads"
-        />
-      ) : error ? (
+      {error && !books ? (
         <p className="text-sm text-muted">
           Your current reads didn’t load.{' '}
           <button type="button" className="underline" onClick={() => void refresh()}>
             Retry
           </button>
         </p>
+      ) : isLoading ? (
+        <div
+          className="h-32 rounded-xl bg-surface motion-safe:animate-pulse"
+          role="status"
+          aria-label="Loading current reads"
+        />
       ) : books?.length ? (
         <div className="grid gap-4 md:grid-cols-2">
           {books.slice(0, 2).map((book) => (

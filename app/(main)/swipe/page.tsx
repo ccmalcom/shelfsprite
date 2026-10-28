@@ -34,6 +34,7 @@ export default function SwipePage() {
     data: recs,
     isLoading: recsLoading,
     error: recsError,
+    mutate: retryRecs,
   } = useSWR<Recommendation[]>('recommendations', () => api.recommendations());
 
   const { data: traits = [] } = useSWR<Trait[]>('profile', () => api.profile());
@@ -138,6 +139,20 @@ export default function SwipePage() {
     }
   }
 
+  // Error before loading: SWR's retry of a failed fetch reports isLoading again.
+  if (recsError && !recs) {
+    return (
+      <div className="fade-in space-y-4 py-12 text-center">
+        <p role="alert" className="text-danger">
+          Your picks didn&apos;t load.
+        </p>
+        <Button variant="secondary" onClick={() => void retryRecs()}>
+          Try again
+        </Button>
+      </div>
+    );
+  }
+
   if (recsLoading) {
     return (
       <div className="fade-in flex items-center justify-center py-24">
@@ -145,15 +160,6 @@ export default function SwipePage() {
           <Spinner size="lg" />
           <p className="text-muted text-sm">Fetching your picks…</p>
         </div>
-      </div>
-    );
-  }
-
-  if (recsError) {
-    return (
-      <div className="fade-in py-12 text-center">
-        <p className="text-danger">Your picks didn&apos;t load. Refresh to retry.</p>
-        <p className="mt-1 text-sm text-faint">{String(recsError)}</p>
       </div>
     );
   }

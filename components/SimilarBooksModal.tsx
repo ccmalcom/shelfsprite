@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BookOpen, Plus, Check } from 'lucide-react';
+import { Plus, Check } from 'lucide-react';
+import BookCover from '@/components/BookCover';
 import { Modal, Spinner, useToast } from '@/components/ui';
 import { api, type Book, type SimilarBook } from '@/lib/api';
 
@@ -99,25 +100,12 @@ export default function SimilarBooksModal({ book, onClose }: Props) {
               const isAdded = added.has(rec.rank);
               return (
                 <li key={rec.rank} className="flex gap-3">
-                  <div className="relative h-24 w-16 shrink-0 overflow-hidden rounded-md bg-elevated">
-                    {rec.cover_url ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={rec.cover_url}
-                        alt={`Cover of ${rec.title}`}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center text-faint">
-                        <BookOpen className="h-6 w-6" />
-                      </div>
-                    )}
-                  </div>
+                  <BookCover book={rec} className="h-24 w-16 rounded-md" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold text-text">{rec.title}</p>
                     <p className="truncate text-xs text-muted">{rec.author ?? 'Unknown author'}</p>
                     {rec.rationale && (
-                      <p className="mt-1 text-xs leading-relaxed text-muted">{rec.rationale}</p>
+                      <p className="mt-1 text-sm leading-relaxed text-muted">{rec.rationale}</p>
                     )}
                     <button
                       type="button"

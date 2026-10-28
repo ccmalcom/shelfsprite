@@ -84,9 +84,8 @@ describe('YearCard', () => {
     mockData = undefined;
     mockError = new Error('failed');
     render(<YearCard />);
-    expect(screen.getByText("Your goals didn't load. Refresh to retry.")).toHaveClass(
-      'text-danger'
-    );
+    expect(screen.getByText(/Your goals didn't load\./)).toHaveClass('text-danger');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
   });
 
   it('names the unknown-pages caveat on a pages goal', () => {

@@ -29,6 +29,7 @@ export default function HomePage() {
     data: stats,
     isLoading: statsLoading,
     error: statsError,
+    mutate: retryStats,
   } = useSWR<Stats>('stats', () => api.stats());
 
   const {
@@ -144,19 +145,21 @@ export default function HomePage() {
           )}
         </div>
         <div className="home-saved">
-          {savedLoading ? (
-            <div
-              className="h-48 w-32 rounded bg-elevated motion-safe:animate-pulse"
-              role="status"
-              aria-label="Loading saved books"
-            />
-          ) : savedError ? (
+          {/* Error before loading: SWR retries a failed fetch with no data, which reads as
+              loading again, so a loading-first branch hides the error behind a skeleton. */}
+          {savedError && !savedBooks ? (
             <p className="text-sm text-muted">
               Your saved shelf didn’t load.{' '}
               <button type="button" className="underline" onClick={() => void retrySaved()}>
                 Retry
               </button>
             </p>
+          ) : savedLoading ? (
+            <div
+              className="h-48 w-32 rounded bg-elevated motion-safe:animate-pulse"
+              role="status"
+              aria-label="Loading saved books"
+            />
           ) : saved ? (
             <Link
               href="/library?tab=to-read"
@@ -208,10 +211,15 @@ export default function HomePage() {
         <YearCard compact />
       </section>
       <div className="mt-8 border-t border-border pt-5 text-sm text-muted">
-        {statsLoading ? (
+        {statsError && !stats ? (
+          <p>
+            Your library summary didn’t load.{' '}
+            <button type="button" className="underline" onClick={() => void retryStats()}>
+              Retry
+            </button>
+          </p>
+        ) : statsLoading ? (
           <p role="status">Loading library summary…</p>
-        ) : statsError ? (
-          <p>Your library summary didn’t load. Refresh to retry.</p>
         ) : stats ? (
           <Link href="/library">
             {stats.total} books in your library · {stats.rated} rated · View library →

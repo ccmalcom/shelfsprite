@@ -40,7 +40,7 @@ const STATUS_LABEL: Record<string, string> = {
 const ACTIVE_FILTER = ACTIVE_FEEDBACK_STATUSES.join(',');
 
 const selectClasses =
-  'rounded-lg border border-border bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none';
+  'rounded-lg border border-border-strong bg-base px-2 py-1 text-xs text-text focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
 
 export function FeedbackTab() {
   const [offset, setOffset] = useState(0);

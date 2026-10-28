@@ -14,9 +14,12 @@ const GATED = new Set(['/', '/swipe', '/library']);
 
 function GateSpinner() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3" role="status">
+      {/* motion-safe: the global reduced-motion rule shortens an infinite spin rather than
+          stopping it, which makes it jump to a new angle every frame. */}
       <svg
-        className="h-6 w-6 animate-spin text-slate-400"
+        aria-hidden="true"
+        className="h-6 w-6 text-muted motion-safe:animate-spin"
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
@@ -35,6 +38,7 @@ function GateSpinner() {
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
         />
       </svg>
+      <p className="text-sm text-muted">Opening your library…</p>
     </div>
   );
 }
