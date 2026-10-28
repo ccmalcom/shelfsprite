@@ -13,6 +13,7 @@
  * either, so the observable behavior matches.
  */
 import { randomUUID } from 'node:crypto';
+import { and, desc, eq } from 'drizzle-orm';
 import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import {
@@ -38,7 +39,7 @@ import {
   SEED_QUERIES,
   type AssembledCandidate,
 } from './recAssemble';
-import { applyDirectiveConstraints } from './recFilters';
+import { applyDirectiveConstraints, dedupKey } from './recFilters';
 import {
   buildRerankPrompt,
   buildSeedPrompt,
@@ -58,6 +59,39 @@ export interface RecommendOptions {
   n: number;
   useMetadata: boolean;
   useClaudeSeeds: boolean;
+  /** Replace the current deck: its unswiped picks are kept out of the new run (#135). */
+  reroll?: boolean;
+}
+
+/**
+ * A reroll replaces the deck, so the picks the reader skipped past must not come straight
+ * back. They join the library exclusion sets for this run only: unlike a rejection they
+ * leave no trace in the taste signal, and a later ordinary run may surface them again.
+ * MUTATES the signal's sets in place.
+ */
+async function excludeUnswipedPicks(db: Db, userId: string, signal: RecSignal): Promise<void> {
+  const last = await db
+    .select({ runId: schema.recommendations.runId })
+    .from(schema.recommendations)
+    .where(eq(schema.recommendations.userId, userId))
+    .orderBy(desc(schema.recommendations.createdAt), desc(schema.recommendations.id))
+    .limit(1);
+  if (last.length === 0) return;
+  const unswiped = await db
+    .select()
+    .from(schema.recommendations)
+    .where(
+      and(
+        eq(schema.recommendations.userId, userId),
+        eq(schema.recommendations.runId, last[0].runId),
+        eq(schema.recommendations.status, 'served')
+      )
+    );
+  for (const r of unswiped) {
+    signal.library_keys.add(dedupKey(r.title, r.author));
+    signal.library_titles.push(r.title);
+    if (r.isbn13) signal.library_isbns.add(r.isbn13);
+  }
 }
 
 interface RankedCandidate extends AssembledCandidate {
@@ -84,6 +118,7 @@ export async function runRecommend(
 
   let signal = await buildSignal(db, userId);
   if (signal.loved.length === 0) throw new ApiError(400, NO_LOVED_BOOKS_MESSAGE);
+  if (opts.reroll) await excludeUnswipedPicks(db, userId, signal);
 
   // Block recommendations when the taste profile is missing or stale. Python computes
   // `changed` BEFORE testing last_profiled_at, then raises the missing-profile error
