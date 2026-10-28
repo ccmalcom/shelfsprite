@@ -160,6 +160,11 @@ export async function metadataPool(
     TOP_AUTHORS
   )) {
     const reason = `${preferred ? 'preferred_author' : 'author'}:${author}`;
+    // Open Library first, as for subjects: Google's inauthor: operator has answered
+    // totalItems 0 with no error since at least 2026-10-20 (#123), which left author
+    // expansion, explicit favorites included, with no candidates at all. Google stays
+    // in case the operator comes back.
+    for (const c of await openlibraryAuthor(db, author, perQuery)) pool.push([c, reason]);
     for (const c of await googleBooksAuthor(db, author, perQuery)) pool.push([c, reason]);
   }
   return pool;
