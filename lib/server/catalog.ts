@@ -249,7 +249,7 @@ interface OpenLibraryDoc {
   language?: string[];
 }
 
-const SEARCH_FETCH = 25;
+export const SEARCH_FETCH = 25;
 
 export async function googleBooksQuery(db: Db, q: string, maxResults = 5): Promise<Candidate[]> {
   const capped = Math.max(1, Math.min(maxResults, 40)); // Google caps at 40

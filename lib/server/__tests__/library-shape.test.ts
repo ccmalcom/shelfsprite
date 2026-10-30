@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { fictionKind, genreLabel, libraryShape } from '../libraryShape';
+import { fictionKind, genreLabel, libraryShape, mostlyFiction } from '../libraryShape';
 import { ARCHETYPES, ARCHETYPE_HOOKS, archetypeCopy } from '../archetype';
 
 describe('genreLabel', () => {
@@ -79,5 +79,27 @@ describe('archetypeCopy', () => {
 
   it('has no literal double hyphen in any tagline', () => {
     for (const { tagline } of Object.values(ARCHETYPES)) expect(tagline).not.toContain('--');
+  });
+});
+
+describe('mostlyFiction (QA 2026-10-30)', () => {
+  const F = ['Fiction', 'Fantasy'];
+  const N = ['History'];
+
+  it('is true for a fiction shelf, like the six-book cozy-fantasy account', () => {
+    expect(mostlyFiction([F, F, F, F, ['Juvenile fiction'], F])).toBe(true);
+    // Three in four is the bar.
+    expect(mostlyFiction([F, F, F, N])).toBe(true);
+  });
+
+  it('is false for mixed and nonfiction shelves', () => {
+    expect(mostlyFiction([F, F, N, N])).toBe(false);
+    expect(mostlyFiction([F, F, F, N, N])).toBe(false);
+    expect(mostlyFiction([N, N, N])).toBe(false);
+  });
+
+  it('is false when too few books can be classified', () => {
+    expect(mostlyFiction([F, F])).toBe(false);
+    expect(mostlyFiction([F, F, [], null, ['Iowa']])).toBe(false);
   });
 });

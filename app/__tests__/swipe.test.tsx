@@ -141,6 +141,25 @@ describe('swipe page "Already read"', () => {
   });
 });
 
+describe('swipe page short batches (QA 2026-10-30)', () => {
+  // The reranker may now serve fewer than ten picks (floor of five), so the deck must count
+  // the batch it has, not assume ten.
+  it('counts a six-card deck as six', () => {
+    recs = [1, 2, 3, 4, 5, 6].map((id) => rec(id));
+    renderSwipe();
+    expect(screen.getByText('0 / 6 reviewed')).toBeInTheDocument();
+  });
+
+  it('reports the whole short batch once every card is decided, even after a reload', () => {
+    recs = [1, 2, 3, 4, 5].map((id) =>
+      rec(id, { status: id % 2 ? 'accepted' : 'rejected' } as Partial<Recommendation>)
+    );
+    renderSwipe();
+    expect(screen.getByText("That's the batch.")).toBeInTheDocument();
+    expect(screen.getByText(/All 5 picks reviewed\./)).toBeInTheDocument();
+  });
+});
+
 describe('swipe page skip reasons', () => {
   it('labels exactly the server vocabulary', () => {
     // Mirrors REJECT_REASONS in lib/server/recs.ts, which Jest cannot import (it pulls in

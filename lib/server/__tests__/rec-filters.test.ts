@@ -11,7 +11,9 @@ import {
   fuzzyDuplicate,
   isLearnerEdition,
   isCollectionEdition,
+  isNonNovelCompanion,
   isTranslatedLibraryEdition,
+  isUnreleased,
   applyAuthorCaps,
   capDeckLibraryAuthors,
   MAX_PER_AUTHOR,
@@ -158,10 +160,104 @@ describe('isCollectionEdition', () => {
       'The 39 Steps',
       'Book of the New Sun',
       'Lock In (Lock In, #1)',
+      // Near misses for the anthology markers (QA 2026-10-30).
+      'Gilead',
+      'The Complete Stories',
+      'Eight Novels Later',
+      'Novels and Novelists [Volume 12]',
     ]) {
       expect(isCollectionEdition({ title }), title).toBe(false);
     }
     expect(isCollectionEdition({ title: null })).toBe(false);
+  });
+
+  test('flags the many-novel anthologies discovery surfaced for "like Gilead" (QA 2026-10-30)', () => {
+    for (const title of [
+      'J. M. Barrie Complete Novels',
+      'A Literary Cavalcade-V',
+      'Illustrated literature of all nations [8 novels]',
+      'Sinclair Lewis: Collected Novels',
+      'Thomas Hardy: Collected Works',
+      'Great Adventure Stories (3 Books)',
+      'Westerns [5 novels]',
+    ]) {
+      expect(isCollectionEdition({ title }), title).toBe(true);
+    }
+  });
+});
+
+describe('isUnreleased (QA 2026-10-30)', () => {
+  const now = new Date('2026-10-30T12:00:00Z');
+  const google = (publishedDate: string, year: number | null = null) => ({
+    year,
+    raw: { volumeInfo: { publishedDate } },
+  });
+
+  test('drops a year after this one, the "Ninth Life of an Erstwhile Witch" case', () => {
+    expect(isUnreleased({ year: 2027 }, now)).toBe(true);
+    expect(isUnreleased({ year: 2026 }, now)).toBe(false);
+    expect(isUnreleased({ year: 1999 }, now)).toBe(false);
+  });
+
+  test('drops a later month or day this year when the catalog gives one', () => {
+    expect(isUnreleased(google('2026-11-15', 2026), now)).toBe(true);
+    expect(isUnreleased(google('2026-11', 2026), now)).toBe(true);
+    expect(isUnreleased(google('2026-10-31', 2026), now)).toBe(true);
+    expect(isUnreleased(google('2026-10-29', 2026), now)).toBe(false);
+    expect(isUnreleased(google('2026-10', 2026), now)).toBe(false);
+    expect(isUnreleased(google('2026', 2026), now)).toBe(false);
+    expect(isUnreleased(google('2027-02-01'), now)).toBe(true);
+  });
+
+  test('a past first publication outranks a future edition date', () => {
+    // A classic's preorder paperback: Google's year is the edition's.
+    expect(isUnreleased({ ...google('2027-03-01', 2027), first_publish_year: 1980 }, now)).toBe(
+      false
+    );
+    expect(isUnreleased({ first_publish_year: 2027 }, now)).toBe(true);
+  });
+
+  test('unknown or malformed dates pass', () => {
+    expect(isUnreleased({}, now)).toBe(false);
+    expect(isUnreleased({ year: null, raw: null }, now)).toBe(false);
+    expect(isUnreleased(google('n.d.'), now)).toBe(false);
+  });
+});
+
+describe('isNonNovelCompanion (QA 2026-10-30)', () => {
+  test('flags the companions and study aids QA saw in a fiction deck', () => {
+    for (const cand of [
+      { title: "Miyazaki and the Hero's Journey", subjects: ['Performing Arts'] },
+      { title: 'Ghiblipedia', subjects: [] },
+      { title: 'Ghiblipedia', subjects: ['Performing Arts / Film / Genres / Animation'] },
+      { title: 'Study Guide: The Goblin Emperor', subjects: ['Fiction'] },
+      { title: 'Summary & Analysis of Legends & Lattes', subjects: [] },
+      {
+        title: 'Western Science Fiction Literature in the 21st Century',
+        subjects: ['Literary Criticism'],
+      },
+      { title: 'The Wheel of Time Companion', subjects: ['Reference'] },
+      { title: 'The Art of Spirited Away', subjects: ['Art'] },
+      { title: 'Tolkien', subjects: ['Literary Criticism'] },
+    ]) {
+      expect(isNonNovelCompanion(cand), cand.title).toBe(true);
+    }
+  });
+
+  test('keeps novels, including ones that borrow companion words or carry critical headings', () => {
+    for (const cand of [
+      { title: "Emily Wilde's Encyclopaedia of Faeries", subjects: ['Fiction', 'Fantasy'] },
+      { title: "The Hitchhiker's Guide to the Galaxy", subjects: ['Science fiction'] },
+      { title: 'Companion Piece', subjects: ['Fiction'] },
+      { title: 'The Art of Racing in the Rain', subjects: ['Fiction'] },
+      { title: 'Pride and Prejudice', subjects: ['Fiction', 'Criticism and interpretation'] },
+      { title: 'Counterfeit Worlds', subjects: ['Comics & Graphic Novels'] },
+      { title: 'Nettle & Bone', subjects: [] },
+      // Plain nonfiction is not a companion; the filter is about books ABOUT fiction.
+      { title: 'Africa', subjects: ['History'] },
+    ]) {
+      expect(isNonNovelCompanion(cand), cand.title).toBe(false);
+    }
   });
 });
 

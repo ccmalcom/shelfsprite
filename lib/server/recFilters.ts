@@ -5,6 +5,7 @@
  */
 import { normalizeTitle, surname } from './dedup';
 import { subjectHits } from './exclusions';
+import { fictionKind } from './libraryShape';
 import { titleSim, STRONG_SIM } from './similarity';
 
 /** recommend.py:59-60 tuning knobs. */
@@ -192,13 +193,22 @@ const COLLECTION_EDITION_MARKERS = [
   'complete series',
   'ultimate collection',
   'collection set',
+  // Many-novel anthologies that free-text discovery queries surface ("J. M. Barrie Complete
+  // Novels", "A Literary Cavalcade-V", "Illustrated literature of all nations [8 novels]").
+  'complete novels',
+  'collected novels',
+  'collected works',
+  'cavalcade',
+  'literature of all nations',
 ];
 // "(Book 1&2)", "Books 1-4", "21 Time Travel & Dystopia Stories" / "17 Book Collection",
-// and small bundles such as "2 Books Collection Set" (a pair that can hold a library book).
+// small bundles such as "2 Books Collection Set" (a pair that can hold a library book), and
+// a bracketed single-digit count such as "[8 novels]" or "(3 Books)".
 const COLLECTION_EDITION_RES = [
   /\bbooks?\s+\d+\s*(?:&|-|–|and|to)\s*\d+/,
   /\b\d{2,}\+?\s+(?:[a-z&'-]+\s+){0,4}(?:stories|novels?|books?|titles|novellas?)\b/,
   /\b\d+\s+(?:books?|novels?)\s+(?:collection|set|bundle)\b/,
+  /[[(]\s*\d\s+(?:novels|books|novellas|titles)\s*[\])]/,
 ];
 
 /** Drop box sets, omnibuses and multi-book bundles, which are never a recommendation. */
@@ -208,6 +218,98 @@ export function isCollectionEdition(cand: { title?: string | null }): boolean {
     COLLECTION_EDITION_MARKERS.some((marker) => title.includes(marker)) ||
     COLLECTION_EDITION_RES.some((re) => re.test(title))
   );
+}
+
+/**
+ * A book that is not out yet: a publication year after this one, or, when the catalog gives a
+ * month or a full date (Google Books' publishedDate, "2026-11" or "2026-11-15"), one after
+ * `now`. Catalogs list preorders a year or more ahead, and a reader cannot act on a pick they
+ * cannot get. Unknown dates pass, and so does a work whose first publication year is known and
+ * past: a Google hit's year is its EDITION's, so a classic's preorder paperback is not new.
+ */
+export function isUnreleased(
+  cand: { year?: number | null; first_publish_year?: number | null; raw?: unknown },
+  now: Date = new Date()
+): boolean {
+  const thisYear = now.getUTCFullYear();
+  const first = cand.first_publish_year;
+  if (typeof first === 'number' && first > 0) {
+    if (first > thisYear) return true;
+    if (first < thisYear) return false;
+  }
+  if (typeof cand.year === 'number' && cand.year > thisYear) return true;
+  const published = (cand.raw as { volumeInfo?: { publishedDate?: unknown } } | null | undefined)
+    ?.volumeInfo?.publishedDate;
+  if (typeof published !== 'string') return false;
+  const m = /^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?/.exec(published.trim());
+  if (!m) return false;
+  const year = Number(m[1]);
+  if (year !== thisYear) return year > thisYear;
+  if (!m[2]) return false;
+  const month = Number(m[2]) - 1;
+  if (!m[3]) return month > now.getUTCMonth();
+  return Date.UTC(year, month, Number(m[3])) > now.getTime();
+}
+
+// Titles that announce a study aid about another book. These decide on their own.
+const STUDY_AID_TITLE_RES = [
+  /\b(?:study guide|sparknotes|cliffsnotes|summary of|analysis of|workbook|trivia)\b/,
+  /\bsummary\s*(?:&|and)\s*analysis\b/,
+  /\bcritical essays\b/,
+];
+// Titles that suggest a book ABOUT books, films or a fandom: companions, encyclopedias
+// ("Ghiblipedia"), making-of books. Novels use these words too (Emily Wilde's Encyclopaedia
+// of Faeries), so they decide only when no subject says fiction. Deliberately narrow: "guide
+// to" alone would take The Hitchhiker's Guide to the Galaxy, "companion" alone Ali Smith's
+// Companion Piece, and "the art of" The Art of Racing in the Rain.
+const COMPANION_TITLE_RES = [
+  /\b(?:official|unofficial|ultimate|essential|complete|definitive|illustrated|visual|reader'?s|critical)\s+(?:guide|companion|handbook)\b/,
+  /\bcompanion\s+to\b/,
+  /\bcompanion$/,
+  /\w+pedia\b/,
+  /\bencyclop(?:a)?edia\b/,
+  /\bthe making of\b/,
+];
+
+// Catalog subjects of criticism, reference and art/film books. Google categories are whole
+// strings ("Literary Criticism", "Performing Arts"); Open Library headings add subdivisions
+// ("Criticism and interpretation").
+const NON_NOVEL_SUBJECT_MARKERS = [
+  'literary criticism',
+  'criticism',
+  'study aids',
+  'reference',
+  'encyclopedias',
+  'dictionaries',
+  'performing arts',
+  'motion pictures',
+  'film',
+  'language arts',
+  'bibliography',
+];
+// Short umbrella categories matched whole, so "Art" does not catch "Martial arts" fiction.
+const NON_NOVEL_SUBJECT_EXACT = new Set(['art', 'design', 'photography', 'music', 'animation']);
+
+/**
+ * A nonfiction companion to fiction: a study guide, encyclopedia, critical study, or art or
+ * film book ("Miyazaki and the Hero's Journey", "Ghiblipedia"). A study-aid title decides
+ * on its own. A companion-style title or a criticism/reference/art subject decides only when
+ * no OTHER subject says the book is fiction: novels borrow those title words, and Open
+ * Library merges critical editions into a novel's work record, so a real novel can carry
+ * "Criticism and interpretation" beside "Fiction".
+ */
+export function isNonNovelCompanion(cand: {
+  title?: string | null;
+  subjects?: string[] | null;
+}): boolean {
+  const title = (cand.title || '').toLowerCase();
+  if (STUDY_AID_TITLE_RES.some((re) => re.test(title))) return true;
+  const subjects = (cand.subjects ?? []).map((s) => String(s).toLowerCase().trim());
+  const isMarker = (s: string) =>
+    NON_NOVEL_SUBJECT_EXACT.has(s) || NON_NOVEL_SUBJECT_MARKERS.some((m) => s.includes(m));
+  const companionTitle = COMPANION_TITLE_RES.some((re) => re.test(title));
+  if (!companionTitle && !subjects.some(isMarker)) return false;
+  return fictionKind(subjects.filter((s) => !isMarker(s))) !== 'fiction';
 }
 
 // Letters that almost never occur in English titles but are common in translations

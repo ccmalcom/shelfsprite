@@ -19,12 +19,15 @@ import {
   discoveryPool,
   dropUnstartedLaterSeries,
   fillOlDescriptions,
+  referencePool,
+  resolveReferenceBooks,
   MAX_CANDIDATES,
   PER_AUTHOR,
   PER_QUERY,
   type AssembledCandidate,
+  type ReferenceBook,
 } from './recAssemble';
-import { applyDiscoveryConstraints, cleanConstraints } from './recFilters';
+import { applyDiscoveryConstraints, cleanConstraints, dedupKey } from './recFilters';
 import {
   DISCOVER_RANK_SYSTEM,
   DISCOVER_RANK_TOOL,
@@ -44,8 +47,13 @@ interface Interpretation {
   queries: string[];
   /** Authors whose own books the reader asked for ("my next Scalzi read"). */
   authors: string[];
+  /** Books the request names as a comparison ("like Gilead"), at most MAX_REFERENCE_BOOKS. */
+  references: ReferenceBook[];
   constraints: Record<string, unknown>;
 }
+
+/** Comparison books resolved per request: each costs four catalog searches plus its pool. */
+const MAX_REFERENCE_BOOKS = 2;
 
 interface RankedDiscovery extends AssembledCandidate {
   score: number;
@@ -77,7 +85,11 @@ export async function runDiscover(
   const interp = await interpretQuery(db, requireClient(), q, signal, userId);
   const model = rankModel();
 
-  if (interp.queries.length === 0 && interp.authors.length === 0) {
+  if (
+    interp.queries.length === 0 &&
+    interp.authors.length === 0 &&
+    interp.references.length === 0
+  ) {
     return {
       query: q,
       interpretation: interp.interpretation,
@@ -100,6 +112,22 @@ export async function runDiscover(
   // authorPool), so they survive the cap ahead of the free-text hits. With no author
   // named there is no metadata pool, and every candidate comes out tagged 'claude_seed'.
   const byAuthor = await authorPool(db, interp.authors, PER_AUTHOR);
+  // A book named as a comparison ("a quiet novel like Gilead") is resolved in the catalog
+  // first, and its own author and subjects seed retrieval: free-text facet queries alone
+  // returned omnibuses for it. The reference itself never becomes a candidate.
+  const references = await resolveReferenceBooks(db, interp.references);
+  if (references.length) {
+    signal = {
+      ...signal,
+      library_keys: new Set([
+        ...signal.library_keys,
+        ...references.map((r) => dedupKey(r.title, r.author)),
+      ]),
+      library_titles: [...signal.library_titles, ...references.map((r) => r.title ?? '')],
+    } as RecSignal;
+  }
+  const excludeSubjects = (interp.constraints.exclude_subjects as string[] | undefined) ?? [];
+  const byReference = await referencePool(db, references, PER_QUERY, excludeSubjects);
   // Free-text search returns periodicals and catalogs (TV Guide, Library Journal) with no
   // author; nothing author-less is a book to recommend.
   const pool = (await discoveryPool(db, interp.queries, PER_QUERY)).filter(([c]) => c.author);
@@ -107,7 +135,7 @@ export async function runDiscover(
   // Constraints filter the RAW pools, before the cap, so a constraint-violating book can
   // never displace a valid one.
   let candidates = assemble(
-    applyDiscoveryConstraints(byAuthor, interp.constraints),
+    applyDiscoveryConstraints([...byAuthor, ...byReference], interp.constraints),
     applyDiscoveryConstraints(pool, interp.constraints),
     signal,
     MAX_CANDIDATES,
@@ -165,6 +193,7 @@ export async function runDiscover(
     count: recsOut.length,
     model,
     queries: interp.queries,
+    reference_books: references.map((r) => (r.author ? `${r.title} by ${r.author}` : r.title)),
     recommendations: recsOut,
   };
 }
@@ -194,7 +223,9 @@ async function interpretQuery(
   // Python matches the FIRST tool_use block without checking its name, and falls
   // back to a fully-empty interpretation when there is none.
   const input = toolInput(message as any, '');
-  if (!input) return { interpretation: '', queries: [], authors: [], constraints: {} };
+  if (!input) {
+    return { interpretation: '', queries: [], authors: [], references: [], constraints: {} };
+  }
 
   const items = (input.queries as Array<{ query?: string }> | undefined) ?? [];
   const authors = Array.isArray(input.authors) ? input.authors : [];
@@ -204,8 +235,29 @@ async function interpretQuery(
     authors: [
       ...new Set(authors.filter((a): a is string => typeof a === 'string').map((a) => a.trim())),
     ].filter(Boolean),
+    references: parseReferenceBooks(input.reference_books),
     constraints: cleanConstraints((input.constraints as Record<string, unknown>) ?? {}),
   };
+}
+
+/** The interpreter's reference_books, cleaned: a title present, deduplicated, at most two. */
+export function parseReferenceBooks(raw: unknown): ReferenceBook[] {
+  const out: ReferenceBook[] = [];
+  const seen = new Set<string>();
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    if (out.length >= MAX_REFERENCE_BOOKS) break;
+    if (!entry || typeof entry !== 'object') continue;
+    const item = entry as Record<string, unknown>;
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    if (!title) continue;
+    const author =
+      typeof item.author === 'string' && item.author.trim() ? item.author.trim() : null;
+    const key = dedupKey(title, author);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title, author });
+  }
+  return out;
 }
 
 /** recommend._rerank_discovery: stage B. */

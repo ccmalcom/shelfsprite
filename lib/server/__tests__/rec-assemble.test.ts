@@ -1,5 +1,13 @@
 import { describe, test, expect } from 'vitest';
-import { assemble, capPool, type AssembledCandidate, type PoolEntry } from '../recAssemble';
+import {
+  assemble,
+  capPool,
+  referenceSubjects,
+  titleSeedMatch,
+  TITLE_SEED_PREFIX,
+  type AssembledCandidate,
+  type PoolEntry,
+} from '../recAssemble';
 import type { Candidate } from '../catalog';
 import { dedupKey } from '../recFilters';
 
@@ -127,6 +135,103 @@ describe('capPool', () => {
   test('sorts description-carrying candidates first within each bucket', () => {
     const out = capPool([...mk(5, 'metadata', false), ...mk(5, 'metadata', true)], 5);
     expect(out.every((c) => c.description === 'd')).toBe(true);
+  });
+
+  test('keeps resolved cold-start title seeds with the "both" tier (QA 2026-10-30)', () => {
+    // Twenty seed-query hits WITH descriptions would otherwise outrank the description-less
+    // title seeds for the seed bucket's three slots.
+    const titled = mk(4, 'claude_seed').map((c, i) => ({
+      ...c,
+      title: `titled-${i}`,
+      seed_reason: `${TITLE_SEED_PREFIX}Book ${i} by A Writer`,
+    }));
+    const out = capPool(
+      [...mk(30, 'metadata', true), ...mk(20, 'claude_seed', true), ...titled],
+      10
+    );
+    expect(out.slice(0, 4).map((c) => c.title)).toEqual([
+      'titled-0',
+      'titled-1',
+      'titled-2',
+      'titled-3',
+    ]);
+  });
+});
+
+describe('assemble drops unreleased books (QA 2026-10-30)', () => {
+  test('a year after this one never reaches the pool, on any path', () => {
+    const next = new Date().getUTCFullYear() + 1;
+    const out = assemble(
+      [entry(cand({ title: 'Ninth Life of an Erstwhile Witch', author: 'R. Durst', year: next }))],
+      [entry(cand({ title: 'Out Already', author: 'C D', year: 2020 }), 'query:q')],
+      emptySignal(),
+      60
+    );
+    expect(out.map((c) => c.title)).toEqual(['Out Already']);
+  });
+});
+
+describe('titleSeedMatch', () => {
+  const hits = [
+    cand({ title: "Study Guide: Emily Wilde's Encyclopaedia of Faeries", author: 'SummaryCo' }),
+    cand({
+      title: "Emily Wilde's Encyclopaedia of Faeries: Book One",
+      author: 'Heather Fawcett',
+    }),
+  ];
+
+  test('takes the hit with the same author surname and a strongly similar title', () => {
+    const seed = { title: "Emily Wilde's Encyclopaedia of Faeries", author: 'Heather Fawcett' };
+    expect(titleSeedMatch(seed, hits)?.author).toBe('Heather Fawcett');
+  });
+
+  test("drops a seed whose only hits are someone else's books", () => {
+    expect(
+      titleSeedMatch({ title: 'Bookshops & Bonedust', author: 'Travis Baldree' }, [
+        cand({ title: 'Summary of Bookshops & Bonedust', author: 'QuickReads' }),
+        cand({ title: 'Bookshops & Bonedust', author: 'Imitation Press' }),
+      ])
+    ).toBeNull();
+    expect(
+      titleSeedMatch({ title: 'Nettle & Bone', author: 'T. Kingfisher' }, [
+        cand({ title: 'Paladin’s Grace', author: 'T. Kingfisher' }),
+      ])
+    ).toBeNull();
+  });
+
+  test('without an author, takes the first strongly similar title that has one', () => {
+    expect(
+      titleSeedMatch({ title: 'Gilead', author: null }, [
+        cand({ title: 'Gilead', author: null }),
+        cand({ title: 'Gilead', author: 'Marilynne Robinson' }),
+      ])?.author
+    ).toBe('Marilynne Robinson');
+  });
+});
+
+describe('referenceSubjects', () => {
+  test('keeps genre-like subjects, fiction forms first, minus what the request excludes', () => {
+    const gilead = cand({
+      title: 'Gilead',
+      author: 'Marilynne Robinson',
+      subjects: [
+        'Fiction',
+        'Iowa, fiction',
+        'Clergy',
+        'Fathers and sons',
+        'Congregationalists',
+        'Religious fiction',
+        'Epistolary fiction',
+        'Domestic fiction',
+        'Gilead',
+      ],
+    });
+    // "not about religion" must also keep "Religious fiction" out of the searches.
+    expect(referenceSubjects(gilead, ['religion'])).toEqual([
+      'Epistolary fiction',
+      'Domestic fiction',
+      'Congregationalists',
+    ]);
   });
 });
 

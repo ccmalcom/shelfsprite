@@ -242,7 +242,11 @@ export default function SwipePage() {
           <ShelfSprite variant="success" sizes="144px" className="mx-auto h-36 w-36" />
           <h2 className="text-xl font-display font-semibold text-text">That&apos;s the batch.</h2>
           <p className="text-muted">
-            All {total.length} picks reviewed. Your verdicts are already sharpening the next run.
+            {/* The whole batch, not `total`: after a reload every card is already decided, so
+                nothing is served or dismissed this session and `total` would read "All 0". A
+                batch can also be shorter than ten (QA 2026-10-30), so the count is the run's. */}
+            All {(recs ?? []).length} picks reviewed. Your verdicts are already sharpening the next
+            run.
           </p>
           <Button onClick={() => router.push('/library?tab=to-read')}>
             See your to-read shelf
@@ -266,9 +270,7 @@ export default function SwipePage() {
         <div className="flex flex-col items-center gap-6">
           {/* Progress */}
           <p className="font-mono text-xs uppercase tracking-widest text-faint">
-            {dismissed.size} /{' '}
-            {(recs ?? []).filter((r) => r.status === 'served' || dismissed.has(r.id)).length}{' '}
-            reviewed
+            {dismissed.size} / {total.length} reviewed
           </p>
 
           {/* Card stack */}

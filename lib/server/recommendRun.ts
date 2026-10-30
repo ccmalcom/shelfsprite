@@ -15,6 +15,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, desc, eq } from 'drizzle-orm';
 import { trackedToolCall } from './anthropic';
+import type { Candidate } from './catalog';
 import { toolInput, type ClaudeClient } from './claude';
 import {
   NO_LOVED_BOOKS_MESSAGE,
@@ -35,22 +36,36 @@ import {
   fillOlDescriptions,
   metadataPool,
   seedPool,
+  titleSeedPool,
   MAX_CANDIDATES,
   PER_QUERY,
   SEED_QUERIES,
   type AssembledCandidate,
+  type PoolEntry,
+  type TitleSeed,
 } from './recAssemble';
-import { applyDirectiveConstraints, capDeckLibraryAuthors, dedupKey } from './recFilters';
+import {
+  applyDirectiveConstraints,
+  capDeckLibraryAuthors,
+  dedupKey,
+  isNonNovelCompanion,
+} from './recFilters';
 import {
   buildRerankPrompt,
   buildSeedPrompt,
+  buildTitleSeedPrompt,
   rankModel,
+  MIN_DECK,
   RANK_MAX_TOKENS,
   RANK_TOOL,
   RANK_SYSTEM,
   SEED_MAX_TOKENS,
   SEED_SYSTEM,
   SEED_TOOL,
+  TITLE_SEED_COUNT,
+  TITLE_SEED_MAX_TOKENS,
+  TITLE_SEED_SYSTEM,
+  TITLE_SEED_TOOL,
 } from './recPrompts';
 import { buildSignal, isColdStart, type RecSignal } from './recSignal';
 import { round2, utcnowTs } from './serialize';
@@ -100,6 +115,33 @@ interface RankedCandidate extends AssembledCandidate {
   rationale: string;
   grounded_trait_ids: number[];
   grounded_book_ids: number[];
+  /** The reranker flagged it, or its rationale doubts the book itself (lowConfidence). */
+  low_confidence: boolean;
+}
+
+/**
+ * In a mostly-fiction library, drop nonfiction companions to fiction (study guides,
+ * encyclopedias, criticism, art and film books) from a raw pool. Subject searches for a
+ * fiction reader's genres return these in bulk ("Miyazaki and the Hero's Journey" for a
+ * Ghibli-adjacent fantasy shelf), and they are never what that reader asked for. Mixed and
+ * nonfiction libraries keep them.
+ *
+ * Judged on the book's OWN subjects: an Open Library subjects-API hit carries only the
+ * subject that was searched (catalog.ts echoes it), so every hit for "Cozy fantasy" would
+ * claim to be fantasy. Its raw work record lists the real ones.
+ */
+export function dropCompanionsForFiction(
+  pool: PoolEntry[],
+  signal: Pick<RecSignal, 'mostly_fiction'>
+): PoolEntry[] {
+  if (!signal.mostly_fiction) return pool;
+  return pool.filter(([c]) => !isNonNovelCompanion({ title: c.title, subjects: ownSubjects(c) }));
+}
+
+/** A candidate's own catalog subjects: an Open Library record's list, else its categories. */
+function ownSubjects(c: Candidate): string[] {
+  const raw = (c.raw as { subject?: unknown } | null | undefined)?.subject;
+  return Array.isArray(raw) ? raw.filter((s): s is string => typeof s === 'string') : c.subjects;
 }
 
 export async function runRecommend(
@@ -151,16 +193,27 @@ export async function runRecommend(
   const preferredSurnames = preferredAuthorSurnames(preferences.prefer_authors);
 
   const coldStart = isColdStart(signal);
-  const metaPool = useMetadata
-    ? await metadataPool(db, signal, PER_QUERY, coldStart, preferences)
-    : [];
+  const metaPool = dropCompanionsForFiction(
+    useMetadata ? await metadataPool(db, signal, PER_QUERY, coldStart, preferences) : [],
+    signal
+  );
 
   let seedQueries: string[] = [];
-  let seedEntries: Awaited<ReturnType<typeof seedPool>> = [];
+  let seedEntries: PoolEntry[] = [];
+  let titleSeeds: TitleSeed[] = [];
+  let titleEntries: PoolEntry[] = [];
   if (useClaudeSeeds) {
     seedQueries = await claudeSeedQueries(db, requireClient(), signal, userId, SEED_QUERIES);
     seedEntries = await seedPool(db, seedQueries, PER_QUERY);
+    // Cold start only: a thin library's subject searches return keyword-titled filler, so one
+    // small extra call names the established books next to it, resolved against the catalog.
+    if (coldStart) {
+      titleSeeds = await claudeTitleSeeds(db, requireClient(), signal, userId);
+      titleEntries = await titleSeedPool(db, titleSeeds);
+    }
   }
+  // Resolved titles first, so a book both seed paths found keeps its title-seed reason.
+  seedEntries = dropCompanionsForFiction([...titleEntries, ...seedEntries], signal);
 
   // Recent "wrong genre" skips take their genre out of retrieval, before the cap.
   const [metaKept, seedKept] = dropSuppressedGenreEntries(
@@ -183,7 +236,7 @@ export async function runRecommend(
     };
   }
 
-  const ranked = await claudeRerank(
+  const { picks: ranked, heldBack } = await claudeRerank(
     db,
     requireClient(),
     candidates,
@@ -260,6 +313,9 @@ export async function runRecommend(
     pool_metadata: metaPool.length,
     pool_seed: seedEntries.length,
     seed_queries: seedQueries,
+    pool_title_seed: titleEntries.length,
+    title_seeds: titleSeeds.map((t) => `${t.title} by ${t.author}`),
+    held_back: heldBack,
     model: rankModel(),
     recommendations: recsOut,
   };
@@ -293,6 +349,82 @@ async function claudeSeedQueries(
   return items.filter((q) => (q?.query ?? '').trim() !== '').map((q) => String(q.query).trim());
 }
 
+/**
+ * The title-seed tool's answer, cleaned: a title and an author both present, no duplicate,
+ * at most TITLE_SEED_COUNT. Exported for tests.
+ */
+export function parseTitleSeeds(input: Record<string, unknown> | null): TitleSeed[] {
+  const raw = Array.isArray(input?.books) ? (input.books as unknown[]) : [];
+  const seen = new Set<string>();
+  const out: TitleSeed[] = [];
+  for (const entry of raw) {
+    if (out.length >= TITLE_SEED_COUNT) break;
+    if (!entry || typeof entry !== 'object') continue;
+    const item = entry as Record<string, unknown>;
+    const title = typeof item.title === 'string' ? item.title.trim() : '';
+    const author = typeof item.author === 'string' ? item.author.trim() : '';
+    if (!title || !author) continue;
+    const key = dedupKey(title, author);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title, author, reason: typeof item.reason === 'string' ? item.reason.trim() : '' });
+  }
+  return out;
+}
+
+/** Stage 1c, cold start only: real titles adjacent to a thin library, as catalog lookups. */
+async function claudeTitleSeeds(
+  db: Db,
+  client: ClaudeClient,
+  signal: RecSignal,
+  userId: string
+): Promise<TitleSeed[]> {
+  const message = await trackedToolCall(
+    client,
+    db,
+    { userId, operation: 'recommend_title_seed' },
+    {
+      model: modelFor('seed'),
+      max_tokens: TITLE_SEED_MAX_TOKENS,
+      system: TITLE_SEED_SYSTEM,
+      tools: [TITLE_SEED_TOOL],
+      tool_choice: { type: 'tool', name: TITLE_SEED_TOOL.name },
+      messages: [{ role: 'user', content: buildTitleSeedPrompt(signal, TITLE_SEED_COUNT) }],
+    }
+  );
+  return parseTitleSeeds(toolInput(message as any, TITLE_SEED_TOOL.name));
+}
+
+// Rationale phrases that doubt the BOOK rather than the fit, for when the reranker says so in
+// prose without setting low_confidence ("metadata is thin", "authorship looks questionable").
+// A taste stretch is deliberately not here: RANK_SYSTEM asks for honest stretch picks.
+const DOUBT_RE =
+  /\b(?:metadata (?:is|looks|seems) (?:thin|sparse)|thin metadata|(?:authorship|attribution) (?:is|looks|seems) (?:questionable|doubtful|unclear)|questionable authorship|cannot verify|can't verify)\b/i;
+
+/** A ranked pick the reranker doubted, by its flag or in its own rationale. */
+export function lowConfidence(r: Record<string, unknown>): boolean {
+  return r.low_confidence === true || DOUBT_RE.test(String(r.rationale ?? ''));
+}
+
+/**
+ * The deck from the reranker's picks, given best first: the confident ones, unless there are
+ * fewer than the floor (MIN_DECK, or n if smaller), when the best low-confidence picks fill it
+ * up to that floor. Never more than the reranker returned, so a pool with three good books
+ * serves three. Keeps the given order. Exported for tests.
+ */
+export function confidentDeck<T extends { low_confidence: boolean }>(
+  byScore: T[],
+  n: number
+): { picks: T[]; heldBack: number } {
+  const floor = Math.min(MIN_DECK, n);
+  const keep = new Set(byScore.filter((c) => !c.low_confidence));
+  for (const c of byScore) {
+    if (keep.size >= floor) break;
+    keep.add(c);
+  }
+  return { picks: byScore.filter((c) => keep.has(c)), heldBack: byScore.length - keep.size };
+}
+
 /** recommend._claude_rerank: stage 2. */
 async function claudeRerank(
   db: Db,
@@ -302,7 +434,7 @@ async function claudeRerank(
   userId: string,
   n: number,
   preferredSurnames: Set<string>
-): Promise<RankedCandidate[]> {
+): Promise<{ picks: RankedCandidate[]; heldBack: number }> {
   const validTraitIds = new Set(signal.traits.map((t) => t.id));
   const validBookIds = new Set(signal.loved.map((b) => b.id));
 
@@ -353,6 +485,7 @@ async function claudeRerank(
       // `[i for i in ... if i in valid_ids]` — reused rather than duplicated.
       grounded_trait_ids: asIdList(r.grounded_trait_ids, validTraitIds),
       grounded_book_ids: asIdList(r.grounded_book_ids, validBookIds),
+      low_confidence: lowConfidence(r),
     });
   }
 
@@ -370,15 +503,18 @@ async function claudeRerank(
   }
 
   out.sort((a, b) => b.score - a.score);
+  // Doubted picks leave the deck unless it would fall under MIN_DECK.
+  const { picks, heldBack } = confidentDeck(out, n);
   // Prefer candidates with descriptions (better UX), but never drop below n if
   // description-having candidates are scarce.
-  const withDesc = out.filter((c) => c.description);
-  const withoutDesc = out.filter((c) => !c.description);
+  const withDesc = picks.filter((c) => c.description);
+  const withoutDesc = picks.filter((c) => !c.description);
   // The pool's 40% library-author cap does not bind the deck the reranker picks from it.
-  return capDeckLibraryAuthors(
+  const deck = capDeckLibraryAuthors(
     [...withDesc, ...withoutDesc],
     n,
     signal.library_authors,
     preferredSurnames
   );
+  return { picks: deck, heldBack };
 }

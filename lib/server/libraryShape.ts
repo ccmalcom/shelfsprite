@@ -135,3 +135,26 @@ export function libraryShape(rated: ShapeBook[]): LibraryShape {
     mostlyNonfiction: nonfiction > 0 && nonfiction >= fiction,
   };
 }
+
+/** Fiction share of the classifiable books at or above which a library counts as mostly fiction. */
+export const MOSTLY_FICTION_SHARE = 0.75;
+/** Fewer classifiable books than this say nothing about the library's shape. */
+export const MOSTLY_FICTION_MIN_BOOKS = 3;
+
+/**
+ * Whether a library is mostly fiction: at least MOSTLY_FICTION_MIN_BOOKS books the catalog
+ * could classify, and fiction at least MOSTLY_FICTION_SHARE of them. A mixed or nonfiction
+ * library, or one too thin to classify, answers false, so callers that narrow candidates on
+ * this leave those readers alone.
+ */
+export function mostlyFiction(subjectLists: Array<string[] | null>): boolean {
+  let fiction = 0;
+  let nonfiction = 0;
+  for (const subjects of subjectLists) {
+    const kind = fictionKind(subjects ?? []);
+    if (kind === 'fiction') fiction += 1;
+    else if (kind === 'nonfiction') nonfiction += 1;
+  }
+  const classified = fiction + nonfiction;
+  return classified >= MOSTLY_FICTION_MIN_BOOKS && fiction >= classified * MOSTLY_FICTION_SHARE;
+}

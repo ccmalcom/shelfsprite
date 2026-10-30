@@ -19,6 +19,7 @@ import {
   type GenreSuppression,
 } from './genreSuppression';
 import { readPreferences } from './preferences';
+import { mostlyFiction } from './libraryShape';
 import { dedupKey, seriesInfo } from './recFilters';
 import { effectiveRating, pyFloat, round2, type PyFloat } from './serialize';
 
@@ -78,6 +79,12 @@ export interface RecSignal {
   genre_suppression: GenreSuppression;
   directive_text: string | null;
   directive_constraints: Record<string, unknown>;
+  /**
+   * The RATED books are mostly fiction (libraryShape.mostlyFiction), so nonfiction companions
+   * to fiction (study guides, encyclopedias, criticism, art books) are off the deck. False for
+   * a mixed, nonfiction or unclassifiable library.
+   */
+  mostly_fiction: boolean;
 }
 
 /**
@@ -173,6 +180,7 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
   const authorCounts = new Map<string, number>();
   const lovedGenreCounts = new Map<string, number>();
   let rated_count = 0;
+  const ratedSubjects: string[][] = [];
 
   for (const { b, enr } of rows) {
     library_keys.add(dedupKey(b.title, b.author));
@@ -193,10 +201,13 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
     if (b.author) library_authors.add(surname(b.author));
 
     const rating = effectiveRating(b.appRating, b.goodreadsRating);
-    if (rating !== null) rated_count++;
+    const subjects = ((enr?.subjects as string[] | null) ?? []) as string[];
+    if (rating !== null) {
+      rated_count++;
+      ratedSubjects.push(subjects);
+    }
     if (rating === null || rating < LOVED_MIN) continue;
 
-    const subjects = ((enr?.subjects as string[] | null) ?? []) as string[];
     for (const s of subjects) subjectCounts.set(s, (subjectCounts.get(s) ?? 0) + 1);
     countLovedGenres(lovedGenreCounts, subjects);
     if (b.author) authorCounts.set(b.author, (authorCounts.get(b.author) ?? 0) + 1);
@@ -309,6 +320,7 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
     genre_suppression,
     directive_text,
     directive_constraints,
+    mostly_fiction: mostlyFiction(ratedSubjects),
   };
 }
 

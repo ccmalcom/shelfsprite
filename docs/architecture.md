@@ -191,11 +191,13 @@ concurrent enrichment or user correction wins.
   user directive (`buildSignal`, `isColdStart`). `buildBookSignal` creates the book-anchored form
   used by “more like this.”
 - `recAssemble.ts` — deterministic Stage 1 retrieval. `metadataPool`, `seedPool`, and
-  `discoveryPool` query real catalog sources; `assemble` removes owned/duplicate/ineligible
-  editions, applies language/series/author rules, tracks provenance, and caps the pool before any
-  rerank.
-- `recFilters.ts` — reusable language, series, fuzzy-duplicate, learner-edition, author-cap,
-  directive, and discovery constraints.
+  `discoveryPool` query real catalog sources; `assemble` removes owned/duplicate/ineligible and
+  unreleased editions, applies language/series/author rules, tracks provenance, and caps the pool
+  before any rerank. `titleSeedPool` resolves cold-start title seeds and
+  `resolveReferenceBooks`/`referencePool` resolve a book a discovery request names ("like
+  Gilead") through `searchBooks`, keeping only hits whose own title and author match.
+- `recFilters.ts` — reusable language, series, fuzzy-duplicate, learner-edition, collection,
+  unreleased, nonfiction-companion, author-cap, directive, and discovery constraints.
 - `publisherAuthor.ts` — the conservative publisher/imprint/brand-as-author test
   (`isPublisherLikeAuthor`, `hasPublisherAuthor`). `assemble` drops a candidate whose author is
   one, and enrichment keeps a match resting on one at `LOW`. A trailing word that can be a
@@ -205,9 +207,14 @@ concurrent enrichment or user correction wins.
   sharing one before `assemble`, `assembleScreenPool` drops hydrated candidates, and both
   rerank and seed prompts name them. A genre on two or more loved items, or a favorite subject,
   stays a soft reranker hint instead.
-- `recPrompts.ts` / `recommendRun.ts` — query-seed and rerank prompt construction plus the main
-  two-stage orchestration. `runRecommend` persists only validated catalog candidates returned by
-  the rerank tool.
+- `recPrompts.ts` / `recommendRun.ts` — query-seed, cold-start title-seed and rerank prompt
+  construction plus the main two-stage orchestration. Under the cold-start threshold one extra
+  Haiku call names well-known real books adjacent to the library; each is a catalog lookup, and
+  only resolved catalog books join the pool (pinned past the cap). In a mostly-fiction library
+  (`libraryShape.mostlyFiction`) nonfiction companions are dropped from the raw pools. The rerank
+  may return fewer than `n` and flag `low_confidence` picks; the deck serves confident picks only,
+  backfilled to `MIN_DECK` (5) when fewer are confident. `runRecommend` persists only validated
+  catalog candidates returned by the rerank tool.
 - `recSimilarPrompts.ts` / `recSimilarRun.ts` — ephemeral, book-anchored retrieval and reranking
   for `POST /api/books/{id}/similar`.
 - `recDiscoverPrompts.ts` / `recDiscoverRun.ts` — interprets a natural-language request into
