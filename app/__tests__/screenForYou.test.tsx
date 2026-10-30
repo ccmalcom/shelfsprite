@@ -75,12 +75,25 @@ describe('/screen', () => {
     );
   });
 
-  it('blocks the run while the profile is out of date', () => {
-    renderPage([], { ...OK_STATUS, dirty: true });
+  it('blocks the run while changed titles are missing from the profile', () => {
+    renderPage([], { ...OK_STATUS, dirty: true, changed_titles: 1 });
     expect(screen.getByRole('button', { name: 'Find something to watch' })).toBeDisabled();
     expect(
       screen.getByText(/Your library changed since the last profile build/)
     ).toBeInTheDocument();
+  });
+
+  it('blocks the run while changed books are missing from the profile', () => {
+    renderPage([], { ...OK_STATUS, dirty: true, changed_books: 2 });
+    expect(screen.getByRole('button', { name: 'Find something to watch' })).toBeDisabled();
+  });
+
+  it('keeps the run open when only a skipped pick or trait verdict dirtied the profile', () => {
+    renderPage([], { ...OK_STATUS, dirty: true, changed_books: 0, changed_titles: 0 });
+    expect(screen.getByRole('button', { name: 'Find something to watch' })).toBeEnabled();
+    expect(
+      screen.queryByText(/Your library changed since the last profile build/)
+    ).not.toBeInTheDocument();
   });
 
   it('says nothing new and labels the earlier run', async () => {

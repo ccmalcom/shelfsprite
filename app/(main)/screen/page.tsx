@@ -67,12 +67,17 @@ export default function ScreenForYouPage() {
   );
 
   // Home's gate and messages (app/(main)/page.tsx), pointed at the screen profile (spec §6.2).
+  // Block only where POST /screen/recommend itself refuses: books or titles changed since the
+  // last build. `dirty` also counts trait verdicts and skipped picks, which the run gate
+  // ignores; blocking on those sent a reader who skipped one pick through a paid profile
+  // update before the next run. ReprofileBanner still offers the update.
   const noProfile = profileStatus != null && profileStatus.last_profiled_at === null;
-  const isDirty = profileStatus?.dirty ?? false;
-  const blocked = !profileStatus || noProfile || isDirty;
+  const libraryChanged =
+    (profileStatus?.changed_books ?? 0) > 0 || (profileStatus?.changed_titles ?? 0) > 0;
+  const blocked = !profileStatus || noProfile || libraryChanged;
   const blockMsg = noProfile
     ? 'No taste profile yet. Build one on your profile page first.'
-    : isDirty
+    : libraryChanged
       ? 'Your library changed since the last profile build. Update it on your profile page.'
       : null;
 
