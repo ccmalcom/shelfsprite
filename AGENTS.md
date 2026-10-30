@@ -18,8 +18,9 @@ schema in `lib/server/schema.ts`; drizzle-kit owns schema migrations. There is n
 separate web service or worker deployment.
 
 The product is invite-only. Supabase JWT `sub` values are the tenant keys, and every data access
-path must preserve its `user_id` boundary. Local mode uses the `local` user only when Supabase is
-not configured.
+path must preserve its `user_id` boundary. Local mode uses the `local` user only when no Supabase
+variable is set, `ALLOW_LOCAL_AUTH=true`, and `NODE_ENV` is not `production` (see “The auth-mode
+decision” below).
 
 `invite_requests` is the one deliberate exception to that tenancy rule. Waitlist rows are submitted
 from the public marketing page by people who have no Supabase `sub` yet, so there is nothing to
@@ -34,6 +35,10 @@ scope them to; they are readable only by admins. Do not "fix" it by adding a `us
   export, administration, and wire-format domain code.
 - `drizzle/` — generated migration SQL and drizzle metadata snapshots.
 - `proxy.ts` — page-session middleware; API authentication stays in route handlers.
+- `utils/supabase/` — browser and middleware Supabase clients; `hooks/` — shared React hooks.
+- `scripts/` — operator scripts run by hand: `rotate-encryption-key.ts`
+  (`npm run db:rotate-encryption-key`), `stamp-baseline.ts` (one-time adoption of an existing
+  database, not for a fresh one), `screen-classes.ts`, fixture recorders and the benchmark.
 
 See `docs/architecture.md` for the server module map, `docs/frontend.md` for UI and client
 patterns, `docs/hosting.md` for deployment and operational history, and `docs/conventions.md` for
@@ -170,7 +175,12 @@ prerender failures.
 nothing” does not prove production has no drift. Verify production columns, nullability, and defaults with
 `information_schema.columns`, never with `schema.ts` comments. Generate migrations from the
 checked-in schema and snapshot, inspect the SQL, then apply through the documented drizzle
-workflow.
+workflow. On an empty database, `npm run db:migrate` builds the whole schema from `0000` onward.
+
+Every table in `schema.ts` must end with `.enableRLS()`, so its migration turns row-level security
+on. With no policies, RLS shuts the Supabase Data API's `anon` and `authenticated` roles out of
+application data; the app is unaffected because it connects as the tables' owner through
+`DATABASE_URL`. `lib/server/__tests__/schema-rls.test.ts` fails on a table without it.
 
 ## Product decisions
 
