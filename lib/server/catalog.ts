@@ -74,11 +74,20 @@ function currentThrottle(): number {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Callers queue on this chain, so concurrent lookups (the bulk matcher runs a few at once)
+// are spaced like serial ones instead of all reading the same `lastCallAt` and firing
+// together. Only the spacing is serialized; the requests themselves still overlap.
+let throttleChain: Promise<void> = Promise.resolve();
+
 async function throttle(): Promise<void> {
-  const gap = currentThrottle() * 1000;
-  const elapsed = Date.now() - lastCallAt;
-  if (elapsed < gap) await sleep(gap - elapsed);
-  lastCallAt = Date.now();
+  const turn = throttleChain.then(async () => {
+    const gap = currentThrottle() * 1000;
+    const elapsed = Date.now() - lastCallAt;
+    if (elapsed < gap) await sleep(gap - elapsed);
+    lastCallAt = Date.now();
+  });
+  throttleChain = turn.catch(() => undefined);
+  await turn;
 }
 
 /** GET a JSON URL with Postgres cache + retry/backoff. Null on 404/failure. */

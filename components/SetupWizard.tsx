@@ -18,6 +18,9 @@ import RevealSequence from '@/components/reveal/RevealSequence';
 import { useFeedbackPrompt } from '@/hooks/useFeedbackPrompt';
 import BrandLogo from '@/components/BrandLogo';
 import ShelfSprite from '@/components/ShelfSprite';
+import PasteImport from '@/components/onboarding/PasteImport';
+import QuickRate from '@/components/onboarding/QuickRate';
+import ColdStartMeter from '@/components/onboarding/ColdStartMeter';
 
 type Step = 'name' | 'api-key' | 'upload' | 'enrich' | 'manual' | 'profile' | 'done';
 
@@ -289,12 +292,12 @@ function ApiKeyStep({ onDone }: { onDone: () => void }) {
 
 // ── Step: Upload ──────────────────────────────────────────────────────────────
 
-function UploadStep({
+export function UploadStep({
   onDone,
   onManual,
 }: {
   onDone: (result: IngestResult) => void;
-  onManual: () => void;
+  onManual: (mode: ManualMode) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -338,12 +341,22 @@ function UploadStep({
     <div className="space-y-6">
       <div>
         <h2 className="mb-1 text-xl font-semibold text-text">
-          Import from Goodreads or StoryGraph
+          Import from Goodreads or The StoryGraph
         </h2>
         <p className="text-sm text-muted">
-          Export a CSV from Goodreads (My Books &rsaquo; Import/Export) or The StoryGraph (Manage
-          Account &rsaquo; Export), then drop it here.
+          Both exports work as they are. We recognize the file and bring in your shelves, ratings
+          and reviews. Download yours here:
         </p>
+        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg border border-border bg-elevated/60 px-3 py-2">
+            <dt className="text-sm font-medium text-text">Goodreads</dt>
+            <dd className="text-xs text-muted">My Books &rsaquo; Import/Export</dd>
+          </div>
+          <div className="rounded-lg border border-border bg-elevated/60 px-3 py-2">
+            <dt className="text-sm font-medium text-text">The StoryGraph</dt>
+            <dd className="text-xs text-muted">Manage Account &rsaquo; Export</dd>
+          </div>
+        </dl>
       </div>
 
       {/* Drop zone — <label> so the whole area activates the file input */}
@@ -417,32 +430,111 @@ function UploadStep({
 
       <div className="flex items-center gap-3 text-xs text-faint">
         <div className="h-px flex-1 bg-border" />
-        or
+        No export? Start another way
         <div className="h-px flex-1 bg-border" />
       </div>
 
-      <button
-        type="button"
-        onClick={onManual}
-        className={[
-          'w-full rounded-lg border border-border py-3 text-sm font-medium text-muted transition',
-          'hover:border-muted hover:text-text',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
-        ].join(' ')}
-      >
-        No export? Add books by hand
-      </button>
+      <div className="grid gap-2">
+        {START_OPTIONS.map((o) => (
+          <button
+            key={o.mode}
+            type="button"
+            onClick={() => onManual(o.mode)}
+            className={[
+              'w-full rounded-lg border border-border px-4 py-3 text-left transition',
+              'hover:border-muted',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+            ].join(' ')}
+          >
+            <span className="block text-sm font-medium text-text">{o.title}</span>
+            <span className="block text-xs text-muted">{o.detail}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
+const START_OPTIONS: { mode: ManualMode; title: string; detail: string }[] = [
+  {
+    mode: 'quick',
+    title: 'Rate popular books',
+    detail: 'Pick a few genres and tap stars on what you have read. About a minute.',
+  },
+  {
+    mode: 'paste',
+    title: 'Paste a list of titles',
+    detail: 'From your notes, or a Kindle, Audible or Libby library page.',
+  },
+  {
+    mode: 'list',
+    title: 'Search and add by hand',
+    detail: 'Find your books one at a time.',
+  },
+];
+
 // ── Step: Manual ──────────────────────────────────────────────────────────────
 
-export function ManualStep({ onDone }: { onDone: () => void }) {
+/** How the no-export branch opens: the starter list, a pasted list, or the quick-rate grid. */
+export type ManualMode = 'list' | 'paste' | 'quick';
+
+export function ManualStep({
+  onDone,
+  initialMode = 'list',
+}: {
+  onDone: () => void;
+  initialMode?: ManualMode;
+}) {
   const toast = useToast();
   const [books, setBooks] = useState<Book[]>([]);
   const [adding, setAdding] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [mode, setMode] = useState<ManualMode>(initialMode);
+  const ratings = books.map((b) => b.effective_rating);
+
+  function handleBulkAdded(added: Book[]) {
+    setBooks((prev) => [...prev, ...added]);
+    setMode('list');
+  }
+
+  if (mode === 'paste') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="mb-1 text-xl font-semibold text-text">Paste a list of titles</h2>
+          <p className="text-sm text-muted">
+            Copy titles from anywhere: your notes, or a Kindle, Audible or Libby library page. You
+            will check every match and rate what you have read before anything is added.
+          </p>
+        </div>
+        <PasteImport
+          onAdded={handleBulkAdded}
+          onCancel={() => setMode('list')}
+          baselineRatings={ratings}
+          cancelLabel="Back"
+        />
+      </div>
+    );
+  }
+
+  if (mode === 'quick') {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h2 className="mb-1 text-xl font-semibold text-text">Rate popular books</h2>
+          <p className="text-sm text-muted">
+            The fastest way to a first profile. Rate the ones you have read and skip the rest.
+          </p>
+        </div>
+        <QuickRate
+          onAdded={handleBulkAdded}
+          onCancel={() => setMode('list')}
+          baselineRatings={ratings}
+          cancelLabel="Back"
+        />
+      </div>
+    );
+  }
 
   async function handleFinish() {
     setFinishing(true);
@@ -536,9 +628,19 @@ export function ManualStep({ onDone }: { onDone: () => void }) {
         </ul>
       )}
 
-      <Button variant="secondary" className="w-full" onClick={() => setAdding(true)}>
-        + Add a book
-      </Button>
+      {books.length > 0 && <ColdStartMeter ratings={ratings} />}
+
+      <div className="grid gap-2 sm:grid-cols-3">
+        <Button variant="secondary" onClick={() => setAdding(true)}>
+          + Add a book
+        </Button>
+        <Button variant="secondary" onClick={() => setMode('paste')}>
+          Paste a list
+        </Button>
+        <Button variant="secondary" onClick={() => setMode('quick')}>
+          Rate popular books
+        </Button>
+      </div>
 
       <Button
         size="lg"
@@ -885,6 +987,7 @@ export function DoneStep({ profiled, onComplete }: { profiled: boolean; onComple
 export default function SetupWizard({ onComplete }: { onComplete?: () => void }) {
   const [step, setStep] = useState<Step>('name');
   const [path, setPath] = useState<'csv' | 'manual'>('csv');
+  const [manualMode, setManualMode] = useState<ManualMode>('list');
   const [ingestResult, setIngestResult] = useState<IngestResult | null>(null);
   const [profiled, setProfiled] = useState(false);
 
@@ -919,7 +1022,8 @@ export default function SetupWizard({ onComplete }: { onComplete?: () => void })
                 setIngestResult(result);
                 setStep('enrich');
               }}
-              onManual={() => {
+              onManual={(mode) => {
+                setManualMode(mode);
                 setPath('manual');
                 setStep('manual');
               }}
@@ -928,7 +1032,9 @@ export default function SetupWizard({ onComplete }: { onComplete?: () => void })
           {step === 'enrich' && ingestResult && (
             <EnrichStep ingestResult={ingestResult} onDone={() => setStep('profile')} />
           )}
-          {step === 'manual' && <ManualStep onDone={() => setStep('profile')} />}
+          {step === 'manual' && (
+            <ManualStep initialMode={manualMode} onDone={() => setStep('profile')} />
+          )}
           {step === 'profile' && (
             <ProfileStep
               onDone={() => {

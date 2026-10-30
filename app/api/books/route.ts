@@ -1,17 +1,16 @@
-import { and, asc, eq, isNotNull } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { withApi, ApiError } from '@/lib/server/http';
 import { getDb, schema } from '@/lib/server/db';
-import { bookOut, VALID_SHELVES } from '@/lib/server/books';
+import { bookOut } from '@/lib/server/books';
+import { effectiveRating, parseBoolParam } from '@/lib/server/serialize';
 import {
-  effectiveRating,
-  parseBoolParam,
-  utcnowTs,
-  todayIsoDate,
-  pyList,
-} from '@/lib/server/serialize';
-import { sameWork } from '@/lib/server/dedup';
-import { isValidRating } from '@/lib/server/rating';
+  AddBookSchema,
+  hasSameWork,
+  insertManualBook,
+  libraryWorks,
+  validateAddBook,
+} from '@/lib/server/addBook';
 
 const Query = z.object({
   rated_only: z.string().optional(),
@@ -59,115 +58,27 @@ export const GET = withApi('/api/books', async (req, ctx) => {
   return Response.json(out);
 });
 
-const AddBook = z.object({
-  title: z.string(),
-  author: z.string().nullish(),
-  year: z.number().int().nullish(),
-  isbn13: z.string().nullish(),
-  shelf: z.string().default('read'),
-  rating: z.number().nullish(),
-  review: z.string().nullish(),
-  cover_url: z.string().nullish(),
-  subjects: z.array(z.string()).nullish(),
-  description: z.string().nullish(),
-  catalog_source: z.string().nullish(),
-  catalog_id: z.string().nullish(),
-  // Same shape as PATCH /books/{id}/feedback's date_read.
-  date_read: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .nullish(),
-});
-
 export const POST = withApi('/api/books', async (req, ctx) => {
   const raw = await req.json().catch(() => null);
-  const parsed = AddBook.safeParse(raw);
+  const parsed = AddBookSchema.safeParse(raw);
   if (!parsed.success) {
     throw new ApiError(
       422,
       `validation error: ${parsed.error.issues[0]?.message ?? 'invalid body'}`
     );
   }
-  const b = parsed.data;
-
-  // Port of library.add_book — validation order matters for parity.
-  const title = (b.title ?? '').trim();
-  if (!title) throw new ApiError(422, 'title is required.');
-  if (!VALID_SHELVES.includes(b.shelf)) {
-    throw new ApiError(422, `shelf must be one of ${pyList(VALID_SHELVES)}.`);
-  }
-  // 0 is the "unrated" sentinel, not a rating.
-  if (b.rating != null && b.rating !== 0 && !isValidRating(b.rating)) {
-    throw new ApiError(
-      422,
-      'rating must be 0.5 to 5 in half-star steps (or omitted/0 for unrated).'
-    );
-  }
-  const author = (b.author ?? '').trim() || null;
-  const isbn13 = (b.isbn13 ?? '').trim() || null;
-  const review = (b.review ?? '').trim() || null;
-  if (review && (b.rating == null || b.rating === 0)) {
-    throw new ApiError(
-      422,
-      'A review requires a rating (0.5 to 5). Rate the book, or omit the review.'
-    );
-  }
+  // Port of library.add_book — validation order matters for parity. The insert itself is
+  // shared with POST /api/books/bulk (lib/server/addBook.ts).
+  const valid = validateAddBook(parsed.data);
 
   const db = getDb();
   // Dedup walk, scoped to this user (same-work identity — enrich.py::_same_work).
-  const existing = await db
-    .select({ title: schema.books.title, author: schema.books.author })
-    .from(schema.books)
-    .where(and(eq(schema.books.userId, ctx.user.userId), isNotNull(schema.books.title)));
-  for (const row of existing) {
-    if (sameWork(row.title, row.author, title, author)) {
-      throw new ApiError(409, `"${title}" is already in your library.`);
-    }
+  const works = await libraryWorks(db, ctx.user.userId);
+  if (hasSameWork(works, valid.title, valid.author)) {
+    throw new ApiError(409, `"${valid.title}" is already in your library.`);
   }
 
-  const rated = b.rating != null && b.rating !== 0;
-  const { book, enr } = await db.transaction(async (tx) => {
-    const [book] = await tx
-      .insert(schema.books)
-      .values({
-        userId: ctx.user.userId,
-        title,
-        author,
-        isbn13,
-        yearPublished: b.year ?? null,
-        exclusiveShelf: b.shelf,
-        source: 'manual',
-        goodreadsRating: 0,
-        dateAdded: todayIsoDate(),
-        dateRead: b.date_read ?? null,
-        appRating: rated ? b.rating : null,
-        appReview: review,
-        feedbackUpdatedAt: rated || review ? utcnowTs() : null,
-      })
-      .returning();
-
-    // An unrated to-read book is filtered out of every background enrichment run, so a
-    // description dropped here is never backfilled. Persist what the catalog already gave us.
-    let enr = null;
-    if (b.cover_url || b.subjects || b.description || b.catalog_source || b.catalog_id) {
-      [enr] = await tx
-        .insert(schema.enrichment)
-        .values({
-          bookId: book.id,
-          resolvedSource: b.catalog_source ?? null,
-          resolvedId: b.catalog_id ?? null,
-          subjects: b.subjects ?? [],
-          description: b.description ?? null,
-          coverUrl: b.cover_url ?? null,
-          resolutionConfidence: 1.0,
-          confidenceLabel: 'MANUAL',
-          matchMethod: 'manual_add',
-          resolvedAt: utcnowTs(),
-        })
-        .returning();
-    }
-    return { book, enr };
-  });
+  const out = await insertManualBook(db, ctx.user.userId, valid);
   ctx.timer.mark('db');
-  return Response.json(bookOut(book, enr), { status: 201 });
+  return Response.json(out, { status: 201 });
 });
