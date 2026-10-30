@@ -13,6 +13,7 @@ import {
   isCollectionEdition,
   isTranslatedLibraryEdition,
   applyAuthorCaps,
+  capDeckLibraryAuthors,
   MAX_PER_AUTHOR,
   subjectHits,
   applyDirectiveConstraints,
@@ -270,6 +271,61 @@ describe('applyAuthorCaps', () => {
       new Set(['scalzi'])
     );
     expect(out.map((x) => x.title)).toEqual(['s1', 's2', 's3', 'h1', 'h2']);
+  });
+});
+
+describe('capDeckLibraryAuthors', () => {
+  const c = (title: string, author: string | null) => ({ title, author });
+  const lib = new Set(['herbert', 'butler', 'leguin', 'banks', 'wolfe']);
+
+  test('holds a ten-card deck to 4 library-author picks, keeping serve order', () => {
+    // The QA deck: the reranker put library authors in half the slots.
+    const ordered = [
+      c('l1', 'Frank Herbert'),
+      c('n1', 'Ted Chiang'),
+      c('l2', 'Octavia Butler'),
+      c('l3', 'Ursula LeGuin'),
+      c('n2', 'N. K. Jemisin'),
+      c('l4', 'Iain Banks'),
+      c('l5', 'Gene Wolfe'),
+      c('n3', 'Ann Leckie'),
+      c('n4', 'Martha Wells'),
+      c('n5', 'Becky Chambers'),
+      c('n6', 'Ada Palmer'),
+      c('n7', 'Arkady Martine'),
+    ];
+    const out = capDeckLibraryAuthors(ordered, 10, lib);
+    expect(out.map((x) => x.title)).toEqual([
+      'l1',
+      'n1',
+      'l2',
+      'l3',
+      'n2',
+      'l4',
+      'n3',
+      'n4',
+      'n5',
+      'n6',
+    ]);
+    expect(out.filter((x) => x.title.startsWith('l'))).toHaveLength(4);
+  });
+
+  test('backfills with library authors rather than serving a short deck', () => {
+    const ordered = [c('l1', 'Herbert'), c('l2', 'Butler'), c('n1', 'Chiang'), c('l3', 'Banks')];
+    // 4 cards, maxLib 1, but only one other author exists: the deck stays full.
+    expect(capDeckLibraryAuthors(ordered, 10, lib).map((x) => x.title)).toEqual([
+      'l1',
+      'l2',
+      'n1',
+      'l3',
+    ]);
+  });
+
+  test('preferred authors and authorless picks are not library picks', () => {
+    const ordered = [c('l1', 'Herbert'), c('p1', 'Butler'), c('x', null), c('l2', 'Banks')];
+    const out = capDeckLibraryAuthors(ordered, 3, lib, new Set(['butler']));
+    expect(out.map((x) => x.title)).toEqual(['l1', 'p1', 'x']);
+    expect(capDeckLibraryAuthors([], 10, lib)).toEqual([]);
   });
 });
 

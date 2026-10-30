@@ -195,4 +195,20 @@ describe('TraitsSection', () => {
       unmount();
     }
   });
+
+  it('moves rejected traits out of Loves into a collapsed Dismissed list', () => {
+    const traits = [...TRAITS, { ...trait(4, 'reward', 'Rewards slow burns'), status: 'rejected' }];
+    renderSection(traits);
+    expect(filterButton(/Loves \(2\)/)).toBeInTheDocument();
+    expect(filterButton(/All \(3\)/)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Rewards slow burns/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Show dismissed \(1\)/ }));
+    expect(rowButton('Rewards slow burns')).toBeInTheDocument();
+  });
+
+  it('opens the Dismissed list for a deep link to a rejected trait', () => {
+    mockSearch = new URLSearchParams('trait=4');
+    renderSection([...TRAITS, { ...trait(4, 'reward', 'Rewards slow burns'), status: 'rejected' }]);
+    expect(rowButton('Rewards slow burns')).toHaveAttribute('aria-expanded', 'true');
+  });
 });

@@ -142,6 +142,105 @@ function TargetedModal({ trigger, runId, heading, onClose }: TargetedModalProps)
   );
 }
 
+// ── Session pacing ────────────────────────────────────────────────────────────
+// A new reader once met three prompts in their first session (after setup, after the
+// first batch, on the first Profile visit). At most one prompt now opens per browser
+// session, and none opens over another dialog.
+
+/** sessionStorage: a targeted prompt has opened in this browser session. */
+const SHOWN_KEY = 'shelfsprite:feedback-prompt-shown';
+/** localStorage: a deferred trigger waiting for a later session. */
+const DEFERRED_KEY = 'shelfsprite:feedback-prompt-deferred';
+/** sessionStorage: the deferral was recorded in this session, so it must wait. */
+const DEFERRED_HERE_KEY = 'shelfsprite:feedback-prompt-deferred-here';
+
+/**
+ * Triggers whose firing moment is a bad moment to ask. post-setup fires as the setup
+ * wizard's last step mounts, where its modal covered "Show me what you found"; it is
+ * recorded instead, and asked at the first prompt opportunity of a later session.
+ */
+const DEFERRED_TRIGGERS = new Set(['post-setup']);
+
+/** Fallback for the session flag when storage throws (private mode, blocked storage). */
+let shownThisPageLoad = false;
+
+type StorageKind = 'localStorage' | 'sessionStorage';
+
+function readStore(kind: StorageKind, key: string): string | null {
+  try {
+    return window[kind].getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStore(kind: StorageKind, key: string, value: string | null): void {
+  try {
+    if (value === null) window[kind].removeItem(key);
+    else window[kind].setItem(key, value);
+  } catch {
+    // Storage is a pacing aid; without it the page-load flag still holds a session to one.
+  }
+}
+
+function sessionSlotTaken(): boolean {
+  return shownThisPageLoad || readStore('sessionStorage', SHOWN_KEY) === '1';
+}
+
+function claimSessionSlot(): void {
+  shownThisPageLoad = true;
+  writeStore('sessionStorage', SHOWN_KEY, '1');
+}
+
+function deferTrigger(trigger: string): void {
+  writeStore('localStorage', DEFERRED_KEY, trigger);
+  writeStore('sessionStorage', DEFERRED_HERE_KEY, '1');
+}
+
+/** A trigger deferred in an EARLIER session, ready to ask now. */
+function readyDeferredTrigger(): string | null {
+  if (readStore('sessionStorage', DEFERRED_HERE_KEY) === '1') return null;
+  const trigger = readStore('localStorage', DEFERRED_KEY);
+  return trigger && DEFERRED_TRIGGERS.has(trigger) ? trigger : null;
+}
+
+/** Any modal dialog on the page (components/ui Modal and the reveal both set it). */
+function dialogOpen(): boolean {
+  return document.querySelector('[aria-modal="true"]') !== null;
+}
+
+/** Test-only: forget the page-load flag between cases. */
+export function _resetFeedbackPromptSession(): void {
+  shownThisPageLoad = false;
+}
+
+interface PromptTarget {
+  trigger: string;
+  runId?: string;
+}
+
+/** The prompt to ask, if any: one deferred from an earlier session first, then our own. */
+async function choosePrompt(trigger: string, runId?: string): Promise<PromptTarget | null> {
+  const deferred = readyDeferredTrigger();
+  if (deferred) {
+    try {
+      const resp = await api.feedbackPrompt(deferred);
+      // Asked about either way: an answered or switched-off prompt never comes back.
+      writeStore('localStorage', DEFERRED_KEY, null);
+      if (resp.show) return { trigger: deferred };
+    } catch {
+      // Keep it for the next opportunity.
+    }
+  }
+  try {
+    const resp = await api.feedbackPrompt(trigger, runId);
+    if (resp.show) return { trigger, runId };
+  } catch {
+    // Eligibility check failures are silent - never block the user
+  }
+  return null;
+}
+
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
 export interface UseFeedbackPromptResult {
@@ -150,10 +249,13 @@ export interface UseFeedbackPromptResult {
 }
 
 /**
- * Encapsulates eligibility checking + fire-once-per-session guard for targeted
- * feedback prompts. Call `fire()` at the right moment; the hook calls
- * GET /feedback/prompt and, if show=true, surfaces a targeted modal with
- * Submit / Ask me later / Don't ask again.
+ * Encapsulates eligibility checking + fire-once guard for targeted feedback prompts.
+ * Call `fire()` at the right moment; the hook calls GET /feedback/prompt and, if
+ * show=true, surfaces a targeted modal with Submit / Ask me later / Don't ask again.
+ *
+ * Pacing (see above): nothing opens once a prompt has opened this session, an eligible
+ * prompt waits until no other dialog is open, and a DEFERRED trigger never opens where
+ * it fires.
  *
  * The fire-once guard resets when `runId` changes so different post-recs runs
  * each get one chance.
@@ -161,7 +263,9 @@ export interface UseFeedbackPromptResult {
 export function useFeedbackPrompt(trigger: string, runId?: string): UseFeedbackPromptResult {
   const firedRef = useRef(false);
   const lastRunId = useRef<string | undefined>(undefined);
-  const [open, setOpen] = useState(false);
+  // Eligible and waiting for the page to be clear of other dialogs.
+  const [waiting, setWaiting] = useState<PromptTarget | null>(null);
+  const [open, setOpen] = useState<PromptTarget | null>(null);
 
   // Reset guard when runId changes (new rec run)
   useEffect(() => {
@@ -175,24 +279,44 @@ export function useFeedbackPrompt(trigger: string, runId?: string): UseFeedbackP
     if (firedRef.current) return;
     firedRef.current = true;
 
-    api
-      .feedbackPrompt(trigger, runId)
-      .then((resp) => {
-        if (resp.show) setOpen(true);
-      })
-      .catch(() => {
-        // Eligibility check failures are silent - never block the user
-      });
+    if (DEFERRED_TRIGGERS.has(trigger)) {
+      deferTrigger(trigger);
+      return;
+    }
+    if (sessionSlotTaken()) return;
+    void choosePrompt(trigger, runId).then((target) => {
+      if (target) setWaiting(target);
+    });
   }, [trigger, runId]);
 
-  const heading = HEADINGS[trigger] ?? 'How is ShelfSprite working for you?';
+  // Open only over a clear page: if a dialog is up, watch the DOM until it closes.
+  useEffect(() => {
+    if (!waiting) return;
+    const tryOpen = (): boolean => {
+      if (sessionSlotTaken()) {
+        setWaiting(null); // another prompt opened first
+        return true;
+      }
+      if (dialogOpen()) return false;
+      claimSessionSlot();
+      setOpen(waiting);
+      setWaiting(null);
+      return true;
+    };
+    if (tryOpen()) return;
+    const observer = new MutationObserver(() => {
+      if (tryOpen()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+    return () => observer.disconnect();
+  }, [waiting]);
 
   const modal: ReactNode | null = open ? (
     <TargetedModal
-      trigger={trigger}
-      runId={runId}
-      heading={heading}
-      onClose={() => setOpen(false)}
+      trigger={open.trigger}
+      runId={open.runId}
+      heading={HEADINGS[open.trigger] ?? 'How is ShelfSprite working for you?'}
+      onClose={() => setOpen(null)}
     />
   ) : null;
 

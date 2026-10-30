@@ -96,3 +96,34 @@ describe('POST /api/books — catalog description on add', () => {
     });
   });
 });
+
+// Manual add is how a reader without an export builds a library, so it has to carry the
+// date read: without it every hand-added book is undated and the year stats count none.
+describe('POST /api/books — date read on add', () => {
+  it('stores an optional date read', async () => {
+    await withDb(async () => {
+      const created = await (
+        await POST(
+          addReq({ title: 'Beloved', author: 'Toni Morrison', rating: 5, date_read: '2026-03-14' })
+        )
+      ).json();
+      expect(created.date_read).toBe('2026-03-14');
+    });
+  });
+
+  it('leaves the date read null when none is given', async () => {
+    await withDb(async () => {
+      const created = await (await POST(addReq({ title: 'Sula', author: 'Toni Morrison' }))).json();
+      expect(created.date_read).toBeNull();
+    });
+  });
+
+  it('rejects a date read that is not YYYY-MM-DD', async () => {
+    await withDb(async () => {
+      const res = await POST(
+        addReq({ title: 'Jazz', author: 'Toni Morrison', date_read: '3/14/26' })
+      );
+      expect(res.status).toBe(422);
+    });
+  });
+});

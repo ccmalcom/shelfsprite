@@ -8,6 +8,7 @@ import {
   api,
   type Stats,
   type Book,
+  type Recommendation,
   type ProfileStatus,
   type ArchetypeOut,
   type UserProfile,
@@ -56,6 +57,12 @@ export default function HomePage() {
       : null;
 
   const displayName = userProfile?.display_name ?? null;
+  // GET /recommendations returns the latest run, swiped or not, so an empty list means no
+  // run has ever happened: the reader's first visit, right out of setup. Same SWR key as
+  // the swipe deck, so a reader coming back from it costs no extra fetch.
+  const { data: recs } = useSWR<Recommendation[]>('recommendations', () => api.recommendations());
+  const firstVisit = recs != null && recs.length === 0;
+  const greeting = firstVisit ? 'Welcome' : 'Welcome back';
   const {
     data: savedBooks,
     isLoading: savedLoading,
@@ -77,11 +84,11 @@ export default function HomePage() {
         setRunning(false);
         return;
       }
-      // The deck's cached 'recommendations' key still holds the old batch, and
-      // nothing on THIS page subscribes to it -- so a bare mutate(key) would find no
-      // revalidator, return the stale value, and leave it in cache for /swipe to paint
-      // before the refetch lands. Passing `undefined` as data clears the entry outright;
-      // startRevalidate still runs afterwards and drops the dedupe markers.
+      // The deck's cached 'recommendations' key still holds the old batch. A bare
+      // mutate(key) only revalidates, leaving that stale batch in cache for /swipe to
+      // paint before the refetch lands (this page's greeting reads the key too, but its
+      // refetch can lose the race to navigation). Passing `undefined` as data clears the
+      // entry outright; startRevalidate still runs afterwards and drops the dedupe markers.
       await mutate('recommendations', undefined, { revalidate: true });
       router.push('/swipe');
     } catch (e) {
@@ -96,7 +103,7 @@ export default function HomePage() {
     <div className="fade-in">
       <p className="eyebrow">Your reading room</p>
       <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">
-        {displayName ? `Welcome back, ${displayName}.` : 'Welcome back.'}
+        {displayName ? `${greeting}, ${displayName}.` : `${greeting}.`}
       </h1>
       <section className="home-hero" aria-labelledby="next-read-title">
         <div className="min-w-0">

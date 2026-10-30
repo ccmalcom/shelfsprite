@@ -2,13 +2,17 @@
  * @jest-environment jsdom
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import ReprofileBanner from '@/components/ReprofileBanner';
+import ReprofileBanner, { showReprofileNudge } from '@/components/ReprofileBanner';
+import type { ProfileStatus } from '@/lib/api';
 
 const mockUpdateProfile = jest.fn();
 const mockProfile = jest.fn();
 const mockGetArchetype = jest.fn();
 const mockGlobalMutate = jest.fn();
 let mockStatus: { dirty: boolean } = { dirty: true };
+let mockPathname = '/profile';
+
+jest.mock('next/navigation', () => ({ usePathname: () => mockPathname }));
 
 jest.mock('swr', () => ({
   __esModule: true,
@@ -32,6 +36,7 @@ const noChanges = { added: [], dropped: [], reworded: [], unchanged: 4 };
 
 beforeEach(() => {
   mockStatus = { dirty: true };
+  mockPathname = '/profile';
   mockUpdateProfile.mockReset();
   // Stand in for SWR's own mutate: it consumes the promise it is handed and rejects
   // with it (throwOnError defaults true), which is the case the banner must absorb.
@@ -125,4 +130,46 @@ it('dismisses the summary', async () => {
   mockStatus = { dirty: false };
   fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
   await waitFor(() => expect(screen.queryByText('X')).not.toBeInTheDocument());
+});
+
+it('asks in plain words, without developer jargon', () => {
+  render(<ReprofileBanner />);
+  expect(screen.getByText(/Update your profile to include them/)).toBeInTheDocument();
+  expect(screen.queryByText(/one\s+Claude call/)).toBeNull();
+});
+
+it('stays off the swipe deck', () => {
+  mockPathname = '/swipe';
+  const { container } = render(<ReprofileBanner />);
+  expect(container).toBeEmptyDOMElement();
+});
+
+describe('showReprofileNudge', () => {
+  const status = (over: Partial<ProfileStatus> = {}): ProfileStatus => ({
+    dirty: true,
+    changed_books: 1,
+    changed_book_ids: [1],
+    last_profiled_at: '2026-10-30T12:00:00',
+    last_profile_kind: 'full',
+    rebuild_reason: null,
+    ...over,
+  });
+
+  it('always shows on the profile pages when dirty', () => {
+    expect(showReprofileNudge(status(), '/profile')).toBe(true);
+    expect(showReprofileNudge(status(), '/screen/profile')).toBe(true);
+    expect(showReprofileNudge(status({ dirty: false }), '/profile')).toBe(false);
+  });
+
+  it('waits on home until the changes add up or a rebuild is pending', () => {
+    expect(showReprofileNudge(status(), '/')).toBe(false);
+    expect(showReprofileNudge(status({ changed_books: 3, changed_titles: 2 }), '/')).toBe(true);
+    expect(showReprofileNudge(status({ rebuild_reason: 'screen_enabled' }), '/screen')).toBe(true);
+  });
+
+  it('never interrupts other pages, the swipe deck included', () => {
+    const many = status({ changed_books: 20 });
+    expect(showReprofileNudge(many, '/swipe')).toBe(false);
+    expect(showReprofileNudge(many, '/library')).toBe(false);
+  });
 });

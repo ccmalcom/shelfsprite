@@ -26,6 +26,13 @@ export interface TraitRowProps {
 
 type BadgeVariant = 'default' | 'success' | 'danger' | 'accent';
 
+/** The reader's own verdict, worded so it never reads as part of the confidence number. */
+const STATUS_LABELS: Record<string, string> = {
+  confirmed: 'you confirmed',
+  edited: 'your words',
+  rejected: 'dismissed',
+};
+
 function statusVariant(status: string): BadgeVariant {
   if (status === 'edited') return 'accent';
   if (status === 'confirmed') return 'success';
@@ -181,11 +188,16 @@ export function TraitRow({ trait, bookMap, open, onToggle, titleEvidence }: Trai
           {trait.claim}
         </span>
         <span className="flex shrink-0 flex-col items-end gap-1">
-          <span className="font-mono text-xs text-faint">
-            {Math.round(trait.inference_confidence * 100)}%
+          <span
+            className="font-mono text-xs text-faint"
+            title="How sure Claude was that your ratings show this when it inferred the trait. Your own verdict does not change it."
+          >
+            {Math.round(trait.inference_confidence * 100)}% sure
           </span>
           {trait.status !== 'proposed' && (
-            <Badge variant={statusVariant(trait.status)}>{trait.status}</Badge>
+            <Badge variant={statusVariant(trait.status)}>
+              {STATUS_LABELS[trait.status] ?? trait.status}
+            </Badge>
           )}
           {hasLowWeight && trait.user_weight != null && (
             <span className="font-mono text-xs text-faint" title="Reduced weight">

@@ -23,6 +23,7 @@ import {
   PROFILE_MAX_TOKENS,
 } from './profileBuild';
 import { ensureProfileMeta } from './profileMeta';
+import { CLAIM_TEXT_RULE, DISTINCT_EVIDENCE_RULE, LOCKED_TRAITS_RULE } from './traitText';
 import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient } from './claude';
 import { readScreenToggledAt, isScreenEnabled } from './screenSettings';
@@ -109,6 +110,9 @@ export function buildUpdatePrompt(
     '  - Add new traits the changes reveal — especially anything stated outright in a ' +
     'review.\n' +
     '  - A new/edited `review` is direct testimony; prefer it over metadata guesses.\n' +
+    LOCKED_TRAITS_RULE +
+    DISTINCT_EVIDENCE_RULE +
+    CLAIM_TEXT_RULE +
     '  - Return the COMPLETE revised trait set (the unchanged traits too), 6-12 traits, ' +
     'via the revise_taste_traits tool.\n\n' +
     `CHANGED BOOK IDS (the edits driving this update): ${pyRepr(changedIds)}\n\n` +

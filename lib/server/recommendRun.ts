@@ -39,7 +39,7 @@ import {
   SEED_QUERIES,
   type AssembledCandidate,
 } from './recAssemble';
-import { applyDirectiveConstraints, dedupKey } from './recFilters';
+import { applyDirectiveConstraints, capDeckLibraryAuthors, dedupKey } from './recFilters';
 import {
   buildRerankPrompt,
   buildSeedPrompt,
@@ -177,7 +177,15 @@ export async function runRecommend(
     };
   }
 
-  const ranked = await claudeRerank(db, requireClient(), candidates, signal, userId, n);
+  const ranked = await claudeRerank(
+    db,
+    requireClient(),
+    candidates,
+    signal,
+    userId,
+    n,
+    preferredSurnames
+  );
 
   // A rerank that survives none of its own citations must not mint a run. An empty
   // run writes no rows, so /recommendations falls back to the PREVIOUS run and the
@@ -286,7 +294,8 @@ async function claudeRerank(
   candidates: AssembledCandidate[],
   signal: RecSignal,
   userId: string,
-  n: number
+  n: number,
+  preferredSurnames: Set<string>
 ): Promise<RankedCandidate[]> {
   const validTraitIds = new Set(signal.traits.map((t) => t.id));
   const validBookIds = new Set(signal.loved.map((b) => b.id));
@@ -359,5 +368,11 @@ async function claudeRerank(
   // description-having candidates are scarce.
   const withDesc = out.filter((c) => c.description);
   const withoutDesc = out.filter((c) => !c.description);
-  return [...withDesc, ...withoutDesc].slice(0, n);
+  // The pool's 40% library-author cap does not bind the deck the reranker picks from it.
+  return capDeckLibraryAuthors(
+    [...withDesc, ...withoutDesc],
+    n,
+    signal.library_authors,
+    preferredSurnames
+  );
 }

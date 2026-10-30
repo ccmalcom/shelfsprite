@@ -1,14 +1,22 @@
 import type { schema } from '@/lib/server/db';
 import { tsToIso } from '@/lib/server/serialize';
+import { stripIdCitations } from '@/lib/server/traitText';
 
 export type TraitRow = typeof schema.tasteTraits.$inferSelect;
 
 /** Port of api.py's TraitOut serialization — trait row -> wire JSON. */
 export function traitOut(t: TraitRow) {
+  // The trait's own citations are the ids Claude might have echoed into its text.
+  const cited = [
+    ...((t.exhibits as number[] | null) ?? []),
+    ...((t.contrasts as number[] | null) ?? []),
+    ...((t.exhibitTitleIds as number[] | null) ?? []),
+    ...((t.contrastTitleIds as number[] | null) ?? []),
+  ];
   return {
     id: t.id,
-    claim: t.claim,
-    reveal_line: t.revealLine,
+    claim: stripIdCitations(t.claim, cited),
+    reveal_line: t.revealLine === null ? null : stripIdCitations(t.revealLine, cited),
     polarity: t.polarity,
     exhibits: t.exhibits,
     contrasts: t.contrasts,

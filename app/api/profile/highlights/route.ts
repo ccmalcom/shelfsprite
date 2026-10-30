@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import { withApi } from '@/lib/server/http';
 import { getDb, schema } from '@/lib/server/db';
 import { effectiveRating, pyTitle, round4 } from '@/lib/server/serialize';
+import { genreLabel, libraryShape } from '@/lib/server/libraryShape';
 
 // Constants mirror highlights.py + recommend.py (locked cold-start thresholds).
 const LOVED_MIN = 4;
@@ -60,7 +61,10 @@ export const GET = withApi('/api/profile/highlights', async (_req, ctx) => {
     enrichedRated += 1;
     const seen = new Set<string>();
     for (const raw of subjects.slice(0, 8)) {
-      const subject = pyTitle(raw.trim());
+      // "Fiction, 85% of your shelf" is not a genre; neither is an LC heading.
+      const label = genreLabel(raw, r.books.title);
+      if (label === null) continue;
+      const subject = pyTitle(label);
       if (!subject || seen.has(subject)) continue;
       seen.add(subject);
       genreScore.set(subject, (genreScore.get(subject) ?? 0) + ratingOf(r));
@@ -117,6 +121,14 @@ export const GET = withApi('/api/profile/highlights', async (_req, ctx) => {
         }
       : null;
 
+  const shape = libraryShape(
+    rated.map((r) => ({
+      author: r.books.author,
+      subjects: (r.enrichment?.subjects ?? null) as string[] | null,
+      inSeries: classifyFormat(r)[0] === 'series',
+    }))
+  );
+
   return Response.json({
     thin,
     n_authors: nAuthors,
@@ -124,5 +136,7 @@ export const GET = withApi('/api/profile/highlights', async (_req, ctx) => {
     top_authors: topAuthors,
     format_mix: { ...buckets, dominant, low_confidence: lowConf },
     era_split: eraSplit,
+    // The reveal's format and genre copy is written for fiction; it steps aside for nonfiction.
+    mostly_nonfiction: shape.mostlyNonfiction,
   });
 });

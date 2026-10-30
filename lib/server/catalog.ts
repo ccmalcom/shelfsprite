@@ -9,6 +9,7 @@
  */
 import { cacheGet, cachePut } from './catalogCache';
 import type { Db } from './db';
+import { isCollectionEdition } from './recFilters';
 
 const USER_AGENT = 'ShelfSprite/0.1 (personal book-analysis project)';
 const MAX_RETRIES = 2;
@@ -199,6 +200,11 @@ export interface Candidate {
   year: number | null;
   isbn13?: string | null;
   language: string | null;
+  /**
+   * The work's original publication year, set by searchBooks from Open Library's
+   * first_publish_year. `year` on a Google Books hit is the edition's year instead.
+   */
+  first_publish_year?: number | null;
   raw: unknown;
 }
 
@@ -525,10 +531,86 @@ function applySeriesGrouping(query: string, ranked: Candidate[]): Candidate[] {
 }
 
 function mergeInto(keep: Candidate, extra: Candidate): void {
-  for (const f of ['cover_url', 'isbn13', 'author', 'description', 'year'] as const) {
+  for (const f of [
+    'cover_url',
+    'isbn13',
+    'author',
+    'description',
+    'year',
+    'first_publish_year',
+  ] as const) {
     if (!(keep as any)[f] && (extra as any)[f]) (keep as any)[f] = (extra as any)[f];
   }
   if (!keep.subjects?.length && extra.subjects?.length) keep.subjects = extra.subjects;
+}
+
+/** A publication year worth showing: printing (~1450) through next year, else null. */
+export function plausibleYear(year: number | null | undefined, now = new Date()): number | null {
+  if (year == null || !Number.isInteger(year)) return null;
+  return year >= 1450 && year <= now.getUTCFullYear() + 1 ? year : null;
+}
+
+// Study aids that title themselves after the book they cover ("Beloved: A Study Guide",
+// "Summary of Beloved", "Trivia-On-Books Lock In by John Scalzi"). Matched on the raw
+// lowercased title, because normFull turns "&" into a space.
+const STUDY_AID_RE =
+  /\b(?:sparknotes|cliffsnotes|study guide|summary of|summary\s*(?:&|and)\s*analysis|analysis of|workbook|trivia)\b/;
+
+function isStudyAid(text: string | null): boolean {
+  return STUDY_AID_RE.test((text ?? '').toLowerCase());
+}
+
+function hasUnknownAuthor(cand: Candidate): boolean {
+  const author = normFull(cand.author);
+  return !author || author === 'unknown' || author.startsWith('unknown ');
+}
+
+/**
+ * A non-English edition. Open Library's `language` lists every edition's language and
+ * normLang keeps only the first, so a work is foreign only when no edition is English.
+ */
+function isForeignEdition(cand: Candidate): boolean {
+  const langs = (cand.raw as { language?: unknown } | null)?.language;
+  if (cand.source === 'openlibrary' && Array.isArray(langs) && langs.length) {
+    return !langs.includes('eng');
+  }
+  return cand.language != null && cand.language !== 'en';
+}
+
+/**
+ * matchScore less a fixed cost per flaw the reader rarely wants: a study aid, a box set,
+ * an unknown author, or (for an English query) a foreign edition. Free-text search returns
+ * these in bulk, often with the exact title, and they used to outrank the book itself
+ * ("Beloved" by Unknown author and a study guide above Toni Morrison's). A flawed exact
+ * match still beats an unrelated title; it just loses to the clean one. A flaw the query
+ * asks for ("beloved study guide", "box set") costs nothing.
+ */
+export function searchScore(query: string, cand: Candidate): number {
+  let score = matchScore(query, cand);
+  if (isStudyAid(cand.title) && !isStudyAid(query)) score -= 70;
+  if (isCollectionEdition(cand) && !isCollectionEdition({ title: query })) score -= 50;
+  if (hasUnknownAuthor(cand)) score -= 30;
+  if (/^[\x00-\x7f]*$/.test(query) && isForeignEdition(cand)) score -= 30;
+  return score;
+}
+
+/** Orders deduplicated search hits, best first. Exported for unit tests. */
+export function rankSearchResults(query: string, candidates: Candidate[]): Candidate[] {
+  // Python sorted by the tuple (match, hasCover, hasIsbn, year) DESCENDING; the first
+  // element is now searchScore. Array.sort is stable, so full ties keep insertion order.
+  const key = (c: Candidate) => [
+    searchScore(query, c),
+    c.cover_url ? 1 : 0,
+    c.isbn13 ? 1 : 0,
+    plausibleYear(c.year) ?? 0,
+  ];
+  const ranked = [...candidates].sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return kb[i] - ka[i];
+    return 0;
+  });
+  return applySeriesGrouping(query, ranked);
 }
 
 export async function searchBooks(db: Db, query: string, maxResults = 8): Promise<Candidate[]> {
@@ -540,12 +622,16 @@ export async function searchBooks(db: Db, query: string, maxResults = 8): Promis
     c.isbn13 = isbn13FromGoogleItem(c.raw as any);
     results.push(c);
   }
-  results.push(...(await openlibraryQuery(db, q, SEARCH_FETCH)));
+  // An Open Library hit's year is the work's first_publish_year; keep it apart from
+  // `year` so it survives a merge into a Google hit, whose year is the edition's.
+  const withFirstYear = (cands: Candidate[]) =>
+    cands.map((c) => ({ ...c, first_publish_year: c.year }));
+  results.push(...withFirstYear(await openlibraryQuery(db, q, SEARCH_FETCH)));
   for (const c of await googleBooksQuery(db, `intitle:"${q}"`, SEARCH_FETCH)) {
     c.isbn13 = isbn13FromGoogleItem(c.raw as any);
     results.push(c);
   }
-  results.push(...(await openlibraryTitle(db, q, SEARCH_FETCH)));
+  results.push(...withFirstYear(await openlibraryTitle(db, q, SEARCH_FETCH)));
 
   const byKey = new Map<string, Candidate>();
   const byIsbn = new Map<string, Candidate>();
@@ -567,16 +653,7 @@ export async function searchBooks(db: Db, query: string, maxResults = 8): Promis
     deduped.push(cand);
   }
 
-  // Python sorts by the tuple (match, hasCover, hasIsbn, year) DESCENDING.
-  // Python's sort is STABLE, so equal keys keep insertion order — Array.sort is
-  // also stable in modern V8, so returning 0 for ties reproduces it exactly.
-  deduped.sort((a, b) => {
-    const ka = [matchScore(query, a), a.cover_url ? 1 : 0, a.isbn13 ? 1 : 0, a.year ?? 0];
-    const kb = [matchScore(query, b), b.cover_url ? 1 : 0, b.isbn13 ? 1 : 0, b.year ?? 0];
-    for (let i = 0; i < 4; i++) if (ka[i] !== kb[i]) return kb[i] - ka[i];
-    return 0;
-  });
-  return applySeriesGrouping(query, deduped).slice(0, maxResults);
+  return rankSearchResults(query, deduped).slice(0, maxResults);
 }
 
 // --- Discovery retrieval (the two-stage recommender) -----------------------

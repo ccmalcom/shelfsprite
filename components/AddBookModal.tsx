@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { BookOpen } from 'lucide-react';
-import { api, type Book, type CatalogResult, type Shelf } from '@/lib/api';
+import { api, catalogYearLabel, type Book, type CatalogResult, type Shelf } from '@/lib/api';
 import { Button, Field, Modal, StarRating, Textarea, useToast } from '@/components/ui';
 
 interface Props {
@@ -37,6 +37,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
   const [shelf, setShelf] = useState<Shelf>(defaultShelf);
   const [rating, setRating] = useState(0);
   const [review, setReview] = useState('');
+  const [dateRead, setDateRead] = useState('');
   const [saving, setSaving] = useState(false);
   const [addedCount, setAddedCount] = useState(0);
 
@@ -86,6 +87,8 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
         description: selected.description,
         catalog_source: selected.source,
         catalog_id: selected.catalog_id,
+        // Only a read book has a date read; the field is hidden on the other shelves.
+        date_read: shelf === 'read' && dateRead ? dateRead : undefined,
       });
       toast.success(`${selected.title} added to library.`);
       onAdded(book);
@@ -95,6 +98,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
       setOutcome(null);
       setRating(0);
       setReview('');
+      setDateRead('');
       setSaving(false);
       setAddedCount((n) => n + 1);
       requestAnimationFrame(() => searchRef.current?.focus());
@@ -179,7 +183,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                       <p className="truncate text-sm font-medium text-text">{r.title}</p>
                       <p className="truncate text-xs text-faint">
                         {r.author ?? 'Unknown author'}
-                        {r.year ? ` · ${r.year}` : ''}
+                        {catalogYearLabel(r)}
                       </p>
                     </div>
                   </button>
@@ -220,7 +224,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
               <p className="truncate font-semibold text-text">{selected.title}</p>
               <p className="truncate text-sm text-muted">
                 {selected.author ?? 'Unknown author'}
-                {selected.year ? ` · ${selected.year}` : ''}
+                {catalogYearLabel(selected)}
               </p>
             </div>
             <button
@@ -229,6 +233,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                 setSelected(null);
                 setRating(0);
                 setReview('');
+                setDateRead('');
               }}
               className="shrink-0 text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
             >
@@ -306,6 +311,24 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
               </p>
             )}
           </div>
+
+          {/* Optional date read: the year stats count only dated reads. */}
+          {shelf === 'read' && (
+            <div className="mt-5">
+              <Field label="Date read" hint="Optional, if you remember.">
+                {(p) => (
+                  <input
+                    {...p}
+                    type="date"
+                    value={dateRead}
+                    max={new Date().toISOString().slice(0, 10)}
+                    onChange={(e) => setDateRead(e.target.value)}
+                    className="self-start rounded-lg border border-border bg-base px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent [color-scheme:dark]"
+                  />
+                )}
+              </Field>
+            </div>
+          )}
 
           <div className="mt-6 flex justify-end gap-2">
             <Button variant="ghost" onClick={onClose} disabled={saving}>

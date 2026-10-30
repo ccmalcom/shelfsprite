@@ -178,7 +178,19 @@ describe('YearCard', () => {
     it('names the undated backlog', () => {
       withData({ stats: { ...base.stats, undated: 12 } });
       render(<YearCard compact />);
-      expect(screen.getByText(/12 undated, not counted/i)).toBeInTheDocument();
+      expect(screen.getByText(/12 without a date read, not counted/i)).toBeInTheDocument();
+    });
+
+    it('does not report "0 books read" when every read book is simply undated', () => {
+      // A reader who hand-added 13 books with no dates saw "0 books read this year".
+      withData({ stats: { ...base.stats, books: 0, undated: 13 } });
+      render(<YearCard compact />);
+      expect(screen.queryByText(/0 books read/i)).not.toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "No dated reads in 2026 yet. 13 read books have no date read, so they aren't counted."
+        )
+      ).toBeInTheDocument();
     });
 
     it('invites a first goal when there are none', () => {

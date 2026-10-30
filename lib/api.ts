@@ -198,6 +198,8 @@ export interface ProfileHighlights {
     low_confidence: boolean;
   };
   era_split: { pre_2000: number; post_2000: number } | null;
+  /** Half or more of the classifiable rated books are nonfiction; fiction-only copy steps aside. */
+  mostly_nonfiction?: boolean;
 }
 
 export interface FeedbackRequest {
@@ -240,11 +242,19 @@ export interface CatalogResult {
   catalog_id: string | null;
   title: string;
   author: string | null;
+  /** The original publication year when the catalog gave one, else an edition's year. */
   year: number | null;
+  year_kind?: 'first_published' | 'edition' | null;
   isbn13: string | null;
   cover_url: string | null;
   subjects: string[] | null;
   description: string | null;
+}
+
+/** " · 1987" for an original year, " · 2009 edition" for an edition's, "" for none. */
+export function catalogYearLabel(r: Pick<CatalogResult, 'year' | 'year_kind'>): string {
+  if (!r.year) return '';
+  return r.year_kind === 'edition' ? ` · ${r.year} edition` : ` · ${r.year}`;
 }
 
 /** Fields the generic importer can map to (mirrors backend MAPPING_FIELDS). */
@@ -284,6 +294,8 @@ export interface AddBookRequest {
   description?: string | null;
   catalog_source?: string | null;
   catalog_id?: string | null;
+  /** ISO date (YYYY-MM-DD) the book was read; omit when unknown. */
+  date_read?: string | null;
 }
 
 /** Re-point a book's enrichment at a user-picked catalog match (PATCH /books/{id}/enrichment). */
@@ -803,6 +815,9 @@ export const REJECT_REASONS: Record<string, string> = {
   not_now: 'Not in the mood',
   overhyped: 'Feels overhyped',
   wrong_vibe: 'Wrong vibe',
+  too_similar: "Too similar to what I've read",
+  not_out_yet: 'Not out yet',
+  not_my_kind: 'Not the kind of book I read',
 };
 
 /**

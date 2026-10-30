@@ -261,9 +261,9 @@ export function renderBeat(
       return (
         <div className="space-y-4">
           <p className="font-mono text-5xl font-extrabold text-user">{beat.codeSoFar}</p>
-          <h2 className="font-display text-2xl font-bold capitalize text-text">{beat.axisKey}.</h2>
+          <h2 className="font-display text-2xl font-bold text-text">{beat.label}</h2>
+          <p className="text-sm text-faint">{beat.question}</p>
           <p className="text-base text-muted">{beat.poleLine}</p>
-          {beat.rationale && <p className="text-sm text-faint">{beat.rationale}</p>}
           {beat.nearCenter && (
             <p className="text-xs italic text-faint">
               This one was close. You live near the middle of this axis.

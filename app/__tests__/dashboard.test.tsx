@@ -8,10 +8,11 @@ import { api } from '@/lib/api';
 
 const mutate = jest.fn();
 let mockProfileStatus: unknown;
+let mockSwrData: Record<string, unknown> = {};
 jest.mock('swr', () => ({
   __esModule: true,
   default: (key: string) => ({
-    data: key === 'profile-status' ? mockProfileStatus : undefined,
+    data: key === 'profile-status' ? mockProfileStatus : mockSwrData[key],
     isLoading: false,
     error: undefined,
   }),
@@ -38,6 +39,7 @@ function renderDashboard() {
 describe('dashboard', () => {
   beforeEach(() => {
     mockProfileStatus = { last_profiled_at: '2026-09-01', dirty: false };
+    mockSwrData = {};
     push.mockClear();
     mutate.mockClear();
     runRecommend.mockReset();
@@ -91,5 +93,17 @@ describe('dashboard', () => {
     fireEvent.click(screen.getByRole('button', { name: /find my next books/i }));
     await waitFor(() => expect(screen.getByText(/no usable picks/i)).toBeInTheDocument());
     expect(push).not.toHaveBeenCalled();
+  });
+
+  it('greets a reader with no recommendation runs yet as a first visit', () => {
+    mockSwrData = { 'user-profile': { display_name: 'Ada' }, recommendations: [] };
+    renderDashboard();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Welcome, Ada.');
+  });
+
+  it('welcomes a reader back once a run exists', () => {
+    mockSwrData = { 'user-profile': { display_name: 'Ada' }, recommendations: [{ id: 1 }] };
+    renderDashboard();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Welcome back, Ada.');
   });
 });

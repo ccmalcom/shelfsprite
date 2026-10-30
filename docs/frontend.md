@@ -129,21 +129,31 @@ copy says ScreenSprite; code, routes and keys say `screen`.
   `'/'` so crawlers reaching `/welcome` attribute the page to the shared URL.
   `WaitlistForm` calls `fetch('/api/invite-requests')` directly rather than going through
   `lib/api.ts`, because that client attaches a Supabase token and would pull the Supabase browser
-  client into a bundle whose entire audience is signed out. The hero is an explicitly illustrative shelf of three real books;
-  `ResolveArtifact` explains catalog matching further down the page. The public header provides
-  sign-in and a link to the import/enrichment/recommendation walkthrough. The two invite forms
-  retain the same endpoint and honeypot behavior.
-  The screenshots (`public/marketing/library-reading-room.png`, `taste-profile-reading-room.png`) show the redesigned
-  Library and Profile, captured at **2x** from a 1200px desktop viewport (2400px-wide assets).
-  Their `next/image` dimensions match the assets and figures are capped at 1000px. Both use
-  fictional browser-intercepted API fixtures in an isolated local copy: no real account data,
-  database writes, or paid Claude calls. Captions identify the examples.
+  client into a bundle whose entire audience is signed out. The hero is an explicitly illustrative shelf of three real books
+  with example ratings, and states the bring-your-own-Anthropic-key requirement beside the
+  waitlist form. The section right after it makes the real-books claim and carries
+  `RecommendationExample`, a drawn recommendation card whose "Why for you" cites only the hero
+  shelf's books at the ratings shown there; `ResolveArtifact` beside it explains catalog matching.
+  The public header provides sign-in and a link to the import/enrichment/recommendation
+  walkthrough. The two invite forms retain the same endpoint and honeypot behavior.
+  The Library screenshot (`public/marketing/library-reading-room.png`) shows the redesigned
+  Library, captured at **2x** from a 1200px desktop viewport (a 2400px-wide asset). Its
+  `next/image` dimensions match the asset and the figure is capped at 1000px. It uses fictional
+  browser-intercepted API fixtures in an isolated local copy: no real account data, database
+  writes, or paid Claude calls. The profile example is drawn, not screenshotted:
+  `ProfileExample` is a static server component on the shared palette tokens, so it is in the
+  prerendered HTML, cannot take a reader's accent hue, and shows short trait chips that never
+  truncate. Its archetype and tagline are copied from `lib/server/archetype.ts`; keep them in
+  step if that table changes. Captions identify every example.
   **Never write `text-base` on this page** — `base` is a registered color token, so Tailwind
   resolves `text-base` to `color: var(--bg)` and paints the copy in the background (see
   `docs/conventions.md`).
 - `/` — reading-first Home: recommendation action, an actual to-read shelf preview, `CurrentReads` with finish/review, a compact reader-type link, and `YearCard compact`. The full `TasteHero` stays on Profile. Home reads the same shelf keys and 500-book limits as Library. Recommendations remain disabled until a current profile status is known; loading/errors and absent/stale profiles are explicit.
   The CTA **must check `served` before pushing to `/swipe`**: a run can finish 200 without persisting a row (empty retrieval pool, or a rerank whose every citation was dropped), and `GET /recommendations` serves the latest run that HAS rows — so navigating on a zero-served run shows the previous, fully-swiped batch and tells the reader they have seen everything (issue #64). A zero-served run surfaces `note` as a toast and stays put. `runRecommend` holds up its end by returning `run_id: null` rather than minting a run id nothing was written under.
-- `/swipe` — rec swiping. `already_read` lands the book on the read shelf then prompts a review.
+- `/swipe` — rec swiping. `already_read` first asks for an optional rating and review
+  (`AlreadyReadModal`); only "Mark as read" records the verdict and shelves the book, so Cancel
+  changes nothing. Targeted feedback prompts (`useFeedbackPrompt`) open at most once per browser
+  session, never over another dialog, and `post-setup` is deferred to a later session.
 - `/discover` — natural-language discovery ("find me a book like X"). A search box posts
   `POST /discover`; renders the interpretation echo ("Looking for: …"), a ranked list of real
   catalog matches with a per-result rationale, and "Add to to-read" per result (routes through

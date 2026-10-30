@@ -13,6 +13,7 @@ import { feedbackBlock, type FeedbackContext } from './profileFeedback';
 import type { Tiers } from './profileTiers';
 import type { ScreenTierBuild } from './screenTiers';
 import { pyJsonDumps, pyRepr } from './serialize';
+import { CLAIM_TEXT_RULE, DISTINCT_EVIDENCE_RULE, LOCKED_TRAITS_RULE } from './traitText';
 
 const ID_ARRAY = { type: 'array', items: { type: 'integer' } };
 
@@ -201,6 +202,8 @@ export function buildScreenProfilePrompt(
     'trait).\n' +
     "  - Do NOT force an item into a trait it doesn't fit just to pad the evidence.\n" +
     "  - Keep traits DISTINCT — don't emit two traits describing the same pattern.\n" +
+    DISTINCT_EVIDENCE_RULE +
+    CLAIM_TEXT_RULE +
     '  - Distinguish genuine taste from mechanical rating drift (e.g. later books in a long ' +
     'series, or later films in a franchise, slipping a star is fatigue, not a standalone taste ' +
     'trait).\n' +
@@ -242,6 +245,9 @@ export function buildScreenUpdatePrompt(
     '  - A new/edited `review` is direct testimony; prefer it over metadata guesses.\n' +
     '  - When a trait now spans books and titles, phrase it medium-neutrally.\n' +
     '  - Every trait needs at least one exhibit in `exhibits` or `exhibit_titles`.\n' +
+    LOCKED_TRAITS_RULE +
+    DISTINCT_EVIDENCE_RULE +
+    CLAIM_TEXT_RULE +
     '  - Return the COMPLETE revised trait set (the unchanged traits too), 6-12 traits, via the ' +
     'revise_taste_traits tool.\n\n' +
     `CHANGED BOOK IDS (the edits driving this update): ${pyRepr(changedIds)}\n` +

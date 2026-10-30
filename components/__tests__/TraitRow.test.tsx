@@ -113,19 +113,22 @@ describe('TraitRow', () => {
       <Harness trait={makeTrait({ status: 'confirmed', user_weight: 0.5 })} />
     );
     expect(header()).toHaveAttribute('aria-expanded', 'false');
-    expect(screen.getByText('confirmed')).toBeInTheDocument();
+    expect(screen.getByText('you confirmed')).toBeInTheDocument();
     expect(screen.getByText('0.5x')).toBeInTheDocument();
-    expect(screen.getByText('82%')).toBeInTheDocument();
+    expect(screen.getByText('82% sure')).toHaveAttribute(
+      'title',
+      expect.stringMatching(/how sure/i)
+    );
 
     rerender(<Harness trait={makeTrait({ status: 'rejected' })} />);
-    expect(screen.getByText('rejected')).toBeInTheDocument();
+    expect(screen.getByText('dismissed')).toBeInTheDocument();
     expect((container.querySelector('#trait-7') as HTMLElement).className).toContain('opacity-50');
     expect(
       screen.getByText('Rewards dense political world-building over fast plotting').className
     ).toContain('line-through');
 
     rerender(<Harness trait={makeTrait({ status: 'edited' })} />);
-    expect(screen.getByText('edited')).toBeInTheDocument();
+    expect(screen.getByText('your words')).toBeInTheDocument();
 
     rerender(<Harness trait={makeTrait({ status: 'proposed', user_weight: 1 })} />);
     expect(screen.queryByText('proposed')).toBeNull();

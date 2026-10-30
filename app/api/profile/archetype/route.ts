@@ -1,8 +1,9 @@
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { withApi, ApiError } from '@/lib/server/http';
 import { getDb, schema, type Db } from '@/lib/server/db';
-import { ARCHETYPE_HOOKS, scoreToLetter } from '@/lib/server/archetype';
-import { tsToIso } from '@/lib/server/serialize';
+import { archetypeCopy, scoreToLetter, type ArchetypeLibraryFacts } from '@/lib/server/archetype';
+import { libraryShape } from '@/lib/server/libraryShape';
+import { effectiveRating, tsToIso } from '@/lib/server/serialize';
 import { resolveAnthropicKey, makeAnthropicClient } from '@/lib/server/claude';
 import { ARCHETYPE_NO_KEY_MESSAGE } from '@/lib/server/claudeErrors';
 import { deriveArchetype } from '@/lib/server/archetypeDerive';
@@ -25,8 +26,38 @@ async function getLastProfiledAt(db: Db, userId: string): Promise<string | null>
   return metaRows[0]?.lastProfiledAt ?? null;
 }
 
+/** The rated library's shape, so the archetype copy cannot contradict the reveal's shelf facts. */
+async function libraryFacts(db: Db, userId: string): Promise<ArchetypeLibraryFacts> {
+  const rows = await db
+    .select({
+      author: schema.books.author,
+      appRating: schema.books.appRating,
+      goodreadsRating: schema.books.goodreadsRating,
+      subjects: schema.enrichment.subjects,
+      series: schema.enrichment.series,
+      seriesPosition: schema.enrichment.seriesPosition,
+    })
+    .from(schema.books)
+    .leftJoin(schema.enrichment, eq(schema.enrichment.bookId, schema.books.id))
+    .where(eq(schema.books.userId, userId))
+    .orderBy(asc(schema.books.id));
+  return libraryShape(
+    rows
+      .filter((r) => effectiveRating(r.appRating, r.goodreadsRating) !== null)
+      .map((r) => ({
+        author: r.author,
+        subjects: (r.subjects ?? null) as string[] | null,
+        inSeries: !!(r.series || r.seriesPosition),
+      }))
+  );
+}
+
 /** Port of api.py::_archetype_out — shared by GET and POST (api.py:1244-1281). */
-function archetypeOut(row: ReaderArchetypeRow, lastProfiledAt: string | null) {
+function archetypeOut(
+  row: ReaderArchetypeRow,
+  lastProfiledAt: string | null,
+  facts: ArchetypeLibraryFacts
+) {
   const axis = (
     key: 'lens' | 'engine' | 'range' | 'resonance',
     score: number,
@@ -37,11 +68,14 @@ function archetypeOut(row: ReaderArchetypeRow, lastProfiledAt: string | null) {
     rationale: rationale ? rationale : null, // Python `rationale or None`: '' → null
   });
 
+  // Copy is chosen at read time (the stored tagline is the code's default), so a library that
+  // changes shape, or a copy fix, reaches existing archetypes without a re-derive.
+  const copy = archetypeCopy(row.code, facts);
   return {
     code: row.code,
     name: row.archetypeName,
-    tagline: row.archetypeTagline,
-    hook: ARCHETYPE_HOOKS[row.code] ?? '',
+    tagline: copy.tagline || row.archetypeTagline,
+    hook: copy.hook,
     lens: axis('lens', row.axisLens, row.lensRationale),
     engine: axis('engine', row.axisEngine, row.engineRationale),
     range: axis('range', row.axisRange, row.rangeRationale),
@@ -62,8 +96,9 @@ export const GET = withApi('/api/profile/archetype', async (_req, ctx) => {
   if (!row) throw new ApiError(404, 'No archetype derived yet');
 
   const lastProfiledAt = await getLastProfiledAt(db, ctx.user.userId);
+  const facts = await libraryFacts(db, ctx.user.userId);
   ctx.timer.mark('db');
-  return Response.json(archetypeOut(row, lastProfiledAt));
+  return Response.json(archetypeOut(row, lastProfiledAt, facts));
 });
 
 /**
@@ -92,6 +127,7 @@ export const POST = withApi('/api/profile/archetype', async (_req, ctx) => {
   if (!row) throw new ApiError(500, 'Archetype upsert failed');
 
   const lastProfiledAt = await getLastProfiledAt(db, ctx.user.userId);
+  const facts = await libraryFacts(db, ctx.user.userId);
   ctx.timer.mark('db');
-  return Response.json(archetypeOut(row, lastProfiledAt));
+  return Response.json(archetypeOut(row, lastProfiledAt, facts));
 });

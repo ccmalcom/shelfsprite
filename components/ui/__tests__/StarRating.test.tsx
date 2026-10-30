@@ -4,58 +4,80 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { StarRating } from '@/components/ui/StarRating';
 
-function halfClick(el: Element, fraction: number) {
-  jest.spyOn(el, 'getBoundingClientRect').mockReturnValue({
-    left: 0,
-    width: 20,
-    right: 20,
-    top: 0,
-    bottom: 20,
-    height: 20,
-    x: 0,
-    y: 0,
-    toJSON: () => ({}),
-  } as DOMRect);
-  // A pointer click reports a click count; a keyboard-activated click reports detail 0.
-  fireEvent.click(el, { clientX: 20 * fraction, detail: 1 });
-}
-
 describe('StarRating', () => {
-  it('reports 3.5 when clicking the left side of the fourth star', () => {
+  it('sets a half star with one click on the left half of a star', () => {
     const onChange = jest.fn();
     render(<StarRating value={0} onChange={onChange} allowHalf />);
 
-    halfClick(screen.getAllByRole('radio')[3], 0.25);
+    fireEvent.click(screen.getByRole('radio', { name: '4.5 stars' }));
 
-    expect(onChange).toHaveBeenCalledWith(3.5);
+    expect(onChange).toHaveBeenCalledWith(4.5);
   });
 
-  it('reports 4 when clicking the right side of the fourth star', () => {
+  it('sets the whole star from its right half', () => {
     const onChange = jest.fn();
     render(<StarRating value={0} onChange={onChange} allowHalf />);
 
-    halfClick(screen.getAllByRole('radio')[3], 0.75);
+    fireEvent.click(screen.getByRole('radio', { name: '4 stars' }));
 
     expect(onChange).toHaveBeenCalledWith(4);
   });
 
-  it('reports 4 when clicking the exact centre of the fourth star', () => {
-    const onChange = jest.fn();
-    render(<StarRating value={0} onChange={onChange} allowHalf />);
+  it('offers one radio per half step from half a star to five', () => {
+    render(<StarRating value={0} onChange={jest.fn()} allowHalf />);
 
-    halfClick(screen.getAllByRole('radio')[3], 0.5);
-
-    expect(onChange).toHaveBeenCalledWith(4);
+    const names = screen.getAllByRole('radio').map((r) => r.getAttribute('aria-label'));
+    expect(names).toEqual([
+      'Half a star',
+      '1 star',
+      '1.5 stars',
+      '2 stars',
+      '2.5 stars',
+      '3 stars',
+      '3.5 stars',
+      '4 stars',
+      '4.5 stars',
+      '5 stars',
+    ]);
   });
 
-  it('reports the whole star when Enter or Space activates it', () => {
+  it('offers whole stars only when half stars are not allowed', () => {
+    render(<StarRating value={0} onChange={jest.fn()} />);
+
+    expect(screen.getAllByRole('radio')).toHaveLength(5);
+  });
+
+  it('marks exactly the set value as checked, so 4.5 does not read as 5 stars', () => {
+    render(<StarRating value={4.5} onChange={jest.fn()} allowHalf />);
+
+    expect(screen.getByRole('radio', { name: '4.5 stars' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    expect(screen.getByRole('radio', { name: '5 stars' })).toHaveAttribute('aria-checked', 'false');
+    expect(
+      screen.getAllByRole('radio').filter((r) => r.getAttribute('aria-checked') === 'true')
+    ).toHaveLength(1);
+  });
+
+  it('checks nothing while unrated and keeps the first option tabbable', () => {
+    render(<StarRating value={0} onChange={jest.fn()} allowHalf />);
+
+    expect(
+      screen.getAllByRole('radio').filter((r) => r.getAttribute('aria-checked') === 'true')
+    ).toHaveLength(0);
+    expect(screen.getByRole('radio', { name: 'Half a star' })).toHaveAttribute('tabindex', '0');
+  });
+
+  it('moves focus to the newly selected radio on arrow keys', () => {
     const onChange = jest.fn();
-    render(<StarRating value={0} onChange={onChange} allowHalf />);
+    const { rerender } = render(<StarRating value={4} onChange={onChange} allowHalf />);
 
-    // Keyboard activation fires a click with no pointer position and a click count of 0.
-    fireEvent.click(screen.getAllByRole('radio')[3], { clientX: 0, detail: 0 });
+    fireEvent.keyDown(screen.getByRole('radio', { name: '4 stars' }), { key: 'ArrowRight' });
+    rerender(<StarRating value={4.5} onChange={onChange} allowHalf />);
 
-    expect(onChange).toHaveBeenCalledWith(4);
+    expect(onChange).toHaveBeenCalledWith(4.5);
+    expect(screen.getByRole('radio', { name: '4.5 stars' })).toHaveFocus();
   });
 
   it('steps by half with arrow keys when half stars are allowed', () => {
@@ -72,6 +94,15 @@ describe('StarRating', () => {
     render(<StarRating value={3} onChange={onChange} />);
 
     fireEvent.keyDown(screen.getAllByRole('radio')[2], { key: 'ArrowRight' });
+
+    expect(onChange).toHaveBeenCalledWith(4);
+  });
+
+  it('snaps an off-grid value to a whole star when half stars are not allowed', () => {
+    const onChange = jest.fn();
+    render(<StarRating value={4.5} onChange={onChange} />);
+
+    fireEvent.keyDown(screen.getByRole('radio', { name: '5 stars' }), { key: 'ArrowLeft' });
 
     expect(onChange).toHaveBeenCalledWith(4);
   });

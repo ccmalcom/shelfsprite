@@ -72,6 +72,11 @@ const AddBook = z.object({
   description: z.string().nullish(),
   catalog_source: z.string().nullish(),
   catalog_id: z.string().nullish(),
+  // Same shape as PATCH /books/{id}/feedback's date_read.
+  date_read: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/)
+    .nullish(),
 });
 
 export const POST = withApi('/api/books', async (req, ctx) => {
@@ -134,6 +139,7 @@ export const POST = withApi('/api/books', async (req, ctx) => {
         source: 'manual',
         goodreadsRating: 0,
         dateAdded: todayIsoDate(),
+        dateRead: b.date_read ?? null,
         appRating: rated ? b.rating : null,
         appReview: review,
         feedbackUpdatedAt: rated || review ? utcnowTs() : null,

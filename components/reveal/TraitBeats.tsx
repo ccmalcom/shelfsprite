@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { setTraitVerdict, api, type Trait } from '@/lib/api';
 import { useToast } from '@/components/ui';
-import type { Beat } from '@/lib/revealBeats';
+import { readerLine, type Beat, type ContrastRelation } from '@/lib/revealBeats';
 import { RevealButton } from './revealFrame';
 
 type RewardBeat = Extract<Beat, { kind: 'reward-trait' }>;
@@ -21,30 +21,56 @@ function joinWithAnd(items: string[]): string {
   return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
 }
 
+const PRIMARY_BUTTON = 'rounded-lg bg-user px-4 py-2 text-sm font-semibold text-base';
+const NEUTRAL_BUTTON =
+  'rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-text';
+
+/** The parenthetical under a reward beat, worded by how the contrast book was actually rated. */
+function contrastLine(title: string, relation: ContrastRelation): string {
+  const quoted = `\u201C${title}\u201D`;
+  if (relation === 'lower') return `(Rated lower: ${quoted}.)`;
+  if (relation === 'higher') return `(Rated higher: ${quoted}.)`;
+  return `(For contrast: ${quoted}.)`;
+}
+
 /** Shared verdict-control cluster for one trait. */
 function VerdictControls({
   trait,
   lowConfidence,
   labels,
+  emphasizeConfirm = true,
   onVerdict,
   onNext,
 }: {
   trait: Trait;
   lowConfidence: boolean;
   labels: { confirm: string; reject: string; edit: string };
+  /** False where several traits sit side by side, so no answer looks chosen in advance. */
+  emphasizeConfirm?: boolean;
   onVerdict: (id: number, v: Verdict) => void;
   onNext: () => void;
 }) {
   const toast = useToast();
+  // The editor starts from the sentence the reader just read, not the model's analytic claim.
+  const shownText = readerLine(trait);
   const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(trait.claim);
+  const [draft, setDraft] = useState(shownText);
   const [busy, setBusy] = useState(false);
+  const [chosen, setChosen] = useState<Verdict | null>(null);
+
+  const buttonClass = (verdict: Verdict, base: string) =>
+    chosen === null
+      ? `${base} disabled:opacity-50`
+      : chosen === verdict
+        ? PRIMARY_BUTTON
+        : `${NEUTRAL_BUTTON} opacity-50`;
 
   async function confirm() {
     setBusy(true);
     try {
       await setTraitVerdict(trait.id, { status: 'confirmed' });
       onVerdict(trait.id, 'confirmed');
+      setChosen('confirmed');
       toast.success(CONFIRM_TOAST);
       onNext();
     } catch {
@@ -58,6 +84,7 @@ function VerdictControls({
     try {
       await setTraitVerdict(trait.id, { status: 'rejected' });
       onVerdict(trait.id, 'rejected');
+      setChosen('rejected');
       toast.info(REJECT_TOAST);
       onNext();
     } catch {
@@ -73,6 +100,8 @@ function VerdictControls({
     try {
       await api.updateTrait(trait.id, { claim: trimmed, user_note: trimmed });
       onVerdict(trait.id, 'edited');
+      setChosen('edited');
+      setEditing(false);
       toast.success('Noted. Your profile just got sharper.');
       onNext();
     } catch {
@@ -121,27 +150,30 @@ function VerdictControls({
       <button
         type="button"
         disabled={busy}
+        aria-pressed={chosen === null ? undefined : chosen === 'confirmed'}
         onClick={() => void confirm()}
-        className="rounded-lg bg-user px-4 py-2 text-sm font-semibold text-base disabled:opacity-50"
+        className={buttonClass('confirmed', emphasizeConfirm ? PRIMARY_BUTTON : NEUTRAL_BUTTON)}
       >
         {lowConfidence ? 'Actually, yes' : labels.confirm}
       </button>
       <button
         type="button"
         disabled={busy}
+        aria-pressed={chosen === null ? undefined : chosen === 'rejected'}
         onClick={() => void reject()}
-        className="rounded-lg border border-border px-4 py-2 text-sm text-muted hover:text-text disabled:opacity-50"
+        className={buttonClass('rejected', NEUTRAL_BUTTON)}
       >
         {labels.reject}
       </button>
       <button
         type="button"
         disabled={busy}
+        aria-pressed={chosen === null ? undefined : chosen === 'edited'}
         onClick={() => {
-          setDraft(trait.claim);
+          setDraft(shownText);
           setEditing(true);
         }}
-        className="px-3 py-2 text-sm text-faint hover:text-muted disabled:opacity-50"
+        className={buttonClass('edited', 'px-3 py-2 text-sm text-faint hover:text-muted')}
       >
         {labels.edit}
       </button>
@@ -158,8 +190,8 @@ export function RewardTraitBeat({
   onNext: () => void;
   onVerdict: (id: number, v: Verdict) => void;
 }) {
-  const { trait, lowConfidence, exhibitTitles, contrastTitles } = beat;
-  const line = trait.reveal_line ?? trait.claim;
+  const { trait, lowConfidence, exhibitTitles, contrastTitles, contrastRelation } = beat;
+  const line = readerLine(trait);
   const evidence =
     exhibitTitles.length > 0
       ? `Because of ${joinWithAnd(exhibitTitles.map((t) => `\u201C${t}\u201D`))}.`
@@ -176,14 +208,14 @@ export function RewardTraitBeat({
       {evidence && <p className="text-sm text-muted">{evidence}</p>}
       {contrastTitles.length > 0 && (
         <p className="text-xs italic text-faint">
-          (And because “{contrastTitles[0]}” didn’t land the same way.)
+          {contrastLine(contrastTitles[0], contrastRelation)}
         </p>
       )}
       <div className="pt-2">
         <VerdictControls
           trait={trait}
           lowConfidence={lowConfidence}
-          labels={{ confirm: 'That\u2019s me', reject: 'Not quite', edit: 'Almost\u2026' }}
+          labels={{ confirm: 'That\u2019s me', reject: 'Not me', edit: 'Almost\u2026' }}
           onVerdict={onVerdict}
           onNext={onNext}
         />
@@ -209,14 +241,15 @@ export function AversionsBeat({
       <ul className="space-y-4 text-left">
         {beat.items.map(({ trait, evidence }) => (
           <li key={trait.id} className="border-l-2 border-danger/40 pl-3">
-            <p className="text-sm text-text">{trait.reveal_line ?? trait.claim}</p>
-            {evidence && <p className="mb-2 text-xs italic text-faint">({evidence})</p>}
+            <p className="text-sm text-text">{readerLine(trait)}</p>
+            {evidence && <p className="mb-2 text-xs italic text-faint">{evidence}</p>}
             <VerdictControls
               trait={trait}
               lowConfidence={false}
+              emphasizeConfirm={false}
               labels={{
                 confirm: 'True',
-                reject: 'Not really',
+                reject: 'Not me',
                 edit: 'It\u2019s more specific than that\u2026',
               }}
               onVerdict={onVerdict}

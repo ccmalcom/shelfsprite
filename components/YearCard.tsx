@@ -80,8 +80,15 @@ export default function YearCard({ compact = false }: { compact?: boolean }) {
           </Link>
         </div>
         <p className="mt-3 text-sm text-muted">
-          {stats.books} books read this year
-          {stats.undated > 0 ? ` \u00b7 ${stats.undated} undated, not counted` : ''}
+          {/* A "0 books read" beside a full shelf reads as broken when the books simply have
+              no date read (a hand-built starter library), so say which it is. */}
+          {stats.books === 0 && stats.undated > 0
+            ? `No dated reads in ${year} yet. ${stats.undated} read ${
+                stats.undated === 1 ? 'book has' : 'books have'
+              } no date read, so ${stats.undated === 1 ? "it isn't" : "they aren't"} counted.`
+            : `${stats.books} books read this year${
+                stats.undated > 0 ? ` \u00b7 ${stats.undated} without a date read, not counted` : ''
+              }`}
         </p>
         <div className="mt-4 space-y-3">
           {goals.length ? (
