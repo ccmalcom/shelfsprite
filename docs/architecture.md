@@ -26,14 +26,20 @@ applied with drizzle-kit from `drizzle/`.
 
 - `db.ts` / `schema.ts` — database client and drizzle tables, indexes, constraints, and inferred
   row types.
+- `authMode.ts` — the single, fail-closed decision on whether auth is on (`resolveAuthMode`,
+  `AuthConfigError`). Dependency-free because page middleware imports it.
 - `auth.ts` — Supabase ES256 JWT verification, local single-user mode, and admin-email
-  classification (`verifyRequestUser`, `authEnabled`, `isAdminEmail`).
+  classification (`verifyRequestUser`, `isAdminEmail`).
 - `http.ts`, `errors.ts`, `log.ts` — the `withApi` route wrapper, stable API errors, request IDs,
   structured request logs, and `Server-Timing` support.
 - `ratelimit.ts` — Postgres fixed-window limits used by catalog, enrichment, recommendation,
   discovery, and other protected routes (`checkRateLimit`, `RATE_LIMITS`).
 - `config.ts`, `settings.ts`, `crypto.ts` — application configuration, per-user settings, and
-  encryption/decryption of stored user secrets.
+  AES-256-GCM encryption/decryption of stored user secrets under `ENCRYPTION_KEY`.
+- `rotateEncryptionKey.ts` — re-encrypts every stored Anthropic key from an old `ENCRYPTION_KEY`
+  to a new one (`rotateEncryptionKey`); a dry run unless applied, safe to rerun, and it reports
+  counts and row ids only. Driven by `scripts/rotate-encryption-key.ts`; runbook in
+  `docs/hosting.md`.
 - `claude.ts`, `anthropic.ts`, `claudeErrors.ts` — per-user Anthropic key resolution, injectable
   Claude clients/tool-input extraction, usage-cost recording through `trackedCreate`, and shared
   user-facing failures. Every call that must end in one named tool goes through
@@ -92,6 +98,9 @@ applied with drizzle-kit from `drizzle/`.
   to resend. A lookup that throws is `unmatched`, never retried in a loop. `catalogHitOut` is the
   hit shape shared with `GET /api/catalog/search`.
 - `export.ts` — user-scoped CSV and JSON backup generation (`buildExport`, `exportJsonText`).
+- `goals.ts` — reading-goal vocabulary, counting rules and the year card's statistics
+  (`countForGoal`, `yearStats`, `loadReadRows`). Progress is always recounted from persisted rows;
+  there is no stored counter.
 - `purge.ts` — transactional row-deletion primitives for profile, library, and account resets.
   It deletes enrichments before books for foreign-key safety.
 - `recs.ts` — recommendation response shaping, the rejection-reason vocabulary, and creation or
@@ -113,6 +122,17 @@ User-facing name ScreenSprite; code, routes and tables say `screen`. Opt-in per 
 
 - `screenSettings.ts` — the opt-in flag (`isScreenEnabled`, `requireScreenEnabled`,
   `setScreenEnabled`). Toggling stamps `screen_toggled_at` and sets a profile rebuild reason.
+- `screenOptOut.ts` — turning ScreenSprite off (`previewScreenOptOut`, `disableScreen`): in one
+  transaction it deletes every trait citing a title, clears the archetype, sets a rebuild reason
+  and stamps `screen_toggled_at`. Titles are kept, so turning it back on restores the library.
+- `screenProfile.ts` — unified-profile plumbing: whether the screen prompt variant runs
+  (`screenVariantActive`), `titlesChangedSince`, and `assertScreenToggleUnchanged`, which makes an
+  opt-in or opt-out supersede an in-flight profile, archetype or reveal run.
+- `screenTiers.ts` — SCREEN DATA for the unified profile, the twin of `profileTiers.ts` with
+  separate tiers per medium (`buildScreenTiers`, `SCREEN_TITLE_CAP`).
+- `screenProfilePrompts.ts` — the screen variant of the profile build and revise prompts. These
+  are deliberate copies; the book prompts are pinned byte-for-byte by a golden test and must not
+  be edited to serve screen.
 - `titles.ts` — title row types, effective rating/review (`app_* ?? letterboxd_*`; null means
   unrated, there is no 0 sentinel in storage), profile eligibility, `titleOut`, and
   `normalizeTitleKey` (Unicode-safe; not `dedup.normalizeTitle`).
@@ -212,11 +232,19 @@ concurrent enrichment or user correction wins.
   performs a minimal trait revision, or falls back to a full rebuild when correction/exclusion
   semantics require one (`booksChangedSince`, `collectUpdateInputs`, `updateTasteProfile`).
 - `profileMeta.ts` and `traits.ts` — profile dirty-state row creation and trait response shaping.
+- `traitText.ts` — dependency-free reader-facing trait text: strips book-id citations Claude
+  sometimes repeats inside a claim (`stripIdCitations`, `readerClaim`).
+- `profileDiff.ts` — diff of proposed trait claims across a refresh for the post-refresh summary
+  (`diffProposedClaims`, `matchRevisedClaims`, the calibrated `REWORD_THRESHOLD`).
+- `libraryShape.ts` — reader-facing facts about a library's shape (`libraryShape`, `genreLabel`,
+  `mostlyFiction`) shared by highlights, the subject breakdown, archetype copy and the
+  recommender's fiction check, so the reveal never contradicts itself.
 - `archetype.ts` / `archetypeDerive.ts` — the four-axis, 16-code reader-archetype definition and
   Claude-assisted derivation persisted per user (`scoresToCode`, `deriveArchetype`).
 - `revealLines.ts` — idempotent generation and persistence of short reveal lines only for traits
   that do not already have one (`generateRevealLines`). Profile highlights are computed directly
-  by `app/api/profile/highlights/route.ts` from the user's rated, enriched books.
+  by `app/api/profile/highlights/route.ts` from the user's rated, enriched books, using
+  `libraryShape.ts`.
 
 ### Recommendation and discovery
 
@@ -232,8 +260,12 @@ concurrent enrichment or user correction wins.
   before any rerank. `titleSeedPool` resolves cold-start title seeds and
   `resolveReferenceBooks`/`referencePool` resolve a book a discovery request names ("like
   Gilead") through `searchBooks`, keeping only hits whose own title and author match.
-- `recFilters.ts` — reusable language, series, fuzzy-duplicate, learner-edition, collection,
-  unreleased, nonfiction-companion, author-cap, directive, and discovery constraints.
+- `recFilters.ts` — reusable language, series (title and description position),
+  fuzzy-duplicate, learner-edition, collection/box-set, unreleased, nonfiction-companion,
+  translated-edition-of-an-owned-book, author-cap (pool and served deck), directive, and discovery
+  constraints.
+- `recDisplay.ts` — dependency-free card-facing cleanup of stored catalog fields (`cardChips`,
+  `plainDescription`, `cardYear`), applied by `recOut` at serialization so every card path agrees.
 - `publisherAuthor.ts` — the conservative publisher/imprint/brand-as-author test
   (`isPublisherLikeAuthor`, `hasPublisherAuthor`). `assemble` drops a candidate whose author is
   one, and enrichment keeps a match resting on one at `LOW`. A trailing word that can be a
@@ -266,6 +298,13 @@ are returned or stored.
 - `directive.ts` / `directiveDistill.ts` — normalization of persisted directive constraints and
   an ephemeral Claude-assisted authoring flow. The persisted directive steers profile prompts and
   supported recommendation filters.
+- `preferences.ts` — the only reader of the reader's explicit favorites (`readPreferences`,
+  `preferredAuthorSurnames`); `cleanDirectiveConstraints` in `directive.ts` is the only writer.
+- `preferenceSuggest.ts` — deterministic "suggest from your library" for the favorites editor,
+  counted over loved books only. No Claude or catalog call.
+- `exclusions.ts` — the single definition of what a hard exclusion matches and therefore what a
+  favorite conflicts with (`authorExcluded`, `subjectExcluded`). The recommender filter, the
+  directive conflict check and the editor warning all use it; do not write a fourth copy.
 - `feedbackPrompts.ts` — eligibility and state for one-time and repeatable in-product feedback
   prompts. Feedback and taste-signal writes are implemented in their `app/api/**` handlers and
   update profile dirty-state timestamps.
@@ -303,9 +342,11 @@ approving again.
 
 ## Locked product decisions
 
-1. **Goodreads CSV export is the only ingest path, with import-once semantics.** Never scrape
-   Goodreads or call its API. Import seeds the library and must never overwrite in-app
-   `app_rating` or `app_review` values.
+1. **Books come only from what the reader provides, and CSV import is import-once.** The ingest
+   paths are a CSV export (Goodreads, The StoryGraph, a ShelfSprite backup, or a column-mapped
+   CSV), a pasted list, the quick-rate grid, and manual add; screen titles come from a Letterboxd
+   export. Never scrape Goodreads or any other reading site, or call its API. Import seeds the
+   library and must never overwrite in-app `app_rating` or `app_review` values.
 2. **The recommender is two-stage.** Deterministic retrieval produces real catalog candidates;
    Claude then reranks and explains that bounded set. The LLM is never the recommender itself and
    cannot invent titles into the result.
