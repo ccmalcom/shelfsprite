@@ -18,6 +18,7 @@ import { Button, Badge, Card, Modal, useToast } from '@/components/ui';
 import { inStarBand } from '@/lib/server/rating';
 import BookEditModal from '@/components/BookEditModal';
 import BookDetailModal from '@/components/BookDetailModal';
+import { AffiliateNote, BookLinkPills, shelfLinks } from '@/components/BookLinks';
 import AddBookModal from '@/components/AddBookModal';
 import PasteImport from '@/components/onboarding/PasteImport';
 import EnrichmentCorrectionModal from '@/components/EnrichmentCorrectionModal';
@@ -475,11 +476,17 @@ function ToReadTab({ books }: { books: Book[] }) {
                         <p className="mt-1 text-xs text-faint">Tap to view details</p>
                       </div>
                     </button>
+                    {/* Outside the row's button: a link can't sit inside a button. Indented
+                        to line up with the title (md cover width plus the row gap). */}
+                    <div className="-mt-2 flex flex-wrap gap-1.5 pb-3 pl-[5.5rem] pr-4">
+                      <BookLinkPills links={shelfLinks(book)} size="sm" />
+                    </div>
                   </li>
                 );
               })}
             </ul>
           )}
+          <AffiliateNote show={filtered.some((b) => shelfLinks(b).some((l) => l.affiliate))} />
         </>
       )}
 

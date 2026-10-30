@@ -33,6 +33,7 @@ Current source readers under `lib`, `app`, and `utils` use:
 | `ENCRYPTION_KEY`                       | AES-256-GCM key for stored per-user Anthropic credentials.                                                 |
 | `ANTHROPIC_API_KEY`                    | Server fallback when a user has no stored key.                                                             |
 | `GOOGLE_BOOKS_API_KEY`                 | Optional Google Books credential.                                                                          |
+| `NEXT_PUBLIC_BOOKSHOP_AFFILIATE_ID`    | Optional Bookshop.org affiliate ID, inlined at build. Unset, book links go out plain with no disclosure.   |
 | `MYLIBRARY_MODEL`                      | Profile and rerank model override; defaults to `claude-sonnet-5-5`. Never applies to the Haiku operations. |
 | `MYLIBRARY_MODEL_PROFILE`              | Profile build/update model; falls back to `MYLIBRARY_MODEL`.                                               |
 | `MYLIBRARY_MODEL_RERANK`               | Rerank model (recommend, similar, discover); falls back to `MYLIBRARY_MODEL`.                              |

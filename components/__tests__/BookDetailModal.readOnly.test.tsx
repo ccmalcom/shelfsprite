@@ -51,4 +51,29 @@ describe('BookDetailModal', () => {
     expect(onMove).toHaveBeenCalledWith(book, 'currently-reading', false);
     expect(onClose).toHaveBeenCalled();
   });
+
+  it('shows the commission note only beside an affiliate link', () => {
+    const prev = process.env.NEXT_PUBLIC_BOOKSHOP_AFFILIATE_ID;
+    try {
+      const withIsbn = { ...book, isbn13: '9780441013593' } as Book;
+      process.env.NEXT_PUBLIC_BOOKSHOP_AFFILIATE_ID = '12345';
+      const { unmount } = render(<BookDetailModal book={withIsbn} readOnly onClose={jest.fn()} />);
+      const shop = screen.getByRole('link', { name: /Bookshop\.org/ });
+      expect(shop).toHaveAttribute('href', 'https://bookshop.org/a/12345/9780441013593');
+      expect(shop.getAttribute('rel')).toContain('sponsored');
+      expect(screen.getByText(/earns a small commission/)).toBeInTheDocument();
+      unmount();
+
+      delete process.env.NEXT_PUBLIC_BOOKSHOP_AFFILIATE_ID;
+      render(<BookDetailModal book={withIsbn} readOnly onClose={jest.fn()} />);
+      expect(screen.getByRole('link', { name: /Bookshop\.org/ })).toHaveAttribute(
+        'href',
+        'https://bookshop.org/book/9780441013593'
+      );
+      expect(screen.queryByText(/earns a small commission/)).toBeNull();
+    } finally {
+      if (prev === undefined) delete process.env.NEXT_PUBLIC_BOOKSHOP_AFFILIATE_ID;
+      else process.env.NEXT_PUBLIC_BOOKSHOP_AFFILIATE_ID = prev;
+    }
+  });
 });
