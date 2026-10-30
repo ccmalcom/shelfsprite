@@ -491,8 +491,13 @@ export default function SettingsPage() {
         <section className="mb-6">
           <Card>
             <h2 className="mb-1 font-display text-lg font-semibold text-text">Import books</h2>
-            <p className="mb-4 text-sm text-muted">
-              Bring in your library from Goodreads, StoryGraph, a ShelfSprite backup, or any CSV.
+            <p className="mb-2 text-sm text-muted">
+              Goodreads and The StoryGraph exports are recognized automatically. A ShelfSprite
+              backup or any other CSV works too.
+            </p>
+            <p className="mb-4 text-xs text-faint">
+              From The StoryGraph: Manage Account &rsaquo; Export. From Goodreads: My Books &rsaquo;
+              Import/Export.
             </p>
             <Button onClick={() => setShowImport(true)}>Import from a file</Button>
           </Card>

@@ -33,6 +33,13 @@ export const RATE_LIMITS = {
    * byte-parity, and this route should carry the normal {"detail": ...} shape.
    */
   inviteRequest: { limit: 5, windowSeconds: 3600 },
+  /**
+   * No Python ancestor: POST /api/books/match, onboarding's bulk catalog matching. One request
+   * is a batch of up to MATCH_BATCH_MAX lookups, and a 200-line paste is about twenty batches
+   * of ten, so this leaves room for a paste plus its retries. Answers ApiError(429) with the
+   * normal {"detail": …} shape.
+   */
+  bookMatch: { limit: 40, windowSeconds: 60 },
 } as const;
 
 export interface RateLimitResult {

@@ -187,3 +187,32 @@ describe('getJson', () => {
     }
   });
 });
+
+describe('getJson throttle', () => {
+  // The onboarding bulk matcher runs a few lookups at once (bulkMatch.ts). Concurrent
+  // callers used to read the same lastCallAt and fire together; the throttle now queues
+  // them, so requests keep their spacing however many callers are waiting.
+  it('spaces concurrent callers instead of letting them fire together', async () => {
+    const { db, close } = await makeTestDb();
+    setRate(20); // one request every 50 ms
+    const startedAt: number[] = [];
+    const oldFetch = globalThis.fetch;
+    globalThis.fetch = async () => {
+      startedAt.push(Date.now());
+      return Response.json({ ok: true });
+    };
+    try {
+      await Promise.all(
+        ['a', 'b', 'c', 'd'].map((p) => getJson(db, `https://throttle.test/${p}`, 'test'))
+      );
+      expect(startedAt).toHaveLength(4);
+      const gaps = startedAt.slice(1).map((t, i) => t - startedAt[i]);
+      // Timer slack can land a hair early; anything near 0 means the callers burst.
+      for (const gap of gaps) expect(gap).toBeGreaterThanOrEqual(40);
+    } finally {
+      globalThis.fetch = oldFetch;
+      setRate(1_000_000);
+      await close();
+    }
+  });
+});

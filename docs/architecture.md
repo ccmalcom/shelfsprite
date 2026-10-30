@@ -68,11 +68,43 @@ applied with drizzle-kit from `drizzle/`.
 - `books.ts` — book and enrichment response shaping (`bookOut`, `bookSummary`) plus the canonical
   shelf vocabulary. Book mutations themselves live in the corresponding `app/api/books/**`
   route handlers and are scoped by `userId`.
+- `addBook.ts` — the one manual-add path: `AddBookSchema`, `validateAddBook` (the 422 messages
+  and their order), `libraryWorks` + `hasSameWork` (the same-work duplicate walk, scoped to the
+  user) and `insertManualBook` (the book row plus the `MANUAL` / `manual_add` enrichment row
+  when catalog fields are present). `POST /api/books` and `POST /api/books/bulk` both use it;
+  do not write a second insert. `addBooks` runs the bulk form: the library is read once, each
+  entry is validated and inserted exactly as a single add (one transaction per book), a
+  duplicate of the library or of an earlier entry is reported in `duplicates` rather than
+  raised, and a bad entry is reported in `errors` against its index.
+- `pasteList.ts` — dependency-free parsing of a pasted list of titles (`parsePastedList`, capped
+  at `PASTE_MAX_ITEMS` = 200): bullets, numbering and checkboxes stripped; "Title by Author",
+  "Title - Author" and an Audible-style "By: Author" line understood; Kindle, Audible and Libby
+  page noise (buttons, dates, prices, durations, progress, ratings, formats) skipped; exact
+  repeats dropped. `authorEchoes` finds unmatched bare-name lines that repeat the author of the
+  title above them. The browser imports it, so keep it free of imports.
+- `bulkMatch.ts` — onboarding's bulk catalog matching (`matchItems`). Every item goes through
+  `catalog.searchBooks` and its ranking. `best` mode (a pasted list) takes the hit that is
+  strongly the named book (`recAssemble.titleSeedMatch`) or else the first hit at or above
+  `MATCH_FLOOR` on `searchScore`, plus the other hits as alternatives. `strict` mode (the
+  quick-rate picks) accepts only `titleSeedMatch`. Each returned hit carries `in_library`
+  against the caller's library. At most `MATCH_CONCURRENCY` (3) lookups run at once, and none
+  starts after `MATCH_BUDGET_MS` (20 s); an item not started is returned `pending` for the client
+  to resend. A lookup that throws is `unmatched`, never retried in a loop. `catalogHitOut` is the
+  hit shape shared with `GET /api/catalog/search`.
 - `export.ts` — user-scoped CSV and JSON backup generation (`buildExport`, `exportJsonText`).
 - `purge.ts` — transactional row-deletion primitives for profile, library, and account resets.
   It deletes enrichments before books for foreign-key safety.
 - `recs.ts` — recommendation response shaping, the rejection-reason vocabulary, and creation or
   matching of library books from accepted recommendations.
+
+Onboarding routes: `POST /api/books/match` takes up to `MATCH_BATCH_MAX` (25) `{title, author}`
+items and a `mode`, answers one `matched` / `unmatched` / `pending` result per item in order, and
+writes nothing. It has its own per-user `RATE_LIMITS.bookMatch` bucket (40 a minute, the normal
+`{"detail": …}` 429 shape) and exports the literal `maxDuration = 60`, which leaves 40 s of
+headroom over the 20 s lookup budget. `POST /api/books/bulk` takes up to 200 books and answers
+`{added, duplicates, errors}` from `addBooks`. Neither is a Goodreads path: titles come from the
+reader and records from the catalog search, and the quick-rate titles are the static list in
+`lib/quickRatePicks.ts`, never generated.
 
 ### ScreenSprite (movies & TV)
 
@@ -139,7 +171,9 @@ Routes: `POST /api/screen/import`, `GET|PUT /api/settings/screen`, `GET /api/scr
   manual search/ranking, ISBN lookup, subject/author/query expansion, and description lookup for an
   already-resolved match (`openlibraryWorkDescription`, `googleBooksVolumeDescription`, and the
   `catalogDescription` dispatcher over the two). Its exported `Candidate` is the common catalog
-  record used downstream.
+  record used downstream. The throttle is a promise chain, so concurrent callers (the bulk
+  matcher) are spaced like serial ones instead of all reading the same `lastCallAt` and firing
+  together; only the spacing is serialized, and the requests themselves overlap.
 - `dedup.ts` and `similarity.ts` — shared title/author normalization, same-work checks, and
   deterministic title similarity (`normalizeTitle`, `sameWork`, `titleSim`, `STRONG_SIM`).
 - `enrichment.ts` — selects eligible books, resolves ISBN before title/author search, scores
@@ -189,7 +223,9 @@ concurrent enrichment or user correction wins.
 - `recSignal.ts` — the single assembled recommendation signal: loved/rated books, subjects,
   authors, languages, existing-library dedup sets, traits, feedback, rejection history, and the
   user directive (`buildSignal`, `isColdStart`). `buildBookSignal` creates the book-anchored form
-  used by “more like this.”
+  used by “more like this.” `LOVED_MIN` and the cold-start thresholds are defined in the
+  dependency-free `coldStart.ts` (with `coldStartProgress`, which the onboarding meter uses) and
+  re-exported here; change them there.
 - `recAssemble.ts` — deterministic Stage 1 retrieval. `metadataPool`, `seedPool`, and
   `discoveryPool` query real catalog sources; `assemble` removes owned/duplicate/ineligible and
   unreleased editions, applies language/series/author rules, tracks provenance, and caps the pool

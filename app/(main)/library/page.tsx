@@ -19,6 +19,7 @@ import { inStarBand } from '@/lib/server/rating';
 import BookEditModal from '@/components/BookEditModal';
 import BookDetailModal from '@/components/BookDetailModal';
 import AddBookModal from '@/components/AddBookModal';
+import PasteImport from '@/components/onboarding/PasteImport';
 import EnrichmentCorrectionModal from '@/components/EnrichmentCorrectionModal';
 import ShelfSprite from '@/components/ShelfSprite';
 import BookCover from '@/components/BookCover';
@@ -1089,6 +1090,7 @@ function LibraryInner() {
     : 'read';
 
   const [adding, setAdding] = useState(false);
+  const [pasting, setPasting] = useState(false);
   const [lcQueue, setLcQueue] = useState<Book[] | null>(null);
   const [lcIndex, setLcIndex] = useState(0);
 
@@ -1102,6 +1104,16 @@ function LibraryInner() {
 
   async function handleAdded(book: Book) {
     setTab((book.exclusive_shelf as Tab) ?? 'read');
+    await refreshShelves();
+  }
+
+  async function handleBulkAdded(books: Book[]) {
+    if (books.length === 0) return;
+    setTab('read');
+    await refreshShelves();
+  }
+
+  async function refreshShelves() {
     await Promise.all([
       mutate(READ_KEY),
       mutate(TO_READ_KEY),
@@ -1242,10 +1254,38 @@ function LibraryInner() {
             My library
           </h1>
         </div>
-        <Button onClick={() => setAdding(true)}>+ Add book</Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button variant="secondary" onClick={() => setPasting(true)}>
+            Paste a list
+          </Button>
+          <Button onClick={() => setAdding(true)}>+ Add book</Button>
+        </div>
       </div>
 
       {adding && <AddBookModal onAdded={handleAdded} onClose={() => setAdding(false)} />}
+
+      {pasting && (
+        <Modal
+          labelId="paste-list-title"
+          onClose={() => setPasting(false)}
+          className="fade-in flex max-h-[85vh] w-full max-w-xl flex-col overflow-y-auto rounded-2xl border border-border bg-surface p-6 shadow-2xl"
+        >
+          <h2 id="paste-list-title" className="mb-1 font-display text-lg font-bold text-text">
+            Paste a list of titles
+          </h2>
+          <p className="mb-4 text-sm text-muted">
+            From your notes, or a Kindle, Audible or Libby library page. You check every match
+            before anything is added, and books already in your library are skipped.
+          </p>
+          <PasteImport
+            onCancel={() => setPasting(false)}
+            onAdded={(books) => {
+              setPasting(false);
+              void handleBulkAdded(books);
+            }}
+          />
+        </Modal>
+      )}
 
       {lcQueue && lcQueue[lcIndex] && (
         <EnrichmentCorrectionModal

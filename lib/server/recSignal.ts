@@ -22,14 +22,15 @@ import { readPreferences } from './preferences';
 import { mostlyFiction } from './libraryShape';
 import { dedupKey, seriesInfo } from './recFilters';
 import { effectiveRating, pyFloat, round2, type PyFloat } from './serialize';
+import { COLD_START_LOVED, COLD_START_RATED, LOVED_MIN } from './coldStart';
 
 /** recommend.py:51-62 tuning knobs. */
 export const TOP_SUBJECTS = 8;
 export const TOP_AUTHORS = 6;
-export const LOVED_MIN = 4; // effective rating at/above which a book counts as "loved"
 export const LOVED_SAMPLE = 20; // loved books shown to Claude for context
-export const COLD_START_LOVED = 8;
-export const COLD_START_RATED = 12;
+// LOVED_MIN (effective rating at/above which a book counts as "loved") and the cold-start
+// thresholds live in the dependency-free coldStart.ts so onboarding UI can count toward them.
+export { LOVED_MIN, COLD_START_LOVED, COLD_START_RATED };
 
 const REJECTED_STATUS = 'rejected';
 

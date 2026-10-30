@@ -108,7 +108,8 @@ export default function ImportModal({
         Import books
       </h2>
       <p className="mb-4 text-sm text-muted">
-        Goodreads, StoryGraph, a ShelfSprite backup, or any CSV from another app.
+        Goodreads and The StoryGraph exports are recognized automatically, and so is a ShelfSprite
+        backup. Any other CSV can be matched column by column.
       </p>
 
       {!preview && (
@@ -131,7 +132,9 @@ export default function ImportModal({
           />
           <BookOpen className="mx-auto mb-2 h-10 w-10 text-faint" />
           <p className="font-medium text-text">Drop a CSV here, or click to browse</p>
-          <p className="mt-1 text-xs text-faint">StoryGraph, Calibre, LibraryThing, …</p>
+          <p className="mt-1 text-xs text-faint">
+            From The StoryGraph: Manage Account &rsaquo; Export.
+          </p>
         </label>
       )}
 

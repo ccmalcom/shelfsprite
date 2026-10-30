@@ -175,9 +175,16 @@ copy says ScreenSprite; code, routes and keys say `screen`.
   the mobile `BottomNav` (`primary: true` in `NAV_ROUTES`). Suggested prompts fill the input;
   the reader still submits Search. Results use the same divided list rhythm as Library.
 - `/to-read` — legacy redirect to `/library?tab=to-read`; it has no independent page UI.
-- `/library` — Read includes unrated books directly in its list, not only via the review queue; click a row to re-rate/review; each tab's sort dropdown is sticky per tab via `useStickySort` under `shelfsprite:library-sort:<tab>` (issue #63), so the hardcoded default only applies to a browser that has never chosen one — search text and the star-band filter stay transient by design; "N books waiting on a rating" button steps through unrated read books; **+ Add book** button opens `AddBookModal`; "N books need a match check" button (shown whenever any book across all four shelves has `confidence_label === 'LOW'`) steps through `EnrichmentCorrectionModal`.
+- `/library` — Read includes unrated books directly in its list, not only via the review queue; click a row to re-rate/review; each tab's sort dropdown is sticky per tab via `useStickySort` under `shelfsprite:library-sort:<tab>` (issue #63), so the hardcoded default only applies to a browser that has never chosen one — search text and the star-band filter stay transient by design; "N books waiting on a rating" button steps through unrated read books; **+ Add book** button opens `AddBookModal`; **Paste a list** opens `PasteImport` in a `Modal` (no cold-start meter there, since the page does not load the library's ratings for it) and switches to the Read tab after an add; "N books need a match check" button (shown whenever any book across all four shelves has `confidence_label === 'LOW'`) steps through `EnrichmentCorrectionModal`.
 - `/profile` — `TasteHero` archetype card at top; taste traits as compact, independently expandable rows (`components/profile/TraitsSection.tsx`, `components/profile/TraitRow.tsx`): a collapsed row shows polarity, a two-line claim, confidence, any non-`proposed` status, the reduced-weight marker and rejected dimming; the expanded panel holds evidence (`e.g.` / `unlike`), Confirm / Not me / Apply less, and **Reword**, which opens the inline editor (a row cannot collapse while editing). `?trait=<id>` opens and scrolls to that trait once traits load, resetting the Loves/Avoids filter to All when it would hide it; it is read with `useSearchParams` inside a `<Suspense>` boundary (required for the production build) because Next's router navigates with `history.pushState`, so a `#hash` would not react to client navigation. Then the `CustomInstructions` editor, rating distribution, genre breakdown (book stats; `/screen/profile` shows screen stats instead — see the ScreenSprite Profile note). Also carries the **mobile escape-hatch row** (`sm:hidden`, top-right): links to `/settings` and — gated on `me?.is_admin` — `/admin`. Both routes are unreachable on a phone otherwise, since the `NavBar` link row is `hidden sm:flex` and the `BottomNav` is capped at 5 items (issue #80).
 - `/setup` — CSV import wizard plus a no-CSV "add books manually" branch (`ManualStep`). Now a thin wrapper around `components/SetupWizard.tsx`. `UploadStep` also links a downloadable blank template (`public/shelfsprite-template.csv`, headers = the `canonical` import format) for testers with no Goodreads/StoryGraph export — fills through the same upload/`detect_format` path, no separate code path.
+  `UploadStep` is the reader's first choice. It names Goodreads and The StoryGraph side by side,
+  each with where its export lives (My Books › Import/Export; Manage Account › Export, the paths
+  this page already gave), because both formats are detected by `import-csv.ts#detectFormat`.
+  Below it, "No export? Start another way" offers three starts, each opening `ManualStep` in a
+  `ManualMode`: `quick` (the quick-rate grid), `paste` (a pasted list) and `list` (search and add
+  by hand). Both bulk flows return to the `list` view with their books appended, so the reader
+  can mix them, and that view shows `ColdStartMeter` once it holds a book.
 - `/settings` — API key management, **Claude usage this month** panel, + Danger Zone.
   The usage panel (`getUsage` / `USAGE_KEY` SWR call) shows month-to-date spend vs. the
   soft cap as a progress bar, a per-operation cost breakdown (`by_operation`), an
@@ -201,7 +208,7 @@ navigation. Auth token consumption and full-document navigation remain unchanged
 ## Components
 
 - **`LibraryGate`** — gates `/`, `/swipe`, `/library` behind having a library. Renders `SetupWizard` inline when `stats.total === 0`, otherwise the page. Decision is **latched** on first stats load so ingesting books mid-wizard doesn't swap it out. `/profile`, `/to-read`, `/settings` are never gated — `/settings` must stay reachable to add the Anthropic key before profiling.
-- **`SetupWizard`** — the onboarding flow. Takes optional `onComplete` so it can be used both at `/setup` and inline by the gate. First step is always `ApiKeyStep` (auto-advances if key already configured). CSV path (ingest + enrich) is required two-step — no "skip enrichment". Manual path (`ManualStep`) skips enrich: manual adds already carry catalog metadata.
+- **`SetupWizard`** — the onboarding flow. Takes optional `onComplete` so it can be used both at `/setup` and inline by the gate. First step is always `ApiKeyStep` (auto-advances if key already configured). CSV path (ingest + enrich) is required two-step — no "skip enrichment". Manual path (`ManualStep`) skips enrich: manual adds already carry catalog metadata. That holds for the paste and quick-rate starts too, because they add through the same manual-add path (`lib/server/addBook.ts`).
 - **`TasteHero`** — archetype-first profile card (profile page only, NOT on home page). Render states: (1) loading skeleton, (2) no-profile CTA, (3) no-archetype CTA, (4) full archetype display (code badge + subtitle + name + tagline + trait chips + axis bars). Axis bars: `axis-name | bar | winning-letter + winning-label [why]` — left-aligned. Trait chips expand on click (truncated at 60 chars). Footer: Re-derive (ghost) + Share buttons; stale warning when `is_stale`.
 - **`ArchetypeShareModal`** — canvas share image using archetype color.
 - **`ArchetypeExplainerModal`** — static inline component in `TasteHero.tsx` (not a separate file). Explains the 4 axes. Opened via "What is this?" link.
@@ -212,6 +219,30 @@ navigation. Auth token consumption and full-document navigation remain unchanged
   (rationale per result). Results are not persisted; "Add to to-read" routes through the
   existing `POST /books` add path. Does not touch the main recommendations feed / swipe deck.
 - **`AddBookModal`** — manual add: debounced `/catalog/search` → pick a real result → optional shelf + star rating + review text → `POST /books`. Used by Library page and setup wizard manual branch. It, `/discover`, and `SimilarBooksModal` must all forward the picked result's `description` to `POST /books` alongside cover/subjects/catalog ids: nothing backfills a description for an unrated to-read book later.
+- **Onboarding bulk adds (`components/onboarding/`)** — the faster starts for a reader with no
+  export. Both flows match through `POST /books/match` in batches of ten
+  (`lib/matchBatches.ts#matchInBatches`: a `pending` line goes back to the front of the queue, a
+  batch that settles nothing or a failed request marks its lines unmatched, so the loop always
+  ends) and both land on **`BulkReview`**, the one review screen. Each row shows cover, title,
+  author and year, an optional half-star `StarRating`, **Not this book** (the match's
+  alternatives plus a fresh `CatalogInlineSearch`, which is the add-a-book modal's debounced
+  `/catalog/search`) and a remove button; unmatched lines can be searched by hand or dropped.
+  A book flagged `in_library`, or the same work as an earlier row (`dedup.sameWork`, imported
+  client-side since `dedup.ts` has no dependencies), is badged and never sent. Confirming sends
+  the rest to `POST /books/bulk` with the same fields `AddBookModal` sends (`addRequestFor`),
+  shelf `read`, and reports the server's `duplicates` and `errors` in a toast.
+  - **`PasteImport`** — textarea, parsed in the browser with `lib/server/pasteList.ts` (pure)
+    so the title count updates as the reader pastes, then a progress bar while matching. After
+    matching, `authorEchoes` drops Kindle's bare author lines ("Weir, Andy" under _Project Hail
+    Mary_) that came back unmatched; they are counted with the skipped page noise in a note.
+  - **`QuickRate`** — pick two or three genres, then rate a grid of up to 40 titles from the
+    static `lib/quickRatePicks.ts` (eight genres of twenty widely read title and author pairs,
+    interleaved by `quickRatePicks`). Pairs are resolved in `strict` mode and tiles appear as
+    batches land; a pair that does not resolve, or resolves to a book already shelved, is not
+    shown. No Claude call is involved. Rated tiles go to `BulkReview`.
+  - **`ColdStartMeter`** — two progress bars toward `lib/server/coldStart.ts`'s threshold
+    (12 rated, 8 loved at 4 stars or more), counting the ratings it is given. Shown on the grid,
+    on the review screen in setup, and in `ManualStep`'s list.
 - **`EnrichmentCorrectionModal`** — Wave 3c "fix match" queue: reuses `AddBookModal`'s debounced `/catalog/search` pick pattern (title/author/cover/subjects/description only — no shelf/rating/review) to re-point a mis-resolved book's enrichment via `PATCH /books/{id}/enrichment`. Supports the same `queuePosition`/`onFinishQueue` step-through convention as `BookEditModal`'s review queue. Orchestrated at the `/library` page level (not per-tab) because a LOW-confidence book can be on any shelf.
 - **`ReprofileBanner`** — app-wide; shows only when `/profile/status` reports `dirty`, runs `/profile/update`.
 - **`UsageWarningBanner`** — app-wide, mounted in `(main)/layout.tsx` above the page content. Reads `GET /settings/usage` (`getUsage` / `USAGE_KEY`); renders nothing until `usage.warn` is true. Shows spend-vs-cap copy + a "Details" link to `/settings` and a **Dismiss** button (local `useState`, no persistence — reappears on next page load while `warn` stays true). Purely informational; never blocks any action.

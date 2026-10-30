@@ -68,6 +68,16 @@ jest.mock('@/components/AddBookModal', () => ({
   ),
 }));
 
+// The paste flow is covered in PasteImport.test.tsx; this stub hands back two added books.
+jest.mock('@/components/onboarding/PasteImport', () => ({
+  __esModule: true,
+  default: ({ onAdded }: { onAdded: (b: Book[]) => void }) => (
+    <button type="button" onClick={() => onAdded([book(3, 'Jazz', 4), book(4, 'Paradise', 5)])}>
+      stub paste
+    </button>
+  ),
+}));
+
 jest.mock('@/lib/api', () => ({
   api: {
     setBookFeedback: (...args: unknown[]) => mockSetBookFeedback(...args),
@@ -131,6 +141,24 @@ describe('setup manual step', () => {
       )
     );
     expect(mockSetBookFeedback).toHaveBeenCalledWith(2, { rating: 3.5 });
+  });
+
+  it('opens on a pasted list and returns to the starter library with its books', () => {
+    render(
+      <ToastProvider>
+        <ManualStep onDone={jest.fn()} initialMode="paste" />
+      </ToastProvider>
+    );
+    expect(screen.getByRole('heading', { name: 'Paste a list of titles' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'stub paste' }));
+
+    expect(screen.getByText('Jazz')).toBeInTheDocument();
+    expect(screen.getByText('Paradise')).toBeInTheDocument();
+    expect(screen.getByRole('progressbar', { name: 'Loved (4 stars or more)' })).toHaveAttribute(
+      'aria-valuenow',
+      '2'
+    );
+    expect(screen.getByRole('button', { name: 'Finish with 2 books' })).toBeInTheDocument();
   });
 
   it('states the real cold-start threshold rather than "five or six favorites"', () => {

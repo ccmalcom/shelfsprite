@@ -257,6 +257,27 @@ export function catalogYearLabel(r: Pick<CatalogResult, 'year' | 'year_kind'>): 
   return r.year_kind === 'edition' ? ` · ${r.year} edition` : ` · ${r.year}`;
 }
 
+/** A catalog hit from bulk matching, flagged when the same work is already shelved. */
+export interface CatalogMatch extends CatalogResult {
+  in_library: boolean;
+}
+
+/** One line's outcome from POST /books/match, in request order. */
+export type BookMatchResult =
+  | { index: number; status: 'matched'; best: CatalogMatch; alternatives: CatalogMatch[] }
+  | { index: number; status: 'unmatched' }
+  | { index: number; status: 'pending' };
+
+/** `best` for a pasted list (best hit plus alternatives); `strict` for curated picks. */
+export type BookMatchMode = 'best' | 'strict';
+
+export interface BulkAddResult {
+  added: Book[];
+  /** Already in the library, or listed twice. Never added. */
+  duplicates: { index: number; title: string }[];
+  errors: { index: number; title: string; detail: string }[];
+}
+
 /** Fields the generic importer can map to (mirrors backend MAPPING_FIELDS). */
 export type MappingField =
   'title' | 'author' | 'isbn13' | 'rating' | 'review' | 'shelf' | 'date_read';
@@ -573,6 +594,16 @@ export const api = {
 
   /** Manually add a book to the library (from a picked catalog result). */
   addBook: (req: AddBookRequest) => post<Book>('/books', req),
+
+  /**
+   * Match a batch of titles against the catalog (onboarding paste and quick rate). Items the
+   * server's time budget did not reach come back `pending`; send them again.
+   */
+  matchBooks: (items: { title: string; author: string | null }[], mode: BookMatchMode = 'best') =>
+    post<{ results: BookMatchResult[] }>('/books/match', { items, mode }),
+
+  /** Add confirmed books through the manual-add path; duplicates are reported, not added. */
+  addBooks: (books: AddBookRequest[]) => post<BulkAddResult>('/books/bulk', { books }),
 
   /**
    * Lazily fill in a description the book was stored without. Unrated (to-read)
