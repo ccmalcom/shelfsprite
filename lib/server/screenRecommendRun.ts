@@ -34,6 +34,7 @@ import { booksChangedSince } from './profileUpdate';
 import {
   adaptationPool,
   assembleScreenPool,
+  capDeckPeople,
   defaultScreenCatalogPort,
   metadataPool,
   seedPool,
@@ -69,6 +70,11 @@ export const RETRIEVAL_END_MS = 180_000;
 export const PERSIST_RESERVE_MS = 20_000;
 /** A rerank with less than this left would almost certainly be aborted: answer 504 instead. */
 export const MIN_RERANK_MS = 10_000;
+/**
+ * Extra picks the reranker is asked for beyond `n`, so the deck's director/creator cap
+ * (`capDeckPeople`) can fill from the next-best ranked pick instead of serving short.
+ */
+export const SCREEN_RANK_SPARE = 3;
 /** Seeds kept from one proposal (the prompt asks for SCREEN_SEED_COUNT). */
 const MAX_SEEDS = Math.round(SCREEN_SEED_COUNT * 1.5);
 
@@ -186,7 +192,12 @@ async function claudeScreenRerank(
       system: SCREEN_RANK_SYSTEM,
       tools: [SCREEN_RANK_TOOL],
       tool_choice: { type: 'tool', name: SCREEN_RANK_TOOL.name },
-      messages: [{ role: 'user', content: buildScreenRerankPrompt(candidates, signal, n) }],
+      messages: [
+        {
+          role: 'user',
+          content: buildScreenRerankPrompt(candidates, signal, n + SCREEN_RANK_SPARE),
+        },
+      ],
     },
     { signal: abortSignal }
   );
@@ -228,7 +239,9 @@ async function claudeScreenRerank(
   out.sort((a, b) => b.score - a.score);
   const withDesc = out.filter((c) => c.description);
   const withoutDesc = out.filter((c) => !c.description);
-  return [...withDesc, ...withoutDesc].slice(0, n);
+  // The pool's per-person cap counts only the first-listed director or creator; the deck's
+  // counts all of them, filling from the spare picks the prompt asked for.
+  return capDeckPeople([...withDesc, ...withoutDesc], n);
 }
 
 export async function runScreenRecommend(

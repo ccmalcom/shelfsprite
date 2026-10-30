@@ -267,6 +267,18 @@ describe('POST /api/screen/recommendations/[id]/feedback', () => {
     });
   });
 
+  test('accepts the shared too_similar and the screen-only already_known codes', async () => {
+    await withDb(async () => {
+      const body = await (
+        await call(1, { status: 'rejected', reject_reasons: ['too_similar', 'already_known'] })
+      ).json();
+      expect(body).toMatchObject({
+        status: 'rejected',
+        reject_reasons: ['too_similar', 'already_known'],
+      });
+    });
+  });
+
   test('422 on a bad status, unknown or empty reasons, or reasons without a rejection', async () => {
     await withDb(async () => {
       const detail = async (body: unknown) => {
@@ -278,7 +290,7 @@ describe('POST /api/screen/recommendations/[id]/feedback', () => {
         "status must be one of 'accepted', 'already_watched', 'rejected'"
       );
       expect(await detail({ status: 'rejected', reject_reasons: ['tried_author'] })).toBe(
-        "Unknown reject_reasons: ['tried_author']. Valid codes: ['wrong_genre', 'too_dark', 'too_long', 'not_now', 'overhyped', 'wrong_vibe']"
+        "Unknown reject_reasons: ['tried_author']. Valid codes: ['wrong_genre', 'too_dark', 'too_long', 'not_now', 'overhyped', 'wrong_vibe', 'too_similar', 'already_known']"
       );
       expect(await detail({ status: 'rejected', reject_reasons: [] })).toContain('non-empty list');
       expect(await detail({ status: 'accepted', reject_reasons: ['too_long'] })).toBe(

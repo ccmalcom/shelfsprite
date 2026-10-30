@@ -17,10 +17,13 @@ import { serializeResolutionConfidence, tsToIso, utcnowTs } from './serialize';
 export const MEDIA_FILTERS = ['both', 'movie', 'tv'] as const satisfies readonly MediaFilter[];
 
 /**
- * Spec §6.7: the book list (recs.ts#REJECT_REASONS) without its book-only codes (`tried_author`
- * and the reading-specific additions after `wrong_vibe`), in the same order,
- * so the 422 detail lists codes the way the book route does. `too_long` means runtime or
- * season count.
+ * Spec §6.7: the book list (recs.ts#REJECT_REASONS) without its book-only codes
+ * (`tried_author`, `not_out_yet`, `not_my_kind`), in the same order, so the 422 detail lists
+ * codes the way the book route does; then the screen-only codes. `too_long` means runtime or
+ * season count; `too_similar` is shared with books ("too similar to what I've seen");
+ * `already_known` means the pick was no discovery (QA 2026-10). Having actually watched it is
+ * the separate `already_watched` status, which records the title, so it is not a reason here.
+ * reject_reasons is a json column, so a new code needs no migration.
  */
 export const SCREEN_REJECT_REASONS = [
   'wrong_genre',
@@ -29,6 +32,8 @@ export const SCREEN_REJECT_REASONS = [
   'not_now',
   'overhyped',
   'wrong_vibe',
+  'too_similar',
+  'already_known',
 ] as const;
 export type ScreenRejectReason = (typeof SCREEN_REJECT_REASONS)[number];
 

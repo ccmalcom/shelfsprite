@@ -141,11 +141,12 @@ describe('/screen/library', () => {
     expect(screen.getByText('Nothing matches these filters.')).toBeInTheDocument();
   });
 
-  it('a new title opens the shelf it went on', () => {
+  it('a new title opens the shelf it went on, and the add dialog stays open', () => {
     renderPage();
     fireEvent.click(screen.getByRole('button', { name: '+ Add a title' }));
     fireEvent.click(screen.getByRole('button', { name: 'Finish adding' }));
     expect(replace).toHaveBeenCalledWith('/screen/library?tab=want');
+    expect(screen.getByRole('button', { name: 'Finish adding' })).toBeInTheDocument();
   });
 
   it('says so when a shelf is empty', () => {

@@ -1406,4 +1406,6 @@ export const SCREEN_REJECT_REASONS: Record<string, string> = {
   not_now: 'Not in the mood',
   overhyped: 'Feels overhyped',
   wrong_vibe: 'Wrong vibe',
+  too_similar: "Too similar to what I've seen",
+  already_known: 'Already knew about it',
 };

@@ -344,10 +344,8 @@ function ScreenLibraryInner() {
       {adding && (
         <AddTitleModal
           onClose={() => setAdding(false)}
-          onAdded={(t) => {
-            setAdding(false);
-            setShelf(t.status);
-          }}
+          // The modal stays open for the next add; Done closes it.
+          onAdded={(t) => setShelf(t.status)}
         />
       )}
     </div>

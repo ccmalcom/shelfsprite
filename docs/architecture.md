@@ -113,13 +113,18 @@ User-facing name ScreenSprite; code, routes and tables say `screen`. Opt-in per 
   string goes through `sparqlString`; every label read uses `en` then `mul`.
 - `screenAssemble.ts` — `ScreenCatalogPort` (the only code touching wave 5's clients), the
   metadata, adaptation and seed pools, then merge (popularity floor, owned exclusion), cap,
-  hydrate, directive filter and a two-per-person cap.
+  hydrate, directive filter and a two-per-person cap on the first-listed director or creator.
+  `capDeckPeople` is the served deck's own cap: at most two picks per person across every listed
+  director or creator (case and accents folded), strict, filling from the next ranked pick.
 - `screenRecPrompts.ts` — the seed (`propose_screen_comparables`) and rerank
   (`rank_screen_recommendations`) tools and prompts.
 - `screenRecommendRun.ts` — `runScreenRecommend`: gate, the §6.4 time budget (seeds aborted at
   45 s, retrieval until 180 s, rerank gets the rest minus a 20 s persistence reserve), citation
-  validation, and one-transaction persistence. A rerank with no surviving picks mints no run.
-- `screenRecs.ts` — `titleRecOut`, `SCREEN_REJECT_REASONS`, and `ensureScreenTitle`.
+  validation, and one-transaction persistence. A rerank with no surviving picks mints no run. The
+  rerank is asked for `n + SCREEN_RANK_SPARE` picks so `capDeckPeople` can drop a third film by
+  one director and still serve `n`.
+- `screenRecs.ts` — `titleRecOut`, `SCREEN_REJECT_REASONS`, and `ensureScreenTitle`. The screen
+  reasons are the book list minus its book-only codes, then the screen-only `already_known`.
 
 Routes: `POST /api/screen/import`, `GET|PUT /api/settings/screen`, `GET /api/screen/titles`,
 `GET|PATCH|DELETE /api/screen/titles/{id}`, `DELETE /api/screen/library`, `POST /api/screen/enrich/start`,

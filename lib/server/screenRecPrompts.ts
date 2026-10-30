@@ -321,7 +321,9 @@ function screenSteeringBlock(signal: ScreenSignal): string {
   lines.push(
     'Favor candidates resembling the more-like titles; penalize candidates resembling the ' +
       'less-like titles; penalize candidates matching frequent reject reasons (too_long means ' +
-      "runtime or season count); weight trait influence by each trait's `user_weight`: traits " +
+      'runtime or season count; too_similar means too close to what they have already seen; ' +
+      'already_known means the pick was no discovery, so favor less obvious titles); weight ' +
+      "trait influence by each trait's `user_weight`: traits " +
       'with a lower weight should influence the score less (0.0 = ignore, 1.0 = normal).'
   );
   return lines.join('\n\n');

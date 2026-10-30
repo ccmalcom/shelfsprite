@@ -14,11 +14,13 @@ import {
 } from './helpers/screenRecFixtures';
 import { schema, type Db } from '../db';
 import type { ClaudeClient } from '../claude';
+import type { ScreenCandidate } from '../screenEnrichment';
 import { modelFor } from '../models';
 import { setRebuildReason } from '../profileMeta';
 import {
   parseSeedProposals,
   runScreenRecommend,
+  SCREEN_RANK_SPARE,
   SEED_BUDGET_MS,
   type ScreenRecommendDeps,
 } from '../screenRecommendRun';
@@ -70,7 +72,7 @@ function rankResponse(
 }
 
 /** Candidates after assembly, in order: 0 The Expanse (multiple), 1 Murderbot, 2 Film A, 3 Moon. */
-function scriptedPort(): FakePort {
+function scriptedPort(over: Record<string, Partial<ScreenCandidate>> = {}): FakePort {
   return fakeScreenPort({
     sparql: {
       'seed-movie': [
@@ -147,12 +149,14 @@ function scriptedPort(): FakePort {
         media_type: 'tv',
         tvmaze_id: 60000,
         year: 2025,
+        ...over.Q8004,
       }),
       Q5001: candidate({
         title: 'Film A',
         wikidata_qid: 'Q5001',
         year: 2001,
         directors: ['Someone'],
+        ...over.Q5001,
       }),
       Q11002: candidate({
         title: 'Moon',
@@ -383,6 +387,47 @@ describe('runScreenRecommend happy path', () => {
         'screen_rec_seed',
         'screen_rec_rank',
       ]);
+    } finally {
+      await close();
+    }
+  });
+
+  test('asks for spare picks and caps the deck at two per director or creator', async () => {
+    const { db, close } = await seeded();
+    // The pool cap sees only first-listed people (Duncan Jones, Someone, Other, Mark Fergus),
+    // so all four reach the reranker; the deck cap counts Duncan Jones three times.
+    const port = scriptedPort({
+      Q5001: { directors: ['Someone', 'Duncan Jones'] },
+      Q8004: { creators: ['Other', 'duncan  jones'] },
+    });
+    const client = fakeClaude([
+      seedResponse,
+      rankResponse([
+        { idx: 3, score: 0.9 }, // Moon, Duncan Jones
+        { idx: 2, score: 0.8 }, // Film A, Duncan Jones second
+        { idx: 1, score: 0.7 }, // Murderbot, a third Duncan Jones: skipped
+        { idx: 0, score: 0.6 }, // The Expanse fills the slot
+      ]),
+    ] as never);
+    try {
+      const out = await runScreenRecommend(
+        db,
+        client,
+        'local',
+        { mediaFilter: 'both', n: 3 },
+        deps(port)
+      );
+      expect(out).toMatchObject({ served: 3 });
+      const rankText = (
+        client.calls[1].params.messages as Array<{ content: Array<{ text: string }> }>
+      )[0].content[1].text;
+      expect(rankText).toContain(`Rank the best ${3 + SCREEN_RANK_SPARE} candidates`);
+      const rows = await db
+        .select()
+        .from(schema.titleRecommendations)
+        .orderBy(asc(schema.titleRecommendations.rank));
+      // Described picks lead, as before; Murderbot never serves.
+      expect(rows.map((r) => r.title)).toEqual(['Moon', 'The Expanse', 'Film A']);
     } finally {
       await close();
     }

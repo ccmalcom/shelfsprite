@@ -14,7 +14,14 @@ jest.mock('@/components/TasteHero', () => ({
     return <div />;
   },
 }));
-jest.mock('@/components/CustomInstructions', () => ({ __esModule: true, default: () => <div /> }));
+const instructionsProps: Record<string, unknown>[] = [];
+jest.mock('@/components/CustomInstructions', () => ({
+  __esModule: true,
+  default: (props: Record<string, unknown>) => {
+    instructionsProps.push(props);
+    return <div />;
+  },
+}));
 jest.mock('@/components/ShelfSprite', () => ({ __esModule: true, default: () => <div /> }));
 jest.mock('@/components/reveal/RevealSequence', () => ({ __esModule: true, default: () => null }));
 jest.mock('@/hooks/useFeedbackPrompt', () => ({
@@ -114,6 +121,19 @@ describe('ProfileView', () => {
     expect(screen.getByText('Crime')).toBeInTheDocument();
     // TasteHero fetches its own subjects; the screen section turns that off too.
     expect(heroProps.at(-1)).toMatchObject({ bookSubjects: false });
+  });
+
+  it('names the viewer and passes the screen section to the instructions on /screen/profile', () => {
+    renderView('screen');
+    expect(screen.getByText('The viewer behind the ratings')).toBeInTheDocument();
+    expect(screen.queryByText('The reader behind the ratings')).toBeNull();
+    expect(instructionsProps.at(-1)).toMatchObject({ section: 'screen' });
+  });
+
+  it('keeps the reader eyebrow and book instructions on /profile', () => {
+    renderView('books');
+    expect(screen.getByText('The reader behind the ratings')).toBeInTheDocument();
+    expect(instructionsProps.at(-1)).toMatchObject({ section: 'books' });
   });
 
   it('lets the books section hero load book subjects', () => {

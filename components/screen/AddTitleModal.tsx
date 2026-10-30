@@ -1,7 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { screenApi, type ScreenCandidate, type TitleOut, type TitleStatus } from '@/lib/api';
+import {
+  screenApi,
+  type MediaType,
+  type ScreenCandidate,
+  type TitleOut,
+  type TitleStatus,
+} from '@/lib/api';
 import { Button, Modal, StarRating, useToast } from '@/components/ui';
 import CatalogSearch from '@/components/screen/CatalogSearch';
 import TitleTile from '@/components/screen/TitleTile';
@@ -23,6 +29,11 @@ const LABEL_ID = 'add-title-heading';
  * Manual add (spec §3.5, decision 16): search, pick, then status and an optional rating. A
  * review needs a rating unless the title was dropped, as for books; the route enforces the same
  * rule and its message wins if the two ever disagree.
+ *
+ * Like the book `AddBookModal`, it stays open after an add so a run of titles takes a search
+ * and two clicks each: the search clears, the Film/TV choice and the status carry over, the
+ * rating, review and date reset, a status line names the last title added, and Cancel becomes
+ * Done. `onAdded` fires for every add; only `onClose` ends the session.
  */
 export default function AddTitleModal({
   onClose,
@@ -39,6 +50,9 @@ export default function AddTitleModal({
   const [watchedOn, setWatchedOn] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // CatalogSearch unmounts while a pick is open, so the type it searched lives here.
+  const [searchType, setSearchType] = useState<MediaType>('movie');
+  const [added, setAdded] = useState<{ count: number; last: string } | null>(null);
 
   async function add() {
     if (!picked) return;
@@ -65,6 +79,13 @@ export default function AddTitleModal({
       await invalidateTitleEdits();
       toast.success(`Added "${title.title}".`);
       onAdded(title);
+      // Stay open for the next one: a fresh search of the same type, same status.
+      setPicked(null);
+      setRating(0);
+      setReview('');
+      setWatchedOn('');
+      setSaving(false);
+      setAdded((a) => ({ count: (a?.count ?? 0) + 1, last: titleLabel(title.title, title.year) }));
     } catch (e) {
       setError(errorMessage(e, 'That did not save. Try again.'));
       setSaving(false);
@@ -87,14 +108,21 @@ export default function AddTitleModal({
           <>
             <CatalogSearch
               pickLabel="Add"
+              initialType={searchType}
+              onTypeChange={setSearchType}
               onPick={(c) => {
                 setPicked(c);
                 setError(null);
               }}
             />
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex items-center justify-between gap-3">
+              <p role="status" className="min-w-0 text-xs text-faint">
+                {added
+                  ? `Added ${added.last}${added.count > 1 ? ` \u00B7 ${added.count} so far` : ''}`
+                  : ''}
+              </p>
               <Button variant="ghost" size="sm" onClick={onClose}>
-                Cancel
+                {added ? 'Done' : 'Cancel'}
               </Button>
             </div>
           </>

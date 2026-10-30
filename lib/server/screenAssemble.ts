@@ -759,6 +759,44 @@ export function applyPersonCap(cands: ScreenPoolCandidate[]): ScreenPoolCandidat
   });
 }
 
+/** A director or creator name folded for comparison: case, accents and spacing ignored. */
+function personKey(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * The served deck's own director/creator cap, the screen twin of the book deck caps in
+ * recFilters.ts. applyPersonCap holds the POOL to MAX_PER_PERSON per first-listed person; this
+ * holds the DECK to the same limit across every listed director (films) or creator (series),
+ * so a co-directed film or a person listed second still counts. It walks `ordered` (already in
+ * serve order), skips a pick when any of its people already has MAX_PER_PERSON picks, and
+ * fills from the next candidates until it has `n`. The cap is strict, like
+ * applyAuthorCaps' per-author cap: a deck short of `n` is better than a third film by one
+ * director, and the run asks the reranker for spare picks so it rarely comes to that.
+ * Serve order is kept.
+ */
+export function capDeckPeople<
+  T extends { media_type: MediaType; directors: string[]; creators: string[] },
+>(ordered: T[], n: number): T[] {
+  const counts = new Map<string, number>();
+  const out: T[] = [];
+  for (const c of ordered) {
+    if (out.length >= n) break;
+    const people = [
+      ...new Set((c.media_type === 'movie' ? c.directors : c.creators).map(personKey)),
+    ].filter((p) => p !== '');
+    if (people.some((p) => (counts.get(p) ?? 0) >= MAX_PER_PERSON)) continue;
+    for (const p of people) counts.set(p, (counts.get(p) ?? 0) + 1);
+    out.push(c);
+  }
+  return out;
+}
+
 export async function assembleScreenPool(
   port: ScreenCatalogPort,
   pools: PoolHit[][],

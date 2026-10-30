@@ -67,7 +67,9 @@ beforeEach(() => {
 describe('ScreenSettingsCard', () => {
   it('offers import and opt-in while off', () => {
     renderCard(false);
-    expect(screen.getByRole('heading', { name: /ScreenSprite/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: 'ScreenSprite: movies and TV' })
+    ).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Import from Letterboxd' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Turn on without importing' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Turn off ScreenSprite' })).toBeNull();

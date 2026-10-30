@@ -3,6 +3,7 @@ import {
   applyPersonCap,
   applyScreenDirective,
   assembleScreenPool,
+  capDeckPeople,
   capHits,
   hydrate,
   languageCode,
@@ -222,6 +223,43 @@ describe('filters', () => {
       cand('Q5', {}),
     ]);
     expect(out.map((c) => c.wikidata_qid)).toEqual(['Q1', 'Q2', 'Q5']);
+  });
+});
+
+describe('capDeckPeople', () => {
+  test('counts every listed person, folds case and accents, fills from the next pick', () => {
+    const out = capDeckPeople(
+      [
+        cand('Q1', { directors: ['Yasujir\u014d Ozu'] }),
+        cand('Q2', { directors: ['Kogo Noda', 'yasujiro ozu'] }),
+        cand('Q3', { directors: ['Yasujiro  Ozu'] }),
+        cand('Q4', { media_type: 'tv', creators: ['Someone', 'Yasujiro Ozu'] }),
+        cand('Q5', { directors: ['Wong Kar-wai'] }),
+        cand('Q6', {}),
+      ],
+      3
+    );
+    expect(out.map((c) => c.wikidata_qid)).toEqual(['Q1', 'Q2', 'Q5']);
+  });
+
+  test('keeps serve order and never pads past the cap when the list runs out', () => {
+    const out = capDeckPeople(
+      [
+        cand('Q1', { directors: ['A'] }),
+        cand('Q2', { directors: ['A'] }),
+        cand('Q3', { directors: ['A'] }),
+      ],
+      3
+    );
+    expect(out.map((c) => c.wikidata_qid)).toEqual(['Q1', 'Q2']);
+  });
+
+  test('a person listed twice on one title counts once', () => {
+    const out = capDeckPeople(
+      [cand('Q1', { directors: ['A', 'a'] }), cand('Q2', { directors: ['A'] })],
+      5
+    );
+    expect(out.map((c) => c.wikidata_qid)).toEqual(['Q1', 'Q2']);
   });
 });
 

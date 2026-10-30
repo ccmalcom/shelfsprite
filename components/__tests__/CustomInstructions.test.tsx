@@ -177,3 +177,23 @@ describe('while the directive record is still loading', () => {
     expect(mockPut).not.toHaveBeenCalled();
   });
 });
+
+describe('in the screen section', () => {
+  it('speaks of films and shows and labels the favorites as book-only', () => {
+    render(<CustomInstructions section="screen" />);
+    expect(screen.getByText(/films under two hours/)).toBeInTheDocument();
+    expect(screen.queryByText(/short books/)).toBeNull();
+    const favorites = screen.getByRole('region', { name: 'Book favorites' });
+    expect(favorites).toHaveTextContent('steer book picks only');
+    expect(favorites).toHaveTextContent('Favorite authors');
+    expect(screen.getAllByText('From your books').length).toBeGreaterThan(0);
+    expect(screen.queryByText('From your library')).toBeNull();
+  });
+
+  it('leaves the books section copy as it was', () => {
+    render(<CustomInstructions />);
+    expect(screen.getByText(/short books/)).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Book favorites' })).toBeNull();
+    expect(screen.getAllByText('From your library').length).toBeGreaterThan(0);
+  });
+});

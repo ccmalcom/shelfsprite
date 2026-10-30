@@ -129,6 +129,8 @@ describe('screenApi', () => {
       'not_now',
       'overhyped',
       'wrong_vibe',
+      'too_similar',
+      'already_known',
     ]);
   });
 });
