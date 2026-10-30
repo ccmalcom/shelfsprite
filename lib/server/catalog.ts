@@ -603,12 +603,38 @@ export function searchScore(query: string, cand: Candidate): number {
   return score;
 }
 
+/**
+ * What a record costs when its title is another hit's title with that hit's author tacked
+ * on ("Middlemarch George Eliot", "Middlemarch, by George Eliot"). Such records are reprints
+ * and study notes, and a query naming the author matches their whole title exactly (100),
+ * above the book itself (95). Enough to drop them below it, not below unrelated titles.
+ */
+const AUTHOR_APPENDED_PENALTY = 15;
+
+/**
+ * The titles in this pool that are another hit's title plus that hit's author. Judged
+ * against the pool, not against any list of author names, so "Becoming Jane Austen" is left
+ * alone unless the pool also holds a book called "Becoming" by Jane Austen.
+ */
+function authorAppendedTitles(candidates: Candidate[]): Set<string> {
+  const keys = new Set<string>();
+  for (const c of candidates) {
+    const title = normFull(c.title);
+    if (!title || hasUnknownAuthor(c)) continue;
+    const author = normFull(c.author);
+    keys.add(`${title} ${author}`);
+    keys.add(`${title} by ${author}`);
+  }
+  return keys;
+}
+
 /** Orders deduplicated search hits, best first. Exported for unit tests. */
 export function rankSearchResults(query: string, candidates: Candidate[]): Candidate[] {
+  const appended = authorAppendedTitles(candidates);
   // Python sorted by the tuple (match, hasCover, hasIsbn, year) DESCENDING; the first
   // element is now searchScore. Array.sort is stable, so full ties keep insertion order.
   const key = (c: Candidate) => [
-    searchScore(query, c),
+    searchScore(query, c) - (appended.has(normFull(c.title)) ? AUTHOR_APPENDED_PENALTY : 0),
     c.cover_url ? 1 : 0,
     c.isbn13 ? 1 : 0,
     plausibleYear(c.year) ?? 0,

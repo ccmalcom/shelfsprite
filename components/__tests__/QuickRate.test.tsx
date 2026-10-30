@@ -26,7 +26,7 @@ jest.mock('@/lib/api', () => ({
 }));
 
 const UNRESOLVED = new Set(['Dune', 'The Hobbit']);
-const SHELVED = new Set(['Neuromancer']);
+const SHELVED = new Set<string>(['Neuromancer']);
 
 beforeEach(() => {
   mockMatchBooks.mockReset();
@@ -101,17 +101,33 @@ describe('QuickRate', () => {
 
   it('resolves the curated picks strictly and shows only resolved, unshelved books', async () => {
     await openGrid();
-    const picks = quickRatePicks(['scifi', 'fantasy']);
-    expect(picks).toHaveLength(40);
+    expect(quickRatePicks(['scifi', 'fantasy'])).toHaveLength(40);
+    // Three of the first 40 are hidden, so the next three picks stand in for them.
+    const all = quickRatePicks(['scifi', 'fantasy'], Infinity);
     const sent = mockMatchBooks.mock.calls.flatMap(([items]) => items);
-    expect(sent).toEqual(picks.map((p) => ({ title: p.title, author: p.author })));
+    expect(sent).toEqual(all.slice(0, 43).map((p) => ({ title: p.title, author: p.author })));
     expect(mockMatchBooks.mock.calls.every(([, mode]) => mode === 'strict')).toBe(true);
 
     const grid = screen.getByRole('list', { name: 'Books to rate' });
-    expect(within(grid).getAllByRole('listitem')).toHaveLength(37);
+    expect(within(grid).getAllByRole('listitem')).toHaveLength(40);
     expect(within(grid).queryByText('Dune')).not.toBeInTheDocument();
     expect(within(grid).queryByText('Neuromancer')).not.toBeInTheDocument();
     expect(within(grid).getByText('Circe')).toBeInTheDocument();
+    expect(within(grid).getByText(all[42].title)).toBeInTheDocument();
+  });
+
+  it('stops topping up when the genres run out of picks', async () => {
+    for (const p of quickRatePicks(['scifi', 'fantasy'], Infinity)) SHELVED.add(p.title);
+    try {
+      await openGrid();
+      expect(mockMatchBooks.mock.calls.flatMap(([items]) => items)).toHaveLength(56);
+      expect(
+        await screen.findByText(/You already have every book we would show/)
+      ).toBeInTheDocument();
+    } finally {
+      SHELVED.clear();
+      SHELVED.add('Neuromancer');
+    }
   });
 
   it('shows progress toward the cold-start threshold as tiles are rated', async () => {
@@ -142,6 +158,8 @@ describe('QuickRate', () => {
 
     const list = await screen.findByRole('list', { name: 'Books to add' });
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+    // Rated picks are books the reader has read: no shelf choice.
+    expect(screen.queryByRole('radiogroup', { name: 'Add these to' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add 2 books' }));
 
     await waitFor(() => expect(onAdded).toHaveBeenCalled());
