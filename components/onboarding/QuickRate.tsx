@@ -108,6 +108,7 @@ export default function QuickRate({
     const rows: ReviewRow[] = rated.map((t) => ({
       key: t.key,
       source: t.book.title,
+      query: [t.book.title, t.book.author].filter(Boolean).join(' '),
       book: t.book,
       alternatives: [],
       rating: t.rating,

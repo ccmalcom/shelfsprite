@@ -36,16 +36,23 @@ export function reviewFromMatches(
     const item = items[r.index];
     if (!item) continue;
     const key = `line-${item.line}`;
+    // Title and author without "by", which the catalogs read as a title word.
+    const query = item.author ? `${item.title} ${item.author}` : item.title;
     if (r.status === 'matched') {
       rows.push({
         key,
         source: item.raw,
+        query,
         book: r.best,
         alternatives: r.alternatives,
         rating: 0,
       });
     } else if (!echoes.has(r.index)) {
-      unmatched.push({ key, text: item.author ? `${item.title} by ${item.author}` : item.title });
+      unmatched.push({
+        key,
+        text: item.author ? `${item.title} by ${item.author}` : item.title,
+        query,
+      });
     }
   }
   return { rows, unmatched, echoes: echoes.size };

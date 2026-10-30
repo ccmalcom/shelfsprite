@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Candidate } from '../catalog';
-import { MATCH_FLOOR, matchItems, type MatchOptions } from '../bulkMatch';
+import { MATCH_FETCH, MATCH_FLOOR, MATCH_HITS, matchItems, type MatchOptions } from '../bulkMatch';
 import { coldStartProgress, COLD_START_LOVED, COLD_START_RATED } from '../coldStart';
 import { COLD_START_LOVED as REC_LOVED, COLD_START_RATED as REC_RATED } from '../recSignal';
 
@@ -52,7 +52,8 @@ describe('matchItems — best mode (pasted lists)', () => {
       best: { title: 'Circe', author: 'Madeline Miller', year: 2001, in_library: false },
     });
     if (r.status !== 'matched') throw new Error('expected a match');
-    expect(r.alternatives.map((a) => a.author)).toEqual(['Course Hero', 'Unknown']);
+    // Ranked for the line: an unattributed copy of the title above a study guide.
+    expect(r.alternatives.map((a) => a.author)).toEqual(['Unknown', 'Course Hero']);
   });
 
   it('searches title and author together and prefers the hit by that author', async () => {
@@ -62,6 +63,48 @@ describe('matchItems — best mode (pasted lists)', () => {
     const [r] = await matchItems([{ title: 'Dune', author: 'Frank Herbert' }], base(search));
     expect(asked).toEqual(['Dune Frank Herbert']);
     expect(r.status === 'matched' && r.best.author).toBe('Frank Herbert');
+  });
+
+  it('prefers the book over a record that puts its author in its own title', async () => {
+    // Found in preview QA: "Middlemarch by George Eliot" matched a coverless record titled
+    // "Middlemarch George Eliot", with study guides as every alternative.
+    const { search } = fakeCatalog({
+      'Middlemarch George Eliot': [
+        cand('Middlemarch George Eliot', 'George Eliot', { cover_url: null }),
+        cand('Middlemarch, George Eliot', 'John Peck', { cover_url: null }),
+        cand('Middlemarch (George Eliot)', 'A. O. J. Cockshut', { cover_url: null }),
+        cand('Middlemarch', 'Anonymous'),
+        cand('Middlemarch', 'George Eliot'),
+      ],
+    });
+    const [r] = await matchItems([{ title: 'Middlemarch', author: 'George Eliot' }], base(search));
+    if (r.status !== 'matched') throw new Error('expected a match');
+    expect(r.best).toMatchObject({ title: 'Middlemarch', author: 'George Eliot' });
+  });
+
+  it('prefers a named author over an anthology when the line names none', async () => {
+    const { search } = fakeCatalog({
+      'The Sense of an Ending': [
+        cand('The Sense of an Ending', 'Various', { year: 2012 }),
+        cand('The Sense of an Ending', 'Julian Barnes', { year: 2011 }),
+      ],
+    });
+    const [r] = await matchItems([{ title: 'The Sense of an Ending', author: null }], base(search));
+    expect(r.status === 'matched' && r.best.author).toBe('Julian Barnes');
+  });
+
+  it('fetches past the shown hits and keeps four alternatives', async () => {
+    const asks: number[] = [];
+    const hits = Array.from({ length: 10 }, (_, i) => cand('Stoner', `Author ${i}`));
+    const [r] = await matchItems([{ title: 'Stoner', author: null }], {
+      ...base(async (_q, limit) => {
+        asks.push(limit);
+        return hits;
+      }),
+    });
+    expect(asks).toEqual([MATCH_FETCH]);
+    if (r.status !== 'matched') throw new Error('expected a match');
+    expect(r.alternatives).toHaveLength(MATCH_HITS - 1);
   });
 
   it(`reports no match when nothing clears the floor (${MATCH_FLOOR})`, async () => {

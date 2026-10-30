@@ -11,6 +11,7 @@
 import { plausibleYear, searchBooks, searchScore, type Candidate } from './catalog';
 import { titleSeedMatch } from './recAssemble';
 import { hasSameWork, type LibraryWork } from './addBook';
+import { surname } from './dedup';
 
 /** The add-a-book search result shape (GET /api/catalog/search). */
 export interface CatalogHit {
@@ -75,8 +76,15 @@ export const MATCH_BATCH_MAX = 25;
 export const MATCH_BUDGET_MS = 20_000;
 /** Lookups in flight at once. catalog.ts spaces the requests themselves. */
 export const MATCH_CONCURRENCY = 3;
-/** Hits examined per line: one best match plus a few alternatives. */
+/** Hits shown per line: one best match plus a few alternatives. */
 export const MATCH_HITS = 5;
+/**
+ * Hits fetched per line. The title-and-author query ranks records that put the author in
+ * their own title ("Middlemarch George Eliot", study guides titled "Middlemarch, George
+ * Eliot") above the book itself, so the book can sit below the first five; a wider fetch
+ * keeps it in reach of rankForItem.
+ */
+export const MATCH_FETCH = 10;
 /**
  * The lowest searchScore accepted as a match without an author: every query word in the
  * title (60) or the query inside the title (40). Below it the catalog only matched an
@@ -98,6 +106,30 @@ function queryFor(item: MatchItem): string {
   return item.author ? `${item.title} ${item.author}` : item.title;
 }
 
+// Anthologies and unattributed records, which win exact-title ties on a line with no author
+// ("The Sense of an Ending" by Various over Julian Barnes's novel).
+const COLLECTIVE_AUTHOR = /^(?:various|anonymous|unknown)\b/i;
+
+function itemScore(item: MatchItem, h: Candidate): number {
+  // Score the title against the line's title alone, so a record whose title is
+  // "<title> <author>" no longer outscores the book, then credit the named author.
+  let score = searchScore(item.title, h);
+  if (item.author && surname(h.author ?? null) === surname(item.author)) score += 20;
+  if (COLLECTIVE_AUTHOR.test((h.author ?? '').trim())) score -= 30;
+  return score;
+}
+
+/** Orders one line's hits for that line: its own score, then a cover. Stable on ties. */
+export function rankForItem(item: MatchItem, hits: Candidate[]): Candidate[] {
+  const key = (h: Candidate) => [itemScore(item, h), h.cover_url ? 1 : 0];
+  return [...hits].sort((a, b) => {
+    const ka = key(a);
+    const kb = key(b);
+    for (let i = 0; i < ka.length; i++) if (ka[i] !== kb[i]) return kb[i] - ka[i];
+    return 0;
+  });
+}
+
 function pickBest(item: MatchItem, hits: Candidate[], mode: MatchMode): Candidate | null {
   const strong = titleSeedMatch(item, hits);
   if (mode === 'strict' || strong) return strong;
@@ -108,7 +140,10 @@ function pickBest(item: MatchItem, hits: Candidate[], mode: MatchMode): Candidat
 async function matchOne(item: MatchItem, index: number, opts: MatchOptions): Promise<MatchResult> {
   let hits: Candidate[];
   try {
-    hits = (await opts.search(queryFor(item), MATCH_HITS)).filter((h) => h.title);
+    hits = rankForItem(
+      item,
+      (await opts.search(queryFor(item), MATCH_FETCH)).filter((h) => h.title)
+    );
   } catch {
     // A lookup that threw is not "no such book", but retrying it in the next batch risks a
     // loop; the reader can still search the line by hand from the review screen.
@@ -120,7 +155,13 @@ async function matchOne(item: MatchItem, index: number, opts: MatchOptions): Pro
     const hit = catalogHitOut(h);
     return { ...hit, in_library: hasSameWork(opts.library, hit.title, hit.author) };
   };
-  const alternatives = opts.mode === 'strict' ? [] : hits.filter((h) => h !== best).map(out);
+  const alternatives =
+    opts.mode === 'strict'
+      ? []
+      : hits
+          .filter((h) => h !== best)
+          .slice(0, MATCH_HITS - 1)
+          .map(out);
   return { index, status: 'matched', best: out(best), alternatives };
 }
 

@@ -22,6 +22,8 @@ export interface ReviewRow {
   key: string;
   /** What the reader pasted, or the curated pick this came from. */
   source: string;
+  /** The catalog search "Not this book" starts from: the parsed title and author, not the raw line. */
+  query: string;
   book: ReviewBook;
   alternatives: ReviewBook[];
   /** 0 is unrated. */
@@ -31,6 +33,8 @@ export interface ReviewRow {
 export interface UnmatchedLine {
   key: string;
   text: string;
+  /** The catalog search "Search" starts from. */
+  query: string;
 }
 
 /** The POST /books body for a confirmed row: the same fields AddBookModal sends. */
@@ -124,7 +128,14 @@ export default function BulkReview({
     setUnmatched((prev) => prev.filter((u) => u.key !== line.key));
     setRows((prev) => [
       ...prev,
-      { key: line.key, source: line.text, book: pick, alternatives: [], rating: 0 },
+      {
+        key: line.key,
+        source: line.text,
+        query: line.query,
+        book: pick,
+        alternatives: [],
+        rating: 0,
+      },
     ]);
     setSearching(null);
   }
@@ -259,7 +270,7 @@ export default function BulkReview({
                       </div>
                     )}
                     <CatalogInlineSearch
-                      initialQuery={row.source}
+                      initialQuery={row.query}
                       label={`Search for a different book than ${b.title}`}
                       onPick={(hit) => swapTo(row.key, hit)}
                     />
@@ -308,7 +319,7 @@ export default function BulkReview({
                 {searching === line.key && (
                   <div className="mt-3 border-t border-border pt-3">
                     <CatalogInlineSearch
-                      initialQuery={line.text}
+                      initialQuery={line.query}
                       label={`Search the catalog for ${line.text}`}
                       onPick={(hit) => resolveUnmatched(line, hit)}
                     />
