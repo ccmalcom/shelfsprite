@@ -23,6 +23,7 @@ import {
 } from './claudeErrors';
 import { modelFor } from './models';
 import { matchRevisedClaims, normalizeClaim } from './profileDiff';
+import { CLAIM_TEXT_RULE, DISTINCT_EVIDENCE_RULE, stripIdCitations } from './traitText';
 import { readRebuildReason } from './profileMeta';
 import { readScreenToggledAt } from './screenSettings';
 import { assertScreenToggleUnchanged, screenVariantActive } from './screenProfile';
@@ -163,6 +164,8 @@ export function buildProfilePrompt(tiers: Tiers, feedback: FeedbackContext | nul
     '  - Make claims specific and falsifiable, not generic genre labels.\n' +
     "  - Do NOT force a book into a trait it doesn't fit just to pad the evidence.\n" +
     "  - Keep traits DISTINCT — don't emit two traits describing the same pattern.\n" +
+    DISTINCT_EVIDENCE_RULE +
+    CLAIM_TEXT_RULE +
     '  - Distinguish genuine taste from mechanical rating drift (e.g. later books in ' +
     'a long series slipping a star is series fatigue, not a standalone taste trait).\n' +
     '  - Lower your inference_confidence when a trait rests on very few books.\n' +
@@ -465,6 +468,7 @@ export async function persistProposedTraits(
       await assertScreenToggleUnchanged(tx, userId, opts.expectedScreenToggledAt);
     }
 
+    const citableIds = [...validIds, ...(opts.validTitleIds ?? [])];
     const rows: (typeof schema.tasteTraits.$inferInsert & { claim: string; polarity: string })[] =
       [];
     for (const t of traits) {
@@ -482,7 +486,8 @@ export async function persistProposedTraits(
       }
       rows.push({
         userId,
-        claim: String(t.claim ?? '').trim(),
+        // Readers see the claim verbatim, so ids Claude echoed into it are dropped here.
+        claim: stripIdCitations(String(t.claim ?? '').trim(), citableIds),
         // Python's `t.get("polarity", "reward")` returns None on an explicit `null`
         // polarity, which would violate the NOT NULL column — Node's `?? 'reward'`
         // falls back instead. Deliberately safer, not a bug to reconcile with Python.

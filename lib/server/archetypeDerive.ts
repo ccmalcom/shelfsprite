@@ -5,7 +5,7 @@
  * ARCHETYPE_NO_KEY_MESSAGE) before calling in (see claude.ts / archetype.py:230-234),
  * which is why that RuntimeError is not one of the conditions handled here.
  */
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gte } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import { ApiError } from './errors';
 import type { ClaudeClient } from './claude';
@@ -30,7 +30,15 @@ export const ARCHETYPE_SYSTEM =
   'Use the full range; avoid clustering near 0 unless the evidence is genuinely mixed. ' +
   'Call record_archetype_scores with all 8 fields.';
 
-// Copied verbatim from mylibrary/archetype.py:139-189.
+/**
+ * The rationales are shown to readers on the profile, so they must read as an observation
+ * about the reader, not as scoring notes ("so a moderate positive rather than extreme").
+ */
+const RATIONALE_DESCRIPTION =
+  'One sentence addressed to the reader in second person about what their books show on ' +
+  'this axis. Never mention scores, numbers, the scale, poles or the scoring itself.';
+
+// Adapted from mylibrary/archetype.py:139-189 (the rationale descriptions are reader-facing now).
 export const ARCHETYPE_TOOL = {
   name: 'record_archetype_scores',
   description: "Record the reader's axis scores derived from their taste profile.",
@@ -57,19 +65,19 @@ export const ARCHETYPE_TOOL = {
       },
       lens_rationale: {
         type: 'string',
-        description: 'Brief rationale for the lens score.',
+        description: RATIONALE_DESCRIPTION,
       },
       engine_rationale: {
         type: 'string',
-        description: 'Brief rationale for the engine score.',
+        description: RATIONALE_DESCRIPTION,
       },
       range_rationale: {
         type: 'string',
-        description: 'Brief rationale for the range score.',
+        description: RATIONALE_DESCRIPTION,
       },
       resonance_rationale: {
         type: 'string',
-        description: 'Brief rationale for the resonance score.',
+        description: RATIONALE_DESCRIPTION,
       },
     },
     required: [
@@ -287,4 +295,28 @@ export async function deriveArchetype(
     resonanceRationale,
     derivedAt: now,
   };
+}
+
+/**
+ * is_stale compares derived_at with last_profiled_at, and every profile refresh stamps the latter,
+ * including one that changed no trait. That flagged an archetype stale ("Re-derive") minutes
+ * after it was made, the first time a reader pressed Update profile. When a refresh left the
+ * traits as they were, an archetype that was current before it (derived at or after
+ * `priorProfiledAt`) is still current, so its stamp moves forward; a stale one stays stale.
+ */
+export async function keepArchetypeCurrent(
+  db: Db,
+  userId: string,
+  priorProfiledAt: string | null
+): Promise<void> {
+  if (priorProfiledAt === null) return;
+  await db
+    .update(schema.readerArchetypes)
+    .set({ derivedAt: utcnowTs() })
+    .where(
+      and(
+        eq(schema.readerArchetypes.userId, userId),
+        gte(schema.readerArchetypes.derivedAt, priorProfiledAt)
+      )
+    );
 }

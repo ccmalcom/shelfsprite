@@ -198,6 +198,8 @@ export interface ProfileHighlights {
     low_confidence: boolean;
   };
   era_split: { pre_2000: number; post_2000: number } | null;
+  /** Half or more of the classifiable rated books are nonfiction; fiction-only copy steps aside. */
+  mostly_nonfiction?: boolean;
 }
 
 export interface FeedbackRequest {

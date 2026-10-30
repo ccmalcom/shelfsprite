@@ -106,10 +106,15 @@ export function TraitsSection({
   const [openIds, setOpenIds] = useState<Set<number>>(() => new Set());
   // A fresh object per focus request, so focusing the same id twice still scrolls twice.
   const [scrollRequest, setScrollRequest] = useState<{ id: number } | null>(null);
+  const [showDismissed, setShowDismissed] = useState(false);
 
-  const rewards = traits.filter((t) => t.polarity === 'reward');
-  const aversions = traits.filter((t) => t.polarity === 'aversion');
-  const visible = filter === 'all' ? traits : filter === 'reward' ? rewards : aversions;
+  // A rejected trait is no longer part of the profile, so it leaves Loves and Avoids for a
+  // collapsed Dismissed list, where it can still be reopened and un-rejected.
+  const active = traits.filter((t) => t.status !== 'rejected');
+  const dismissed = traits.filter((t) => t.status === 'rejected');
+  const rewards = active.filter((t) => t.polarity === 'reward');
+  const aversions = active.filter((t) => t.polarity === 'aversion');
+  const visible = filter === 'all' ? active : filter === 'reward' ? rewards : aversions;
   // Stable between renders that do not change `traits`: the watcher's effect depends on it, and
   // an unstable dep would make the once-per-value ref the only thing preventing a render loop.
   const traitIds = useMemo(() => traits.map((t) => t.id), [traits]);
@@ -135,7 +140,8 @@ export function TraitsSection({
     (id: number) => {
       const target = traits.find((t) => t.id === id);
       if (!target) return;
-      if (filter !== 'all' && target.polarity !== filter) setFilter('all');
+      if (target.status === 'rejected') setShowDismissed(true);
+      else if (filter !== 'all' && target.polarity !== filter) setFilter('all');
       setOpenIds((prev) => {
         if (prev.has(id)) return prev;
         const next = new Set(prev);
@@ -161,6 +167,7 @@ export function TraitsSection({
           <h2 className="font-display text-lg font-semibold text-text">Taste traits</h2>
           <p className="mt-0.5 text-xs text-faint">
             Claude inferred these from your ratings. Open a trait to confirm, reject, or reword it.
+            The percentage is how sure Claude was that your ratings show it.
           </p>
         </div>
         <div className="flex gap-1 rounded-lg border border-border bg-elevated p-1">
@@ -173,7 +180,7 @@ export function TraitsSection({
               className={filterBtnClass(filter === f)}
             >
               {f === 'all'
-                ? `All (${traits.length})`
+                ? `All (${active.length})`
                 : f === 'reward'
                   ? `Loves (${rewards.length})`
                   : `Avoids (${aversions.length})`}
@@ -204,6 +211,30 @@ export function TraitsSection({
               titleEvidence={titleEvidence}
             />
           ))}
+        </div>
+      )}
+
+      {dismissed.length > 0 && (
+        <div className="space-y-3">
+          <button
+            type="button"
+            aria-expanded={showDismissed}
+            onClick={() => setShowDismissed((v) => !v)}
+            className="rounded font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          >
+            {showDismissed ? 'Hide' : 'Show'} dismissed ({dismissed.length})
+          </button>
+          {showDismissed &&
+            dismissed.map((t) => (
+              <TraitRow
+                key={t.id}
+                trait={t}
+                bookMap={bookMap}
+                open={openIds.has(t.id)}
+                onToggle={() => toggle(t.id)}
+                titleEvidence={titleEvidence}
+              />
+            ))}
         </div>
       )}
     </section>

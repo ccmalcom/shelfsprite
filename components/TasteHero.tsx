@@ -17,6 +17,7 @@ import { Button } from '@/components/ui';
 import { useToast } from '@/components/ui';
 import { Modal } from '@/components/ui/Modal';
 import { tasteAccent } from '@/lib/tasteAccent';
+import { readerLine } from '@/lib/revealBeats';
 import { ArchetypeShareModal } from '@/components/ArchetypeShareModal';
 import Link from 'next/link';
 import ReaderSprite from '@/components/ReaderSprite';
@@ -133,7 +134,6 @@ export function TasteHero({ compact = false, bookSubjects = true }: TasteHeroPro
   const [deriving, setDeriving] = useState(false);
   const [rederiving, setRederiving] = useState(false);
   const [expandedAxis, setExpandedAxis] = useState<string | null>(null);
-  const [expandedChip, setExpandedChip] = useState<number | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const [explainerOpen, setExplainerOpen] = useState(false);
 
@@ -194,7 +194,8 @@ export function TasteHero({ compact = false, bookSubjects = true }: TasteHeroPro
     : null;
 
   const chipCount = compact ? 3 : 5;
-  const chipTraits = (traits ?? []).slice(0, chipCount);
+  // A trait the reader rejected is not part of who they are, so it never headlines the card.
+  const chipTraits = (traits ?? []).filter((t) => t.status !== 'rejected').slice(0, chipCount);
 
   const headingClass = [
     'font-display font-extrabold tracking-tight leading-[1.05]',
@@ -377,28 +378,19 @@ export function TasteHero({ compact = false, bookSubjects = true }: TasteHeroPro
         </div>
       </div>
 
-      {/* Trait chips as supporting detail -- click to expand truncated claims */}
+      {/* Trait chips as supporting detail. Whole sentences that wrap: a claim cut mid-word
+          read as broken, and the short reveal line is the reader-facing version when present. */}
       {chipTraits.length > 0 && (
-        <div className="mt-6 flex flex-wrap gap-2">
-          {chipTraits.map((t) => {
-            const truncated = t.claim.length > 60;
-            const isExpanded = expandedChip === t.id;
-            const chipLabel = truncated && !isExpanded ? t.claim.slice(0, 57) + '\u2026' : t.claim;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                disabled={!truncated}
-                onClick={() => truncated && setExpandedChip(isExpanded ? null : t.id)}
-                className={truncated ? 'cursor-pointer' : 'cursor-default'}
-              >
-                <span className="inline-flex items-center rounded-full bg-user-ink/10 px-2.5 py-0.5 font-mono text-xs font-medium text-user-ink">
-                  {chipLabel}
-                </span>
-              </button>
-            );
-          })}
-        </div>
+        <ul className="mt-6 flex flex-wrap gap-2">
+          {chipTraits.map((t) => (
+            <li
+              key={t.id}
+              className="max-w-full rounded-lg bg-user-ink/10 px-2.5 py-1 font-mono text-xs font-medium text-user-ink"
+            >
+              {readerLine(t)}
+            </li>
+          ))}
+        </ul>
       )}
 
       {/* Axis bars: axis-name | bar | letter + winning-label [why] */}

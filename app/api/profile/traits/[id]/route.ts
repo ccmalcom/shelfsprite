@@ -47,6 +47,8 @@ export const PATCH = withApi('/api/profile/traits/[id]', async (req, ctx) => {
     if (b.claim != null) {
       updates.claim = b.claim.trim();
       updates.status = 'edited';
+      // The reveal shows reveal_line first; a line written from the old claim would undo the edit.
+      updates.revealLine = updates.claim;
     }
     if (b.user_note != null) updates.userNote = b.user_note;
     if (b.status != null || b.user_weight != null) {

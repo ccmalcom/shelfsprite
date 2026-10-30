@@ -34,3 +34,17 @@ describe('traitOut title evidence', () => {
     expect(out.contrast_title_ids).toEqual([9]);
   });
 });
+
+describe('traitOut reader-facing text', () => {
+  it('strips the trait’s own cited ids from the claim and reveal line', () => {
+    const out = traitOut({
+      ...base,
+      claim: 'Both injustice novels (1138, 1140) rate high.',
+      revealLine: 'You rate injustice novels (1138) high.',
+      exhibits: [1138],
+      contrasts: [1140],
+    });
+    expect(out.claim).toBe('Both injustice novels rate high.');
+    expect(out.reveal_line).toBe('You rate injustice novels high.');
+  });
+});

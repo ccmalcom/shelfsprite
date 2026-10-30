@@ -2,6 +2,7 @@ import { asc, eq } from 'drizzle-orm';
 import { withApi } from '@/lib/server/http';
 import { getDb, schema } from '@/lib/server/db';
 import { effectiveRating, pyTitle } from '@/lib/server/serialize';
+import { genreLabel } from '@/lib/server/libraryShape';
 
 /** Insertion-ordered counter matching Python collections.Counter.most_common. */
 class Counter {
@@ -40,7 +41,10 @@ export const GET = withApi('/api/profile/subjects', async (_req, ctx) => {
     const tier = String(rating);
     const seen = new Set<string>();
     for (const raw of subjects.slice(0, 15)) {
-      const normalised = pyTitle(raw.trim());
+      // A breakdown titled "Genre" shows genres, not "Fiction" or "New York (N.Y.), Fiction".
+      const label = genreLabel(raw, b.title);
+      if (label === null) continue;
+      const normalised = pyTitle(label);
       if (normalised && !seen.has(normalised)) {
         seen.add(normalised);
         overall.add(normalised);

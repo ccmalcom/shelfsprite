@@ -98,7 +98,7 @@ describe('buildBeats with title evidence', () => {
     const beats = buildBeats({ stats, traits: [aversion], archetype, highlights, books, titles });
     const beat = beats.find((b) => b.kind === 'aversions');
     if (!beat || beat.kind !== 'aversions') throw new Error('no aversions beat');
-    expect(beat.items[0].evidence).toBe('You never finished Severance (TV). We noticed.');
+    expect(beat.items[0].evidence).toBe('You never finished Severance (TV).');
   });
 });
 

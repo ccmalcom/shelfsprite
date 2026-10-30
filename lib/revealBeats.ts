@@ -7,7 +7,14 @@ import type {
   Directive,
   TitleOut,
 } from './api';
-import { POLE_LINES, ratingQuip, FORMAT_LINES } from './revealCopy';
+import {
+  AXIS_COPY,
+  DEEP_WITHOUT_LOYALTY_LINE,
+  FORMAT_LINES,
+  NEAR_CENTER_POLE_LINES,
+  POLE_LINES,
+  ratingQuip,
+} from './revealCopy';
 
 const AXIS_ORDER = ['lens', 'engine', 'range', 'resonance'] as const;
 export type AxisKey = (typeof AXIS_ORDER)[number];
@@ -16,6 +23,18 @@ const REWARD_CAP = 5;
 const REWARD_CAP_THIN = 2;
 const LOW_CONFIDENCE_MAX = 0.45; // bottom band -> softened frame
 const NEAR_CENTER_MAX = 0.25;
+/** Two traits whose exhibits overlap this much (Jaccard) read as the same beat twice. */
+const SAME_EVIDENCE_MIN = 0.75;
+/** Above this share, one genre is the shelf: "refuses a genre" would contradict it. */
+const DOMINANT_GENRE_SHARE = 0.5;
+
+/**
+ * The sentence a reader sees for a trait: the reveal line, unless the reader rewrote the trait
+ * (an edit is their own words; a reveal line written before it would undo the edit).
+ */
+export function readerLine(t: Trait): string {
+  return t.status === 'edited' ? t.claim : (t.reveal_line ?? t.claim);
+}
 
 export interface GenreHighlight {
   subject: string;
@@ -24,8 +43,11 @@ export interface GenreHighlight {
 
 export interface AversionItem {
   trait: Trait;
-  evidence: string; // parenthetical, already assembled from the evidence book
+  evidence: string; // one reader-facing sentence, already assembled from the evidence book
 }
+
+/** How the shown contrast book was rated against the trait's evidence books. */
+export type ContrastRelation = 'lower' | 'higher' | 'same' | null;
 
 export type Beat =
   | { kind: 'cold-open'; nBooks: number; thin: boolean }
@@ -43,6 +65,7 @@ export type Beat =
       lowConfidence: boolean;
       exhibitTitles: string[];
       contrastTitles: string[];
+      contrastRelation: ContrastRelation;
     }
   | { kind: 'aversions'; items: AversionItem[] }
   | { kind: 'shelves'; genres: GenreHighlight[]; authors: string[]; formatLine: string | null }
@@ -51,7 +74,9 @@ export type Beat =
       axisKey: AxisKey;
       letter: string;
       poleLine: string;
-      rationale: string | null;
+      /** Reader-facing name and question for the axis; the model's scoring notes stay internal. */
+      label: string;
+      question: string;
       nearCenter: boolean;
       codeSoFar: string;
     }
@@ -81,15 +106,15 @@ function aversionEvidence(
   const bookId = (trait.exhibits ?? [])[0];
   const book = bookId != null ? byId.get(bookId) : undefined;
   if (!book) return titleAversionEvidence(trait, titleById);
-  const title = book.title;
-  if (book.exclusive_shelf === 'did-not-finish') {
-    return `You never finished ${title}. We noticed.`;
-  }
-  if (book.app_review) {
-    return `${title} — your review was brief.`;
-  }
-  const stars = book.effective_rating ?? 1;
-  return `${title}, ${stars} star${stars === 1 ? '' : 's'}, no review. The silence said plenty.`;
+  const title = `\u201C${book.title}\u201D`;
+  if (book.exclusive_shelf === 'did-not-finish') return `You never finished ${title}.`;
+  return ratedEvidence(title, book.effective_rating);
+}
+
+/** "Case in point: “X”, which you gave 2 stars." */
+function ratedEvidence(label: string, stars: number | null): string {
+  if (stars === null) return `Case in point: ${label}.`;
+  return `Case in point: ${label}, which you gave ${stars} star${stars === 1 ? '' : 's'}.`;
 }
 
 /** How a cited film or show reads inside a beat's plain strings. */
@@ -102,9 +127,70 @@ function titleAversionEvidence(trait: Trait, titleById: Map<number, TitleOut>): 
   const t = titleId != null ? titleById.get(titleId) : undefined;
   if (!t) return '';
   const label = titleEvidenceLabel(t);
-  if (t.status === 'dropped') return `You never finished ${label}. We noticed.`;
-  const stars = t.rating ?? 1;
-  return `${label}, ${stars} star${stars === 1 ? '' : 's'}. It did not land.`;
+  if (t.status === 'dropped') return `You never finished ${label}.`;
+  return ratedEvidence(label, t.rating);
+}
+
+function jaccard(a: number[], b: number[]): number {
+  const sa = new Set(a);
+  const sb = new Set(b);
+  let both = 0;
+  for (const x of sa) if (sb.has(x)) both += 1;
+  const either = sa.size + sb.size - both;
+  return either === 0 ? 0 : both / either;
+}
+
+/** Book and title exhibits as one id space (titles negated), for comparing two traits. */
+function evidenceKeys(t: Trait): number[] {
+  return [...(t.exhibits ?? []), ...(t.exhibit_title_ids ?? []).map((id) => -1 - id)];
+}
+
+/**
+ * Drops a trait whose exhibits (nearly) repeat an earlier one's. The list is already strongest
+ * first, so the stronger of two look-alike traits keeps its beat; the other stays on the profile.
+ */
+function distinctEvidence(traits: Trait[]): Trait[] {
+  const kept: Trait[] = [];
+  for (const t of traits) {
+    const keys = evidenceKeys(t);
+    const repeats =
+      keys.length >= 2 && kept.some((k) => jaccard(keys, evidenceKeys(k)) >= SAME_EVIDENCE_MIN);
+    if (!repeats) kept.push(t);
+  }
+  return kept;
+}
+
+function mean(xs: number[]): number | null {
+  return xs.length ? xs.reduce((s, x) => s + x, 0) / xs.length : null;
+}
+
+/** Series are a real part of the shelf; the same test as libraryShape.ts on the server. */
+function readsSeries(h: ProfileHighlights): boolean {
+  const m = h.format_mix;
+  const total = m.novel + m.novella + m.collection + m.series;
+  return m.series >= 2 && m.series >= total * 0.2;
+}
+
+/**
+ * The axis headline, kept consistent with how far the score leans and with what the shelf beat
+ * just said: a narrow lean gets the softer line, "refuses a genre" needs no dominant genre, and
+ * loyalty "to series, to authors" needs a repeat author or a series.
+ */
+function poleLine(
+  axisKey: AxisKey,
+  letter: string,
+  nearCenter: boolean,
+  highlights: ProfileHighlights
+): string {
+  const key = `${axisKey}:${letter}`;
+  const dominantGenre = (highlights.top_genres[0]?.share ?? 0) >= DOMINANT_GENRE_SHARE;
+  if (nearCenter || (key === 'range:B' && dominantGenre)) {
+    return NEAR_CENTER_POLE_LINES[key] ?? POLE_LINES[key] ?? '';
+  }
+  if (key === 'range:D' && highlights.top_authors.length === 0 && !readsSeries(highlights)) {
+    return DEEP_WITHOUT_LOYALTY_LINE;
+  }
+  return POLE_LINES[key] ?? '';
 }
 
 export function buildBeats(input: BuildBeatsInput): Beat[] {
@@ -134,12 +220,36 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
   });
 
   // Beats 3 (rewards) — strongest confidence first, capped.
-  const rewards = traits
-    .filter((t) => t.polarity === 'reward' && t.status !== 'rejected')
-    .slice()
-    .sort((a, b) => b.inference_confidence - a.inference_confidence)
-    .slice(0, thin ? REWARD_CAP_THIN : REWARD_CAP);
+  const rewards = distinctEvidence(
+    traits
+      .filter((t) => t.polarity === 'reward' && t.status !== 'rejected')
+      .slice()
+      .sort((a, b) => b.inference_confidence - a.inference_confidence)
+  ).slice(0, thin ? REWARD_CAP_THIN : REWARD_CAP);
+  const bookRating = (id: number) => byId.get(id)?.effective_rating ?? null;
+  const titleRating = (id: number) => titleById.get(id)?.rating ?? null;
   for (const t of rewards) {
+    // The first contrast that resolves is the one shown; its rating is compared with the mean
+    // of the evidence, so a 5-star contrast is never called a book that "didn't land".
+    const contrasts = [
+      ...(t.contrasts ?? []).map((id) => ({ label: title(id), rating: bookRating(id) })),
+      ...(t.contrast_title_ids ?? []).map((id) => ({
+        label: screenTitle(id),
+        rating: titleRating(id),
+      })),
+    ].filter((c): c is { label: string; rating: number | null } => !!c.label);
+    const evidenceAvg = mean(
+      [
+        ...(t.exhibits ?? []).map(bookRating),
+        ...(t.exhibit_title_ids ?? []).map(titleRating),
+      ].filter((r): r is number => r !== null)
+    );
+    const shown = contrasts[0];
+    let contrastRelation: ContrastRelation = null;
+    if (shown && shown.rating !== null && evidenceAvg !== null) {
+      contrastRelation =
+        shown.rating < evidenceAvg ? 'lower' : shown.rating > evidenceAvg ? 'higher' : 'same';
+    }
     beats.push({
       kind: 'reward-trait',
       trait: t,
@@ -150,18 +260,16 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
       ]
         .filter(Boolean)
         .slice(0, 4) as string[],
-      contrastTitles: [
-        ...(t.contrasts ?? []).map(title),
-        ...(t.contrast_title_ids ?? []).map(screenTitle),
-      ]
-        .filter(Boolean)
-        .slice(0, 1) as string[],
+      contrastTitles: shown ? [shown.label] : [],
+      contrastRelation,
     });
   }
 
   // Beat 4 (aversions grouped) — skipped in thin mode (spec: beats 3-6 compress).
   if (!thin) {
-    const aversions = traits.filter((t) => t.polarity === 'aversion' && t.status !== 'rejected');
+    const aversions = distinctEvidence(
+      traits.filter((t) => t.polarity === 'aversion' && t.status !== 'rejected')
+    );
     if (aversions.length > 0) {
       beats.push({
         kind: 'aversions',
@@ -177,7 +285,8 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
       kind: 'shelves',
       genres: highlights.top_genres,
       authors: highlights.top_authors,
-      formatLine: dom ? FORMAT_LINES[dom] : null,
+      // The format lines are about novels and series; a nonfiction shelf gets none.
+      formatLine: dom && !highlights.mostly_nonfiction ? FORMAT_LINES[dom] : null,
     });
   }
 
@@ -187,13 +296,15 @@ export function buildBeats(input: BuildBeatsInput): Beat[] {
     for (const axisKey of AXIS_ORDER) {
       const axis = archetype[axisKey];
       code += axis.letter;
+      const nearCenter = Math.abs(axis.score) < NEAR_CENTER_MAX;
       beats.push({
         kind: 'axis',
         axisKey,
         letter: axis.letter,
-        poleLine: POLE_LINES[`${axisKey}:${axis.letter}`] ?? '',
-        rationale: axis.rationale,
-        nearCenter: Math.abs(axis.score) < NEAR_CENTER_MAX,
+        poleLine: poleLine(axisKey, axis.letter, nearCenter, highlights),
+        label: AXIS_COPY[axisKey].label,
+        question: AXIS_COPY[axisKey].question,
+        nearCenter,
         codeSoFar: code,
       });
     }

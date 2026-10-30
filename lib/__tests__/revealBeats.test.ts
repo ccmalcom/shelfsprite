@@ -1,4 +1,10 @@
-import { buildBeats, type Beat } from '../revealBeats';
+import { buildBeats, readerLine, type Beat } from '../revealBeats';
+import {
+  ratingQuip,
+  POLE_LINES,
+  NEAR_CENTER_POLE_LINES,
+  DEEP_WITHOUT_LOYALTY_LINE,
+} from '../revealCopy';
 import type { Stats, Trait, ArchetypeOut, ProfileHighlights, Book } from '../api';
 
 function trait(over: Partial<Trait>): Trait {
@@ -136,5 +142,172 @@ describe('buildBeats', () => {
     const beats = buildBeats({ stats, traits: [trait({})], archetype, highlights, books });
     const axes = beats.filter((b) => b.kind === 'axis') as Extract<Beat, { kind: 'axis' }>[];
     expect(axes.map((a) => a.codeSoFar)).toEqual(['I', 'IC', 'ICD', 'ICDH']);
+  });
+});
+
+function book(id: number, title: string, rating: number | null, over: Partial<Book> = {}): Book {
+  return { id, title, effective_rating: rating, exclusive_shelf: 'read', ...over } as Book;
+}
+
+function rewardBeats(beats: Beat[]) {
+  return beats.filter((b) => b.kind === 'reward-trait') as Extract<
+    Beat,
+    { kind: 'reward-trait' }
+  >[];
+}
+
+function axisBeat(beats: Beat[], key: string) {
+  const beat = beats.find((b) => b.kind === 'axis' && b.axisKey === key);
+  if (!beat || beat.kind !== 'axis') throw new Error(`no ${key} axis`);
+  return beat;
+}
+
+describe('ratingQuip', () => {
+  it('reads an above-average rater as generous, not as a critic', () => {
+    expect(ratingQuip(4.12)).toMatch(/You rate high/);
+    expect(ratingQuip(4.0)).toMatch(/You rate high/);
+  });
+
+  it('keeps critic for averages clearly below the norm', () => {
+    expect(ratingQuip(3.85)).toMatch(/where most readers do/);
+    expect(ratingQuip(3.4)).toMatch(/critic/);
+    expect(ratingQuip(2.9)).toMatch(/not an easy audience/);
+    expect(ratingQuip(null)).toBe('');
+  });
+});
+
+describe('reward contrast', () => {
+  const books = [
+    book(1, 'A', 5),
+    book(2, 'B', 4.5),
+    book(3, 'Lower', 4),
+    book(4, 'Say Nothing', 5),
+    book(5, 'Unrated', null),
+  ];
+  const relation = (contrasts: number[]) =>
+    rewardBeats(
+      buildBeats({
+        stats,
+        traits: [trait({ exhibits: [1, 2], contrasts })],
+        archetype,
+        highlights,
+        books,
+      })
+    )[0].contrastRelation;
+
+  it('compares the shown contrast with the evidence books', () => {
+    expect(relation([3])).toBe('lower');
+    expect(relation([4])).toBe('higher');
+    expect(relation([5])).toBeNull();
+  });
+});
+
+describe('repeated evidence', () => {
+  it('drops a weaker trait that cites the same books as a stronger one', () => {
+    const beats = buildBeats({
+      stats,
+      traits: [
+        trait({ id: 1, exhibits: [1, 2, 3], inference_confidence: 0.9 }),
+        trait({ id: 2, exhibits: [3, 2, 1], inference_confidence: 0.8 }),
+        trait({ id: 3, exhibits: [4, 5], inference_confidence: 0.7 }),
+      ],
+      archetype,
+      highlights,
+      books,
+    });
+    expect(rewardBeats(beats).map((b) => b.trait.id)).toEqual([1, 3]);
+  });
+});
+
+describe('aversion evidence', () => {
+  it('reads as a sentence about the book, not a log line', () => {
+    const beats = buildBeats({
+      stats,
+      traits: [
+        trait({ id: 1, polarity: 'aversion', exhibits: [1] }),
+        trait({ id: 2, polarity: 'aversion', exhibits: [2] }),
+      ],
+      archetype,
+      highlights,
+      books: [
+        book(1, 'Dune', 2, { app_review: 'meh' }),
+        book(2, 'Ulysses', null, { exclusive_shelf: 'did-not-finish' }),
+      ],
+    });
+    const beat = beats.find((b) => b.kind === 'aversions');
+    if (!beat || beat.kind !== 'aversions') throw new Error('no aversions beat');
+    expect(beat.items.map((i) => i.evidence)).toEqual([
+      'Case in point: \u201CDune\u201D, which you gave 2 stars.',
+      'You never finished \u201CUlysses\u201D.',
+    ]);
+  });
+});
+
+describe('shelf and axis copy', () => {
+  it('skips the novel-centric format line for a mostly nonfiction shelf', () => {
+    const beats = buildBeats({
+      stats,
+      traits: [],
+      archetype,
+      highlights: { ...highlights, mostly_nonfiction: true },
+      books,
+    });
+    const shelves = beats.find((b) => b.kind === 'shelves');
+    expect(shelves && shelves.kind === 'shelves' && shelves.formatLine).toBeNull();
+  });
+
+  it('labels each axis for readers and keeps the scoring notes out', () => {
+    const beats = buildBeats({ stats, traits: [], archetype, highlights, books });
+    const lens = axisBeat(beats, 'lens');
+    expect(lens.label).toBe('Why you read');
+    expect(JSON.stringify(lens)).not.toContain('because');
+  });
+
+  it('claims author and series loyalty only when the shelf shows it', () => {
+    const loyal = buildBeats({ stats, traits: [], archetype, highlights, books });
+    expect(axisBeat(loyal, 'range').poleLine).toBe(POLE_LINES['range:D']);
+    const noRepeats = buildBeats({
+      stats,
+      traits: [],
+      archetype,
+      highlights: {
+        ...highlights,
+        top_authors: [],
+        format_mix: { ...highlights.format_mix, series: 0, dominant: 'novel' },
+      },
+      books,
+    });
+    expect(axisBeat(noRepeats, 'range').poleLine).toBe(DEEP_WITHOUT_LOYALTY_LINE);
+  });
+
+  it('softens a narrow lean and a broad lean beside a dominant genre', () => {
+    const broad = { ...archetype, range: axis(-0.6, 'B') };
+    const narrow = buildBeats({
+      stats,
+      traits: [],
+      archetype: { ...archetype, range: axis(-0.1, 'B') },
+      highlights,
+      books,
+    });
+    expect(axisBeat(narrow, 'range').poleLine).toBe(NEAR_CENTER_POLE_LINES['range:B']);
+    const dominant = buildBeats({
+      stats,
+      traits: [],
+      archetype: broad,
+      highlights: { ...highlights, top_genres: [{ subject: 'Fantasy', share: 0.7 }] },
+      books,
+    });
+    expect(axisBeat(dominant, 'range').poleLine).toBe(NEAR_CENTER_POLE_LINES['range:B']);
+  });
+});
+
+describe('readerLine', () => {
+  it('shows the reveal line, or the reader’s own words once edited', () => {
+    expect(readerLine(trait({ claim: 'c', reveal_line: 'You do a thing.' }))).toBe(
+      'You do a thing.'
+    );
+    expect(
+      readerLine(trait({ claim: 'I like it dark', reveal_line: 'old', status: 'edited' }))
+    ).toBe('I like it dark');
   });
 });

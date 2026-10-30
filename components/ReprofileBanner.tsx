@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { usePathname } from 'next/navigation';
 import useSWR, { mutate as globalMutate } from 'swr';
 import {
   api,
@@ -12,7 +13,27 @@ import {
 } from '@/lib/api';
 import { Spinner } from '@/components/ui';
 
+/** Changed books and titles it takes before home asks for an update; /profile asks at one. */
+export const REPROFILE_NUDGE_MIN = 5;
+
+/**
+ * Whether the update nudge belongs on this page. The profile page always offers it (home's
+ * "update it on your profile page" sends readers there). Home asks only once the changes add up,
+ * or when a full rebuild is pending. Everywhere else, the swipe deck included, it stays out of
+ * the way: one "Already read" mid-deck is not worth an interruption.
+ */
+export function showReprofileNudge(status: ProfileStatus | undefined, pathname: string | null) {
+  if (!status?.dirty) return false;
+  if (pathname === '/profile' || pathname === '/screen/profile') return true;
+  if (pathname === '/' || pathname === '/screen') {
+    const changes = (status.changed_books ?? 0) + (status.changed_titles ?? 0);
+    return changes >= REPROFILE_NUDGE_MIN || status.rebuild_reason != null;
+  }
+  return false;
+}
+
 export default function ReprofileBanner() {
+  const pathname = usePathname();
   const { data: status } = useSWR<ProfileStatus>(PROFILE_STATUS_KEY, () => api.profileStatus());
   const { mutate } = useSWR<ProfileStatus>(PROFILE_STATUS_KEY);
 
@@ -20,7 +41,8 @@ export default function ReprofileBanner() {
   const [error, setError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ProfileChangeSummary | null>(null);
 
-  if (!status?.dirty && !summary) return null;
+  // A finished update's summary stays wherever the reader is; only the nudge is page-bound.
+  if (!summary && !(running || showReprofileNudge(status, pathname))) return null;
 
   async function handleReprofile() {
     setRunning(true);
@@ -114,9 +136,9 @@ export default function ReprofileBanner() {
     <div className="border-b border-warning/30 bg-warning/10">
       <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2 px-4 py-2.5">
         <p className="text-sm text-warning">
-          <span className="font-semibold">Your taste has new evidence. </span> Ratings and edits
-          since the last build aren&apos;t in your profile yet. Re-profile to fold them in when you
-          choose. This takes a moment and uses your Claude key.
+          <span className="font-semibold">Your taste has new evidence. </span> Some ratings and
+          edits aren&apos;t in your profile yet. Update your profile to include them. This takes a
+          moment and uses your Claude key.
           {error && <span className="ml-2 text-danger">{error}</span>}
         </p>
         <button
