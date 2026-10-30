@@ -74,6 +74,47 @@ describe('POST /api/profile/update', () => {
     });
   });
 
+  it('shows claims without the ids a trait echoed into its text, and diffs them stripped', async () => {
+    await withDb(async (db) => {
+      const { POST } = await import('./route');
+      const schema = await import('@/lib/server/schema');
+      const legacy = (claim: string, exhibits: number[]) => ({
+        userId: 'local',
+        claim,
+        polarity: 'reward',
+        exhibits,
+        inferenceConfidence: 0.8,
+        status: 'proposed',
+      });
+      // Two rows stored before the write-time guard, with their cited ids in the text.
+      await db
+        .insert(schema.tasteTraits)
+        .values([
+          legacy(
+            'The two books with racial injustice at their core (1138, 1140) are rated 5 and 4.5.',
+            [1138, 1140]
+          ),
+          legacy('Rewards memoirs of escape (12).', [12]),
+        ]);
+
+      // The refresh drops the first and keeps the second, stored as the guard now writes it.
+      updateTasteProfile.mockImplementation(async () => {
+        await db.delete(schema.tasteTraits);
+        await db.insert(schema.tasteTraits).values([legacy('Rewards memoirs of escape.', [12])]);
+        return { mode: 'update' };
+      });
+
+      const body = await (await POST(post())).json();
+      expect(body.changes).toEqual({
+        added: [],
+        dropped: ['The two books with racial injustice at their core are rated 5 and 4.5.'],
+        reworded: [],
+        // Stripped on both sides, the kept trait is the same text: not a reword.
+        unchanged: 1,
+      });
+    });
+  });
+
   it('reports empty changes when the refresh moved nothing', async () => {
     await withDb(async (db) => {
       const { POST } = await import('./route');

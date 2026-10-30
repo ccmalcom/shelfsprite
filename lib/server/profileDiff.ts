@@ -10,6 +10,7 @@ import { and, eq } from 'drizzle-orm';
 import type { Db } from './db';
 import * as schema from './schema';
 import { ratio } from './similarity';
+import { readerClaim } from './traitText';
 
 export interface ProposedClaim {
   claim: string;
@@ -207,11 +208,24 @@ export function matchRevisedClaims(
   return out;
 }
 
-/** Read the user's current proposed claims. Cheap: two columns, no joins. */
+/**
+ * Read the user's current proposed claims as readers see them. The summary shows these texts,
+ * so a row stored before the write-time id guard is stripped here exactly as traitOut strips it
+ * (readerClaim, against the trait's own citations). Both snapshots go through this, so the diff
+ * always compares stripped text with stripped text.
+ */
 export async function snapshotProposedClaims(db: Db, userId: string): Promise<ProposedClaim[]> {
-  return db
-    .select({ claim: schema.tasteTraits.claim, polarity: schema.tasteTraits.polarity })
+  const rows = await db
+    .select({
+      claim: schema.tasteTraits.claim,
+      polarity: schema.tasteTraits.polarity,
+      exhibits: schema.tasteTraits.exhibits,
+      contrasts: schema.tasteTraits.contrasts,
+      exhibitTitleIds: schema.tasteTraits.exhibitTitleIds,
+      contrastTitleIds: schema.tasteTraits.contrastTitleIds,
+    })
     .from(schema.tasteTraits)
     .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')))
     .orderBy(schema.tasteTraits.id);
+  return rows.map((r) => ({ claim: readerClaim(r.claim, r), polarity: r.polarity }));
 }
