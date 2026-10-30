@@ -132,8 +132,7 @@ describe('swipe page "Already read"', () => {
     recs = [rec(1)];
     renderSwipe();
     fireEvent.click(screen.getByRole('button', { name: 'Already read' }));
-    const stars = within(screen.getByRole('dialog')).getAllByRole('radio');
-    fireEvent.click(stars[3]);
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('radio', { name: '4 stars' }));
     fireEvent.click(screen.getByRole('button', { name: 'Mark as read' }));
 
     await waitFor(() => expect(mockSetBookFeedback).toHaveBeenCalledWith(77, { rating: 4 }));
