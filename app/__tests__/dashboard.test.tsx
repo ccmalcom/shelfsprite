@@ -54,11 +54,20 @@ describe('dashboard', () => {
   it.each([
     undefined,
     { last_profiled_at: null, dirty: false },
-    { last_profiled_at: '2026-09-01', dirty: true },
+    { last_profiled_at: '2026-09-01', dirty: true, changed_books: 2 },
   ])('blocks recommendations until a current profile is known: %p', (status) => {
     mockProfileStatus = status;
     renderDashboard();
     expect(screen.getByRole('button', { name: /find my next books/i })).toBeDisabled();
+  });
+
+  it('does not block on dirt the run gate ignores (trait verdicts, skipped picks)', () => {
+    // POST /recommend refuses only on changed books; a reveal verdict or a skipped pick
+    // marks the profile dirty without changing any book.
+    mockProfileStatus = { last_profiled_at: '2026-09-01', dirty: true, changed_books: 0 };
+    renderDashboard();
+    expect(screen.getByRole('button', { name: /find my next books/i })).toBeEnabled();
+    expect(screen.queryByText(/your library changed/i)).not.toBeInTheDocument();
   });
 
   it('sends the reader to the swipe deck once a run actually served picks', async () => {

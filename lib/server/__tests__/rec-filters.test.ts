@@ -11,6 +11,7 @@ import {
   fuzzyDuplicate,
   isLearnerEdition,
   isCollectionEdition,
+  isTranslatedLibraryEdition,
   applyAuthorCaps,
   MAX_PER_AUTHOR,
   subjectHits,
@@ -140,6 +141,8 @@ describe('isCollectionEdition', () => {
       'Golden Age Sci-Fi Series – Malcolm Jameson 17 Book Collection',
       'H. G. Wells: The Complete Works',
       'Arcot, Morey & Wade - Complete Series',
+      'Billion Dollar Whale By Tom Wright, Bradley Hope & Bad Blood Secrets and Lies in a Silicon Valley Startup By John Carreyrou 2 Books Collection Set',
+      'Thinking, Fast and Slow / Nudge: 2 Books Collection',
     ]) {
       expect(isCollectionEdition({ title }), title).toBe(true);
     }
@@ -158,6 +161,62 @@ describe('isCollectionEdition', () => {
       expect(isCollectionEdition({ title }), title).toBe(false);
     }
     expect(isCollectionEdition({ title: null })).toBe(false);
+  });
+});
+
+describe('isTranslatedLibraryEdition', () => {
+  const libraryTitles = [
+    'The Immortal Life of Henrietta Lacks',
+    'Harry Potter and the Chamber of Secrets',
+  ];
+  const libraryAuthors = new Set(['skloot', 'rowling']);
+
+  test('drops a translated edition of a library book by the same author', () => {
+    for (const title of [
+      "Henrietta Lacks'in Ölümsüz Yaşamı",
+      'La vida inmortal de Henrietta Lacks',
+      'Die Unsterblichkeit der Henrietta Lacks',
+    ]) {
+      expect(
+        isTranslatedLibraryEdition(
+          { title, author: 'Rebecca Skloot' },
+          libraryTitles,
+          libraryAuthors
+        ),
+        title
+      ).toBe(true);
+    }
+  });
+
+  test('keeps same-author English titles, other authors, and untitled candidates', () => {
+    expect(
+      isTranslatedLibraryEdition(
+        { title: 'Harry Potter and the Prisoner of Azkaban', author: 'J. K. Rowling' },
+        libraryTitles,
+        libraryAuthors
+      )
+    ).toBe(false);
+    expect(
+      isTranslatedLibraryEdition(
+        { title: "Henrietta Lacks'in Ölümsüz Yaşamı", author: 'Someone Else' },
+        libraryTitles,
+        libraryAuthors
+      )
+    ).toBe(false);
+    expect(
+      isTranslatedLibraryEdition(
+        { title: 'Ölümsüz Hücreler', author: 'Rebecca Skloot' },
+        libraryTitles,
+        libraryAuthors
+      )
+    ).toBe(false);
+    expect(
+      isTranslatedLibraryEdition(
+        { title: null, author: 'Rebecca Skloot' },
+        libraryTitles,
+        libraryAuthors
+      )
+    ).toBe(false);
   });
 });
 

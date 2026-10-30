@@ -12,7 +12,7 @@ import {
   USER_PROFILE_KEY,
   type Book,
 } from '@/lib/api';
-import { Button, Field, Input, Spinner, StarRating } from '@/components/ui';
+import { Button, Field, Input, Spinner, StarRating, useToast } from '@/components/ui';
 import AddBookModal from '@/components/AddBookModal';
 import RevealSequence from '@/components/reveal/RevealSequence';
 import { useFeedbackPrompt } from '@/hooks/useFeedbackPrompt';
@@ -736,10 +736,12 @@ export function ProfileStep({ onDone }: { onDone: () => void }) {
 
 // ── Step: Done ────────────────────────────────────────────────────────────────
 
-function DoneStep({ profiled, onComplete }: { profiled: boolean; onComplete?: () => void }) {
+export function DoneStep({ profiled, onComplete }: { profiled: boolean; onComplete?: () => void }) {
   const router = useRouter();
+  const toast = useToast();
   const { fire, modal } = useFeedbackPrompt('post-setup');
   const [revealOpen, setRevealOpen] = useState(false);
+  const [finishing, setFinishing] = useState(false);
 
   useEffect(() => {
     fire();
@@ -751,9 +753,31 @@ function DoneStep({ profiled, onComplete }: { profiled: boolean; onComplete?: ()
     router.push('/');
   }
 
-  function goRecommend() {
-    onComplete?.();
-    router.push('/swipe');
+  // The reveal's last button promises recommendations, so it runs the first batch itself.
+  // Pushing to /swipe alone landed every new reader on "Nothing to swipe yet". Same rules as
+  // the home page's run: only a run that served picks goes to the deck (issue #64), and
+  // anything else falls back to home, where the reader can try again.
+  async function goRecommend() {
+    if (finishing) return;
+    setFinishing(true);
+    try {
+      const run = await api.runRecommend(10);
+      // onComplete unmounts this step under LibraryGate, so it waits for the run.
+      onComplete?.();
+      if (!run.run_id || run.served === 0) {
+        toast.error(run.note ?? 'That run turned up no picks. Try again from home.');
+        router.push('/');
+        return;
+      }
+      await mutate('recommendations', undefined, { revalidate: true });
+      router.push('/swipe');
+    } catch (e) {
+      toast.error(
+        e instanceof Error ? e.message : 'Recommendations hit a snag. Try again from home.'
+      );
+      onComplete?.();
+      router.push('/');
+    }
   }
 
   function goProfile() {
@@ -762,7 +786,14 @@ function DoneStep({ profiled, onComplete }: { profiled: boolean; onComplete?: ()
   }
 
   if (revealOpen) {
-    return <RevealSequence onClose={goHome} onFinish={goRecommend} onSeeProfile={goProfile} />;
+    return (
+      <RevealSequence
+        onClose={goHome}
+        onFinish={() => void goRecommend()}
+        onSeeProfile={goProfile}
+        finishing={finishing}
+      />
+    );
   }
 
   return (
