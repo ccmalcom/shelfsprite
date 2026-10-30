@@ -303,9 +303,11 @@ approving again.
 
 ## Locked product decisions
 
-1. **Goodreads CSV export is the only ingest path, with import-once semantics.** Never scrape
-   Goodreads or call its API. Import seeds the library and must never overwrite in-app
-   `app_rating` or `app_review` values.
+1. **Books come only from what the reader provides, and CSV import is import-once.** The ingest
+   paths are a CSV export (Goodreads, The StoryGraph, a ShelfSprite backup, or a column-mapped
+   CSV), a pasted list, the quick-rate grid, and manual add; screen titles come from a Letterboxd
+   export. Never scrape Goodreads or any other reading site, or call its API. Import seeds the
+   library and must never overwrite in-app `app_rating` or `app_review` values.
 2. **The recommender is two-stage.** Deterministic retrieval produces real catalog candidates;
    Claude then reranks and explains that bounded set. The LLM is never the recommender itself and
    cannot invent titles into the result.

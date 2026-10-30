@@ -240,3 +240,12 @@ a dependency audit.
 - [`docs/hosting.md`](docs/hosting.md) covers deployment, configuration and migrations.
 - [`CLAUDE.md`](CLAUDE.md) is written for AI coding assistants but doubles as a short list of the
   rules that are easiest to break without noticing.
+
+## License
+
+ShelfSprite is licensed under the GNU Affero General Public License, version 3 only
+(`AGPL-3.0-only`). The full text is in [`LICENSE`](LICENSE).
+
+You may run, study, change and share the code. If you run a modified version that other people use
+over a network, the AGPL requires you to offer those users the source code of your version under
+the same license.

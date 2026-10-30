@@ -6,7 +6,8 @@ source file before changing behavior.
 ## What this is
 
 ShelfSprite is a personal, AI-assisted book-analysis and recommendation app at
-`shelfsprite.app`. It starts from a Goodreads CSV export, enriches each book with catalog
+`shelfsprite.app`. It starts from a Goodreads or StoryGraph CSV export, or from books the reader
+adds directly (a pasted list, the quick-rate grid, or search), enriches each book with catalog
 metadata, derives a taste profile, and recommends real books from the catalog.
 
 The application is a TypeScript/Next.js app rooted at the repository root, deployed only on
@@ -186,8 +187,10 @@ public entry pages and setup. Reuse `PageHeading` for editorial app-page heading
 `EntryFrame` for authentication entry screens. Marketing screenshots use labeled fictional
 fixtures; refresh them when their pictured UI changes.
 
-1. Goodreads CSV export is the only ingest path. Never scrape Goodreads or call its API.
-2. Goodreads import is import-once cold-start seeding. Later imports must never overwrite
+1. Books come only from what the reader hands ShelfSprite: a CSV export (Goodreads, The
+   StoryGraph, a ShelfSprite backup, or a column-mapped CSV), a pasted list, the quick-rate grid,
+   or manual add. Never scrape Goodreads or any other reading site, or call its API.
+2. CSV import is import-once cold-start seeding. Later imports must never overwrite
    ShelfSprite-owned `app_rating` or `app_review` values.
 3. Recommendations are two-stage: deterministic retrieval produces real catalog candidates,
    then Claude reranks and explains them. Claude is never the recommender and invented titles
