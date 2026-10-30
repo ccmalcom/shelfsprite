@@ -26,6 +26,7 @@ import {
   fuzzyDuplicate,
   isCollectionEdition,
   isLearnerEdition,
+  isTranslatedLibraryEdition,
   languageOk,
   seriesOk,
 } from './recFilters';
@@ -250,6 +251,7 @@ export function assemble(
     if (!languageOk(cand.language, allowedLangs)) return;
     if (!seriesOk(title, signal.library_series)) return;
     if (fuzzyDuplicate(title, signal.library_titles)) return;
+    if (isTranslatedLibraryEdition(cand, signal.library_titles, signal.library_authors)) return;
     if (isLearnerEdition(cand)) return;
     if (isCollectionEdition(cand)) return;
 

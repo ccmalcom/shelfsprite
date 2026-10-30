@@ -191,11 +191,14 @@ const COLLECTION_EDITION_MARKERS = [
   'complete works',
   'complete series',
   'ultimate collection',
+  'collection set',
 ];
-// "(Book 1&2)", "Books 1-4", and "21 Time Travel & Dystopia Stories" / "17 Book Collection".
+// "(Book 1&2)", "Books 1-4", "21 Time Travel & Dystopia Stories" / "17 Book Collection",
+// and small bundles such as "2 Books Collection Set" (a pair that can hold a library book).
 const COLLECTION_EDITION_RES = [
   /\bbooks?\s+\d+\s*(?:&|-|–|and|to)\s*\d+/,
   /\b\d{2,}\+?\s+(?:[a-z&'-]+\s+){0,4}(?:stories|novels?|books?|titles|novellas?)\b/,
+  /\b\d+\s+(?:books?|novels?)\s+(?:collection|set|bundle)\b/,
 ];
 
 /** Drop box sets, omnibuses and multi-book bundles, which are never a recommendation. */
@@ -205,6 +208,51 @@ export function isCollectionEdition(cand: { title?: string | null }): boolean {
     COLLECTION_EDITION_MARKERS.some((marker) => title.includes(marker)) ||
     COLLECTION_EDITION_RES.some((re) => re.test(title))
   );
+}
+
+// Letters that almost never occur in English titles but are common in translations
+// (Turkish, Portuguese, Spanish, Polish, Nordic, German, Czech, Hungarian), and function
+// words that mark a Romance or Germanic title ("La vida inmortal de Henrietta Lacks").
+const NON_ENGLISH_LETTER_RE = /[ğışçöüãõñłøåæœßąęźżčřšžěůőű]/;
+const FOREIGN_FUNCTION_WORD_RE =
+  /(?:^|[^\p{L}])(?:de|del|la|las|los|el|le|les|des|du|der|das|die|den|il|di|della|het|een|och)(?=[^\p{L}]|$)/u;
+const TITLE_STOPWORDS = new Set(['the', 'and', 'of', 'a', 'an', 'in', 'to', 'for', 'with']);
+
+function nameTokens(title: string): Set<string> {
+  return new Set(
+    title
+      .toLowerCase()
+      .split(/[^\p{L}\p{N}]+/u)
+      .filter((t) => t.length >= 4 && !TITLE_STOPWORDS.has(t))
+  );
+}
+
+/**
+ * A foreign-language edition of a book the reader already has, such as "Henrietta Lacks'in
+ * Ölümsüz Yaşamı" for The Immortal Life of Henrietta Lacks. The title-key and fuzzy checks
+ * miss these because the translated title shares only the names, and catalog editions often
+ * carry no language for languageOk to reject. All three must hold: the author is already in
+ * the library, the title looks non-English (letters or function words English titles don't
+ * use), and it shares at least two name words with a library title. Same-author English
+ * sequels fail the second test.
+ */
+export function isTranslatedLibraryEdition(
+  cand: { title?: string | null; author?: string | null },
+  libraryTitles: string[],
+  libraryAuthors: Set<string>
+): boolean {
+  const title = cand.title;
+  if (!title || !cand.author || !libraryAuthors.has(surname(cand.author))) return false;
+  const lower = title.toLowerCase();
+  if (!NON_ENGLISH_LETTER_RE.test(lower) && !FOREIGN_FUNCTION_WORD_RE.test(lower)) return false;
+  const candTokens = nameTokens(title);
+  for (const libraryTitle of new Set(libraryTitles)) {
+    let shared = 0;
+    for (const token of nameTokens(libraryTitle)) {
+      if (candTokens.has(token) && ++shared >= 2) return true;
+    }
+  }
+  return false;
 }
 
 /**

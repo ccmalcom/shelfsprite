@@ -133,17 +133,24 @@ export function RevealButton({
   children,
   onClick,
   variant = 'primary',
+  disabled = false,
 }: {
   children: ReactNode;
   onClick: () => void;
   variant?: 'primary' | 'ghost';
+  disabled?: boolean;
 }) {
   const base =
-    'mt-8 inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
+    'mt-8 inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base disabled:cursor-wait disabled:opacity-70';
   const styles =
     variant === 'primary' ? 'bg-user text-base hover:opacity-90' : 'text-muted hover:text-text';
   return (
-    <button type="button" onClick={onClick} className={[base, styles].join(' ')}>
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={[base, styles].join(' ')}
+    >
       {children}
     </button>
   );

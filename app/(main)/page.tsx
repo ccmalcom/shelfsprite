@@ -42,12 +42,16 @@ export default function HomePage() {
   const { data: archetype } = useSWR<ArchetypeOut | null>(ARCHETYPE_KEY, () => api.getArchetype());
 
   const noProfile = profileStatus != null && profileStatus.last_profiled_at === null;
-  const isDirty = profileStatus?.dirty ?? false;
-  const recBlocked = !profileStatus || noProfile || isDirty;
+  // Block only where POST /recommend itself refuses: books rated or reviewed since the last
+  // build. `dirty` also counts trait verdicts and skipped picks, which the run gate ignores;
+  // blocking on those sent every reader who answered the reveal, or skipped a pick, through a
+  // paid profile update that usually changed nothing. ReprofileBanner still offers the update.
+  const booksChanged = (profileStatus?.changed_books ?? 0) > 0;
+  const recBlocked = !profileStatus || noProfile || booksChanged;
 
   const recBlockMsg = noProfile
     ? 'No taste profile yet. Build one on your profile page first.'
-    : isDirty
+    : booksChanged
       ? 'Your library changed since the last profile build. Update it on your profile page.'
       : null;
 

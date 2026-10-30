@@ -43,11 +43,14 @@ export default function RevealSequence({
   onClose,
   onFinish,
   onSeeProfile,
+  finishing = false,
 }: {
   onClose: () => void;
   onFinish: () => void;
   /** Where the error state's "See it here" goes; defaults to onClose (already on /profile). */
   onSeeProfile?: () => void;
+  /** onFinish is running a first batch; the handoff button waits instead of firing again. */
+  finishing?: boolean;
 }) {
   const reduced = useReducedMotion() ?? false;
   const [index, setIndex] = useState(0);
@@ -153,6 +156,7 @@ export default function RevealSequence({
           onClose,
           onVerdict: recordVerdict,
           verdicts,
+          finishing,
         })}
       </Stagger>
     </RevealFrame>
@@ -168,6 +172,7 @@ export function renderBeat(
     onClose: () => void;
     onVerdict: (id: number, v: 'confirmed' | 'edited' | 'rejected') => void;
     verdicts: Record<number, 'confirmed' | 'edited' | 'rejected'>;
+    finishing?: boolean;
   }
 ) {
   switch (beat.kind) {
@@ -370,7 +375,9 @@ export function renderBeat(
           <h2 className="font-display text-3xl font-bold text-text">
             Enough about you. Let’s put it to work.
           </h2>
-          <RevealButton onClick={h.onFinish}>Get my first recommendations</RevealButton>
+          <RevealButton onClick={h.onFinish} disabled={h.finishing}>
+            {h.finishing ? 'Choosing carefully\u2026' : 'Get my first recommendations'}
+          </RevealButton>
           <div>
             <button
               type="button"
