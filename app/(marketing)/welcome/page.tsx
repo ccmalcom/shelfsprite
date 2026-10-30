@@ -6,6 +6,7 @@ import InviteHashRedirect from '@/components/InviteHashRedirect';
 import WaitlistForm from './WaitlistForm';
 import ResolveArtifact from './ResolveArtifact';
 import RecommendationExample from './RecommendationExample';
+import { AFFILIATE_DISCLOSURE, bookshopAffiliateId } from '@/lib/bookLinks';
 import ProfileExample from './ProfileExample';
 
 /**
@@ -297,6 +298,7 @@ export default function WelcomePage() {
             sponsored by Goodreads or Amazon. Goodreads is a trademark of Amazon.com, Inc. Catalog
             metadata comes from Open Library and Google Books.
           </p>
+          {bookshopAffiliateId() && <p className="max-w-3xl">{AFFILIATE_DISCLOSURE}</p>}
         </div>
       </footer>
     </>

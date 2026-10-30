@@ -1,9 +1,10 @@
 'use client';
 
-import { ExternalLink, Sparkles, X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Modal } from '@/components/ui';
 import { bookLinks } from '@/lib/bookLinks';
+import { AffiliateNote, BookLinkPills } from '@/components/BookLinks';
 import SimilarBooksModal from '@/components/SimilarBooksModal';
 import BookCover from '@/components/BookCover';
 import { api, type Book, type Shelf } from '@/lib/api';
@@ -132,23 +133,7 @@ export default function BookDetailModal({
 
         {/* External links */}
         <div className="mt-5 flex flex-wrap gap-2">
-          {links.map((link) => (
-            <a
-              key={link.label}
-              href={link.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={[
-                'inline-flex items-center gap-1.5 rounded-full border border-border',
-                'px-3 py-1 text-xs font-medium text-muted',
-                'hover:border-muted hover:text-text transition',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-              ].join(' ')}
-            >
-              {link.label}
-              <ExternalLink className="h-3 w-3" />
-            </a>
-          ))}
+          <BookLinkPills links={links} />
           {!readOnly && (
             <button
               type="button"
@@ -165,6 +150,7 @@ export default function BookDetailModal({
             </button>
           )}
         </div>
+        <AffiliateNote show={links.some((l) => l.affiliate)} className="mt-2" />
 
         {/* Shelf actions */}
         {!readOnly && (
