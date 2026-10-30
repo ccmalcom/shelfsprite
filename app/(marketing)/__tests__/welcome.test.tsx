@@ -24,7 +24,7 @@ describe('welcome page', () => {
     render(<WelcomePage />);
     expect(
       screen.getByRole('heading', {
-        name: /A reading life that feels like you\./i,
+        name: /Tell it what you loved\. It finds what you'll read next\./i,
       })
     ).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /^Import$/ })).toBeInTheDocument();
@@ -47,10 +47,61 @@ describe('welcome page', () => {
     signIn.forEach((a) => expect(a).toHaveAttribute('href', '/login'));
   });
 
-  it('gives both screenshots descriptive alt text', () => {
+  it('states the approved hero subline', () => {
+    render(<WelcomePage />);
+    expect(
+      screen.getByText(
+        'Real books from real catalogs, each with a reason tied to your own ratings.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('says plainly, beside the hero form, that ShelfSprite runs on your own Anthropic key', () => {
+    render(<WelcomePage />);
+    const keyLine = screen.getByText(
+      /ShelfSprite runs on your own Anthropic API key; you'll add it during setup\./
+    );
+    // In the hero, not only in the fine print further down.
+    const hero = screen.getByRole('heading', { level: 1 }).closest('section');
+    expect(hero).toContainElement(keyLine);
+    // The fine print beside the second invite form stays.
+    expect(
+      screen.getByText(/ShelfSprite uses your own Anthropic API key for its AI features/)
+    ).toBeInTheDocument();
+  });
+
+  it('shows an example recommendation whose reason cites books on the example shelf', () => {
+    render(<WelcomePage />);
+    const card = screen.getByRole('heading', { name: 'Annihilation' }).closest('figure');
+    expect(card).not.toBeNull();
+    expect(card).toHaveTextContent('Jeff VanderMeer');
+    expect(card).toHaveTextContent(/Why for you/i);
+    expect(card).toHaveTextContent(/You gave Piranesi and Never Let Me Go five stars/);
+    expect(card).toHaveTextContent(/example pick/i);
+  });
+
+  it('puts the real-books claim and the example pick before how it works', () => {
+    render(<WelcomePage />);
+    const realBooks = screen.getByRole('heading', { name: /The books it recommends exist/i });
+    const example = screen.getByRole('heading', { name: 'Annihilation' });
+    const howItWorks = screen.getByRole('heading', { name: /Start with what you've read/i });
+    // DOCUMENT_POSITION_FOLLOWING: the argument node comes after the reference node.
+    expect(realBooks.compareDocumentPosition(howItWorks)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(example.compareDocumentPosition(howItWorks)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it('gives the library screenshot descriptive alt text', () => {
     render(<WelcomePage />);
     expect(screen.getByAltText(/library/i)).toBeInTheDocument();
-    expect(screen.getByAltText(/taste profile/i)).toBeInTheDocument();
+  });
+
+  it('draws the example profile with short, untruncated trait chips', () => {
+    render(<WelcomePage />);
+    expect(screen.getByRole('heading', { name: 'The Wandering Escapist' })).toBeInTheDocument();
+    const chips = screen.getByRole('list', { name: /trait highlights/i });
+    const labels = Array.from(chips.querySelectorAll('li')).map((li) => li.textContent ?? '');
+    expect(labels.length).toBeGreaterThan(0);
+    labels.forEach((label) => expect(label).not.toMatch(/\u2026|\.\.\.$/));
   });
 
   // Legal-ish copy: it must not quietly disappear in a future redesign of this page.

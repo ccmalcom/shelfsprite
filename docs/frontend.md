@@ -129,15 +129,22 @@ copy says ScreenSprite; code, routes and keys say `screen`.
   `'/'` so crawlers reaching `/welcome` attribute the page to the shared URL.
   `WaitlistForm` calls `fetch('/api/invite-requests')` directly rather than going through
   `lib/api.ts`, because that client attaches a Supabase token and would pull the Supabase browser
-  client into a bundle whose entire audience is signed out. The hero is an explicitly illustrative shelf of three real books;
-  `ResolveArtifact` explains catalog matching further down the page. The public header provides
-  sign-in and a link to the import/enrichment/recommendation walkthrough. The two invite forms
-  retain the same endpoint and honeypot behavior.
-  The screenshots (`public/marketing/library-reading-room.png`, `taste-profile-reading-room.png`) show the redesigned
-  Library and Profile, captured at **2x** from a 1200px desktop viewport (2400px-wide assets).
-  Their `next/image` dimensions match the assets and figures are capped at 1000px. Both use
-  fictional browser-intercepted API fixtures in an isolated local copy: no real account data,
-  database writes, or paid Claude calls. Captions identify the examples.
+  client into a bundle whose entire audience is signed out. The hero is an explicitly illustrative shelf of three real books
+  with example ratings, and states the bring-your-own-Anthropic-key requirement beside the
+  waitlist form. The section right after it makes the real-books claim and carries
+  `RecommendationExample`, a drawn recommendation card whose "Why for you" cites only the hero
+  shelf's books at the ratings shown there; `ResolveArtifact` beside it explains catalog matching.
+  The public header provides sign-in and a link to the import/enrichment/recommendation
+  walkthrough. The two invite forms retain the same endpoint and honeypot behavior.
+  The Library screenshot (`public/marketing/library-reading-room.png`) shows the redesigned
+  Library, captured at **2x** from a 1200px desktop viewport (a 2400px-wide asset). Its
+  `next/image` dimensions match the asset and the figure is capped at 1000px. It uses fictional
+  browser-intercepted API fixtures in an isolated local copy: no real account data, database
+  writes, or paid Claude calls. The profile example is drawn, not screenshotted:
+  `ProfileExample` is a static server component on the shared palette tokens, so it is in the
+  prerendered HTML, cannot take a reader's accent hue, and shows short trait chips that never
+  truncate. Its archetype and tagline are copied from `lib/server/archetype.ts`; keep them in
+  step if that table changes. Captions identify every example.
   **Never write `text-base` on this page** — `base` is a registered color token, so Tailwind
   resolves `text-base` to `color: var(--bg)` and paints the copy in the background (see
   `docs/conventions.md`).

@@ -5,6 +5,8 @@ import ShelfSprite from '@/components/ShelfSprite';
 import InviteHashRedirect from '@/components/InviteHashRedirect';
 import WaitlistForm from './WaitlistForm';
 import ResolveArtifact from './ResolveArtifact';
+import RecommendationExample from './RecommendationExample';
+import ProfileExample from './ProfileExample';
 
 /**
  * The public marketing page. Served at / for signed-out visitors through the rewrite in
@@ -68,17 +70,20 @@ export default function WelcomePage() {
           <div className="grid items-center gap-12 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
             <div>
               <p className="eyebrow mb-5">For the love of the next good book</p>
-              <h1 className="max-w-[14ch] text-balance font-display text-[2.75rem] font-bold leading-[1.06] tracking-tight sm:text-6xl">
-                A reading life that feels like <span className="text-accent">you.</span>
+              <h1 className="max-w-[16ch] text-balance font-display text-[2.5rem] font-bold leading-[1.06] tracking-tight sm:text-[3.5rem]">
+                Tell it what you loved.{' '}
+                <span className="text-accent">It finds what you&apos;ll read next.</span>
               </h1>
               <p className="mt-6 max-w-md text-lg leading-relaxed text-muted">
-                Keep your shelves close. Understand what moves you. Find your next favorite among
-                real books, chosen with your taste in mind.
+                Real books from real catalogs, each with a reason tied to your own ratings.
               </p>
               <div className="mt-8 max-w-sm">
                 <WaitlistForm />
               </div>
-              <p className="mt-4 text-xs text-muted">
+              <p className="mt-4 max-w-sm text-xs leading-relaxed text-muted">
+                ShelfSprite runs on your own Anthropic API key; you&apos;ll add it during setup.
+              </p>
+              <p className="mt-2 text-xs text-muted">
                 A small, invite-only project. Built by a reader.
               </p>
             </div>
@@ -102,16 +107,30 @@ export default function WelcomePage() {
                 className="my-6 grid grid-cols-3 items-end gap-3"
                 aria-label="An illustrative reading shelf"
               >
+                {/* The ratings are the ones the example recommendation below cites. */}
                 {[
-                  ['Piranesi', 'Susanna Clarke', 'bg-[#344941]'],
-                  ['The Left Hand of Darkness', 'Ursula K. Le Guin', 'bg-[#524337]'],
-                  ['Never Let Me Go', 'Kazuo Ishiguro', 'bg-[#434052]'],
-                ].map(([title, author, color], i) => (
+                  { title: 'Piranesi', author: 'Susanna Clarke', color: 'bg-[#344941]', rating: 5 },
+                  {
+                    title: 'The Left Hand of Darkness',
+                    author: 'Ursula K. Le Guin',
+                    color: 'bg-[#524337]',
+                    rating: 4.5,
+                  },
+                  {
+                    title: 'Never Let Me Go',
+                    author: 'Kazuo Ishiguro',
+                    color: 'bg-[#434052]',
+                    rating: 5,
+                  },
+                ].map(({ title, author, color, rating }) => (
                   <div
                     key={title}
                     className={`${color} flex min-h-44 flex-col justify-between rounded-r-md border-l-4 border-white/10 p-3 shadow-lg sm:min-h-52`}
                   >
-                    <span className="font-mono text-[10px] text-white/70">0{i + 1}</span>
+                    <span className="font-mono text-[10px] text-white/70">
+                      <span aria-hidden="true">★</span> {rating}
+                      <span className="sr-only"> stars</span>
+                    </span>
                     <p className="my-3 font-display text-sm font-bold leading-snug text-white sm:text-lg">
                       {title}
                     </p>
@@ -126,14 +145,34 @@ export default function WelcomePage() {
                   ShelfSprite helps you follow it.
                 </p>
                 <p className="mt-3 text-xs text-muted">
-                  An example shelf. Your profile begins with your own books.
+                  An example shelf with example ratings. Your profile begins with your own books.
                 </p>
               </div>
             </div>
           </div>
         </section>
 
-        <section id="how-it-works" className="border-y border-border bg-surface/50 scroll-mt-6">
+        <section className="border-y border-border bg-surface">
+          <div className="marketing-section grid items-start gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
+            <div>
+              <p className="eyebrow mb-4">Real books. Reasons that matter.</p>
+              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+                The books it recommends exist
+              </h2>
+              <p className="mt-6 text-sm leading-relaxed text-muted">
+                ShelfSprite searches real catalogs first. Then Claude ranks those books and explains
+                how they connect to your taste. Every pick has a title you can find and a reason you
+                can judge.
+              </p>
+              <div className="mt-8">
+                <RecommendationExample />
+              </div>
+            </div>
+            <ResolveArtifact />
+          </div>
+        </section>
+
+        <section id="how-it-works" className="border-b border-border bg-surface/50 scroll-mt-6">
           <div className="marketing-section">
             <p className="eyebrow mb-4">From your shelves to your next read</p>
             <h2 className="mb-10 font-display text-3xl font-bold tracking-tight sm:text-4xl">
@@ -183,24 +222,9 @@ export default function WelcomePage() {
           </figure>
         </section>
 
-        <section className="border-y border-border bg-surface">
-          <div className="marketing-section grid items-center gap-10 lg:grid-cols-[1fr_1.1fr] lg:gap-16">
-            <div>
-              <p className="eyebrow mb-4">Real books. Reasons that matter.</p>
-              <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
-                The books it recommends exist
-              </h2>
-              <p className="mt-6 text-sm leading-relaxed text-muted">
-                ShelfSprite searches real catalogs first. Then Claude ranks those books and explains
-                how they connect to your taste. Every pick has a title you can find and a reason you
-                can judge.
-              </p>
-            </div>
-            <ResolveArtifact />
-          </div>
-        </section>
-
-        <section className="marketing-section">
+        {/* The real-books section used to divide the library screenshot from this one; now that it
+            sits above how-it-works, a hairline keeps the two figures from running together. */}
+        <section className="marketing-section border-t border-border">
           <div className="mb-10 grid gap-6 lg:grid-cols-2 lg:gap-16">
             <div>
               <p className="eyebrow mb-4">Get to know your own taste</p>
@@ -220,14 +244,7 @@ export default function WelcomePage() {
             </div>
           </div>
           <figure className="mx-auto max-w-[1000px]">
-            <Image
-              src="/marketing/taste-profile-reading-room.png"
-              alt="A ShelfSprite taste profile showing the reader archetype and traits grounded in their books"
-              width={2400}
-              height={2100}
-              sizes="(max-width: 1000px) 100vw, 1000px"
-              className="h-auto w-full rounded-xl border border-border"
-            />
+            <ProfileExample />
             <figcaption className="mt-3 text-xs text-muted">
               An example profile. Every reader brings a different story.
             </figcaption>

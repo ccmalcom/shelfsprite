@@ -9,7 +9,7 @@ export default function EntryFrame({ children }: { children: React.ReactNode }) 
       </a>
       <div className="mx-auto grid w-full max-w-5xl gap-10 py-12 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-24">
         <div className="entry-story">
-          <p className="eyebrow mb-4">A little magic for your reading life</p>
+          <p className="eyebrow mb-4">For the love of the next good book</p>
           <h2 className="max-w-[12ch] font-display text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
             Your next chapter starts here.
           </h2>
