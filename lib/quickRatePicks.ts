@@ -14,6 +14,10 @@ export interface QuickRatePick {
 export interface QuickRateGenre {
   id: string;
   label: string;
+  /**
+   * Best known first. The first 20 fill the grid; the rest stand in for picks a reader has
+   * already shelved or the catalog cannot resolve, so the grid still fills.
+   */
   picks: QuickRatePick[];
 }
 
@@ -49,6 +53,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('The Great Gatsby', 'F. Scott Fitzgerald'),
       p('Olive Kitteridge', 'Elizabeth Strout'),
       p('The God of Small Things', 'Arundhati Roy'),
+      p('The Bell Jar', 'Sylvia Plath'),
+      p('Things Fall Apart', 'Chinua Achebe'),
+      p('Middlemarch', 'George Eliot'),
+      p('One Hundred Years of Solitude', 'Gabriel García Márquez'),
+      p('The Catcher in the Rye', 'J. D. Salinger'),
+      p('Of Mice and Men', 'John Steinbeck'),
+      p('Klara and the Sun', 'Kazuo Ishiguro'),
+      p('A Thousand Splendid Suns', 'Khaled Hosseini'),
     ],
   },
   {
@@ -75,6 +87,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('Children of Time', 'Adrian Tchaikovsky'),
       p('A Memory Called Empire', 'Arkady Martine'),
       p('Station Eleven', 'Emily St. John Mandel'),
+      p('Red Rising', 'Pierce Brown'),
+      p('The Dispossessed', 'Ursula K. Le Guin'),
+      p('Ready Player One', 'Ernest Cline'),
+      p('Slaughterhouse-Five', 'Kurt Vonnegut'),
+      p('Dark Matter', 'Blake Crouch'),
+      p('Altered Carbon', 'Richard K. Morgan'),
+      p('The Long Way to a Small, Angry Planet', 'Becky Chambers'),
+      p('Ancillary Justice', 'Ann Leckie'),
     ],
   },
   {
@@ -101,6 +121,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('Uprooted', 'Naomi Novik'),
       p('The Colour of Magic', 'Terry Pratchett'),
       p('The Eye of the World', 'Robert Jordan'),
+      p('The Lion, the Witch and the Wardrobe', 'C. S. Lewis'),
+      p('The Golden Compass', 'Philip Pullman'),
+      p('Good Omens', 'Terry Pratchett'),
+      p('Stardust', 'Neil Gaiman'),
+      p('Six of Crows', 'Leigh Bardugo'),
+      p('The House in the Cerulean Sea', 'TJ Klune'),
+      p('The Blade Itself', 'Joe Abercrombie'),
+      p('A Court of Thorns and Roses', 'Sarah J. Maas'),
     ],
   },
   {
@@ -127,6 +155,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('Sharp Objects', 'Gillian Flynn'),
       p('The Name of the Rose', 'Umberto Eco'),
       p('Magpie Murders', 'Anthony Horowitz'),
+      p('The Murder of Roger Ackroyd', 'Agatha Christie'),
+      p('The Maltese Falcon', 'Dashiell Hammett'),
+      p('The Firm', 'John Grisham'),
+      p('Mystic River', 'Dennis Lehane'),
+      p('The Bourne Identity', 'Robert Ludlum'),
+      p("The No. 1 Ladies' Detective Agency", 'Alexander McCall Smith'),
+      p('The Woman in the Window', 'A. J. Finn'),
+      p('The Guest List', 'Lucy Foley'),
     ],
   },
   {
@@ -153,6 +189,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('The Love Hypothesis', 'Ali Hazelwood'),
       p('The Rosie Project', 'Graeme Simsion'),
       p("Bridget Jones's Diary", 'Helen Fielding'),
+      p('Sense and Sensibility', 'Jane Austen'),
+      p('Emma', 'Jane Austen'),
+      p('Wuthering Heights', 'Emily Brontë'),
+      p('North and South', 'Elizabeth Gaskell'),
+      p('Eleanor & Park', 'Rainbow Rowell'),
+      p('Happy Place', 'Emily Henry'),
+      p('The Wedding Date', 'Jasmine Guillory'),
+      p('Get a Life, Chloe Brown', 'Talia Hibbert'),
     ],
   },
   {
@@ -179,6 +223,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('The Alice Network', 'Kate Quinn'),
       p('Where the Crawdads Sing', 'Delia Owens'),
       p('War and Peace', 'Leo Tolstoy'),
+      p('Gone with the Wind', 'Margaret Mitchell'),
+      p('Bring Up the Bodies', 'Hilary Mantel'),
+      p('The Thorn Birds', 'Colleen McCullough'),
+      p('I, Claudius', 'Robert Graves'),
+      p('Lilac Girls', 'Martha Hall Kelly'),
+      p('The Covenant of Water', 'Abraham Verghese'),
+      p('The Tattooist of Auschwitz', 'Heather Morris'),
+      p('The Paris Library', 'Janet Skeslien Charles'),
     ],
   },
   {
@@ -205,6 +257,14 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('Ghost Story', 'Peter Straub'),
       p('Coraline', 'Neil Gaiman'),
       p('The Troop', 'Nick Cutter'),
+      p("'Salem's Lot", 'Stephen King'),
+      p('Misery', 'Stephen King'),
+      p('The Turn of the Screw', 'Henry James'),
+      p('Something Wicked This Way Comes', 'Ray Bradbury'),
+      p('The Woman in Black', 'Susan Hill'),
+      p('NOS4A2', 'Joe Hill'),
+      p('Let the Right One In', 'John Ajvide Lindqvist'),
+      p('The Cabin at the End of the World', 'Paul Tremblay'),
     ],
   },
   {
@@ -231,13 +291,22 @@ export const QUICK_RATE_GENRES: QuickRateGenre[] = [
       p('Between the World and Me', 'Ta-Nehisi Coates'),
       p('A Short History of Nearly Everything', 'Bill Bryson'),
       p('Say Nothing', 'Patrick Radden Keefe'),
+      p('Hiroshima', 'John Hersey'),
+      p('The Glass Castle', 'Jeannette Walls'),
+      p('Killers of the Flower Moon', 'David Grann'),
+      p('Seabiscuit', 'Laura Hillenbrand'),
+      p('Wild', 'Cheryl Strayed'),
+      p('Outliers', 'Malcolm Gladwell'),
+      p("The Omnivore's Dilemma", 'Michael Pollan'),
+      p('Behind the Beautiful Forevers', 'Katherine Boo'),
     ],
   },
 ];
 
 /**
- * The grid for the chosen genres: their picks interleaved (one from each in turn, so every
- * genre is near the top), with no title repeated, capped at QUICK_RATE_MAX_TILES.
+ * The chosen genres' picks interleaved (one from each in turn, so every genre is near the
+ * top), with no title repeated, capped at `max`. The grid resolves them in this order until
+ * it has QUICK_RATE_MAX_TILES tiles, so pass a larger `max` to reach the stand-ins.
  */
 export function quickRatePicks(
   genreIds: readonly string[],

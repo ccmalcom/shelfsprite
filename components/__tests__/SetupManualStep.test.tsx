@@ -8,6 +8,7 @@ import type { Book } from '@/lib/api';
 
 const mockSetBookFeedback = jest.fn();
 const mockRemoveBook = jest.fn();
+const mockStats = jest.fn();
 
 jest.mock('swr', () => ({
   __esModule: true,
@@ -82,7 +83,7 @@ jest.mock('@/lib/api', () => ({
   api: {
     setBookFeedback: (...args: unknown[]) => mockSetBookFeedback(...args),
     removeBook: (...args: unknown[]) => mockRemoveBook(...args),
-    stats: jest.fn(async () => ({})),
+    stats: (...args: unknown[]) => mockStats(...args),
   },
   API_KEY_STATUS_KEY: '/settings/api-key',
   PROFILE_STATUS_KEY: '/profile/status',
@@ -102,6 +103,8 @@ function renderWithTwoBooks() {
 beforeEach(() => {
   mockSetBookFeedback.mockReset();
   mockRemoveBook.mockReset();
+  mockStats.mockReset();
+  mockStats.mockResolvedValue({});
 });
 
 describe('setup manual step', () => {
@@ -159,6 +162,29 @@ describe('setup manual step', () => {
       '2'
     );
     expect(screen.getByRole('button', { name: 'Finish with 2 books' })).toBeInTheDocument();
+  });
+
+  it('counts ratings already in the library on the meter', async () => {
+    mockStats.mockResolvedValue({ by_star: { '5': 6, '4.5': 1, '3': 3 } });
+    renderWithTwoBooks();
+    const rated = screen.getByRole('progressbar', { name: 'Rated' });
+    const loved = screen.getByRole('progressbar', { name: 'Loved (4 stars or more)' });
+    await waitFor(() => expect(rated).toHaveAttribute('aria-valuenow', '12'));
+    // Ten from the library, Beloved (5) and Sula (3) from this step.
+    expect(loved).toHaveAttribute('aria-valuenow', '8');
+  });
+
+  it('shows the meter before anything is added when the library has ratings', async () => {
+    mockStats.mockResolvedValue({ by_star: { '4': 2 } });
+    render(
+      <ToastProvider>
+        <ManualStep onDone={jest.fn()} />
+      </ToastProvider>
+    );
+    expect(await screen.findByRole('progressbar', { name: 'Rated' })).toHaveAttribute(
+      'aria-valuenow',
+      '2'
+    );
   });
 
   it('states the real cold-start threshold rather than "five or six favorites"', () => {

@@ -92,6 +92,24 @@ describe('rankSearchResults', () => {
     expect(got[0]).toBe(studyGuide);
   });
 
+  it('ranks the book above records that append its author to the title', () => {
+    const appended = cand({ title: 'Middlemarch George Eliot', author: 'George Eliot' });
+    const byLine = cand({ title: 'Middlemarch, by George Eliot', author: 'George Eliot' });
+    const notes = cand({ title: 'Middlemarch, George Eliot', author: 'John Peck' });
+    const book = cand({ title: 'Middlemarch', author: 'George Eliot', year: 1994 });
+    const got = rankSearchResults('middlemarch george eliot', [appended, byLine, notes, book]);
+    expect(got[0]).toBe(book);
+    // Without the author in the query the book already won; it still does.
+    expect(rankSearchResults('middlemarch', [appended, notes, book])[0]).toBe(book);
+  });
+
+  it('leaves a title that only ends in an author name alone', () => {
+    const film = cand({ title: 'Becoming Jane Austen', author: 'Jon Spence' });
+    const pride = cand({ title: 'Pride and Prejudice', author: 'Jane Austen' });
+    const got = rankSearchResults('becoming jane austen', [pride, film]);
+    expect(got[0]).toBe(film);
+  });
+
   it('breaks ties on a plausible year only, so a bogus future year cannot win', () => {
     const bogus = cand({ title: 'Beloved', author: 'Toni Morrison', year: 3020 });
     const got = rankSearchResults('beloved', [bogus, morrison]);
