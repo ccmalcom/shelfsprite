@@ -1,5 +1,5 @@
 'use client';
-import { useId, useState, KeyboardEvent, MouseEvent } from 'react';
+import { useId, useRef, useState, KeyboardEvent } from 'react';
 import { RATING_MAX, RATING_STEP } from '@/lib/server/rating';
 
 interface StarRatingProps {
@@ -10,8 +10,13 @@ interface StarRatingProps {
   label?: string;
   readOnly?: boolean;
   size?: number;
-  /** Enable half-star selection: a click on the left half of a star picks the .5 value. */
+  /** Enable half-star selection: the left half of each star is its own .5 option. */
   allowHalf?: boolean;
+}
+
+function optionLabel(v: number) {
+  if (v === 0.5) return 'Half a star';
+  return v === 1 ? '1 star' : `${v} stars`;
 }
 
 export function StarRating({
@@ -25,41 +30,37 @@ export function StarRating({
 }: StarRatingProps) {
   const [hovered, setHovered] = useState(0);
   const uid = useId();
+  const groupRef = useRef<HTMLDivElement>(null);
   const step = allowHalf ? RATING_STEP : 1;
   const min = step;
 
-  function clamp(next: number) {
-    return Math.min(max, Math.max(min, next));
-  }
-
-  /** Which value a pointer at `e` over star `star` represents. */
-  function valueAt(e: MouseEvent<HTMLButtonElement>, star: number) {
-    if (!allowHalf) return star;
-    // Enter or Space fires a click with no pointer position (detail 0): pick the whole star.
-    if (e.type === 'click' && e.detail === 0) return star;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const fraction = rect.width > 0 ? (e.clientX - rect.left) / rect.width : 1;
-    // Only the left half picks .5; the exact centre counts as the whole star.
-    return fraction < 0.5 ? star - 0.5 : star;
+  function select(next: number, moveFocus = false) {
+    const v = Math.min(max, Math.max(min, next));
+    onChange?.(v);
+    if (moveFocus) {
+      groupRef.current?.querySelector<HTMLButtonElement>(`[data-value="${v}"]`)?.focus();
+    }
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (readOnly || !onChange) return;
+    if (!onChange) return;
+    // Snap to the step grid, so an off-grid value (a 4.5 shown without allowHalf) still
+    // moves to a value this control offers.
     if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
       e.preventDefault();
-      onChange(clamp(value + step));
+      select((Math.floor(value / step) + 1) * step, true);
     } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
       e.preventDefault();
-      onChange(clamp(value - step));
+      select((Math.ceil(value / step) - 1) * step, true);
     } else if (e.key === 'Home') {
       e.preventDefault();
-      onChange(min);
+      select(min, true);
     } else if (e.key === 'End') {
       e.preventDefault();
-      onChange(max);
+      select(max, true);
     } else if (e.key >= '1' && e.key <= String(max)) {
       e.preventDefault();
-      onChange(Number(e.key));
+      select(Number(e.key), true);
     }
   }
 
@@ -85,41 +86,55 @@ export function StarRating({
   }
 
   const display = hovered || value;
+  // Every selectable value is its own radio: with allowHalf, each star holds a left-half
+  // radio (x.5) and a right-half radio (x). A half star is one click or tap away, and
+  // aria-checked marks exactly the value that is set, so a 4.5 no longer reads as "5 stars".
+  const options = Array.from({ length: max / step }, (_, i) => (i + 1) * step);
+  // Roving tabindex: the set value, or the nearest option above an unrated or off-grid one.
+  const tabValue = options.find((v) => v >= value) ?? options[options.length - 1];
 
   return (
     <div
+      ref={groupRef}
       role="radiogroup"
       aria-label={`${label}: ${value || 0} of ${max}`}
       className="flex items-center gap-1"
+      onMouseLeave={() => setHovered(0)}
     >
       {Array.from({ length: max }, (_, i) => {
         const star = i + 1;
-        // 1 = full, 0.5 = half, 0 = empty.
-        const fill = starFill(star, display);
-        const tabIdx = star === Math.ceil(value || 1) ? 0 : -1;
-
+        const starOptions = allowHalf ? [star - 0.5, star] : [star];
         return (
-          <button
-            key={star}
-            type="button"
-            role="radio"
-            aria-checked={value > star - 1 && value <= star}
-            aria-label={star === 1 ? '1 star' : `${star} stars`}
-            disabled={readOnly}
-            tabIndex={tabIdx}
-            onClick={(e) => !readOnly && onChange && onChange(valueAt(e, star))}
-            onMouseMove={(e) => !readOnly && setHovered(valueAt(e, star))}
-            onMouseLeave={() => !readOnly && setHovered(0)}
-            onKeyDown={handleKeyDown}
-            className={[
-              'rounded transition-transform',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-              'focus-visible:ring-offset-1 focus-visible:ring-offset-base',
-              readOnly ? 'cursor-default' : 'cursor-pointer hover:scale-110 active:scale-95',
-            ].join(' ')}
-          >
-            <StarIcon fill={fill} size={size} index={star} uid={uid} />
-          </button>
+          <span key={star} className="group relative inline-flex">
+            <span className="inline-flex transition-transform group-hover:scale-110 group-active:scale-95">
+              {/* 1 = full, 0.5 = half, 0 = empty. */}
+              <StarIcon fill={starFill(star, display)} size={size} index={star} uid={uid} />
+            </span>
+            {starOptions.map((v) => (
+              <button
+                key={v}
+                type="button"
+                role="radio"
+                data-value={v}
+                aria-checked={value === v}
+                aria-label={optionLabel(v)}
+                tabIndex={v === tabValue ? 0 : -1}
+                onClick={() => select(v)}
+                onMouseEnter={() => setHovered(v)}
+                onKeyDown={handleKeyDown}
+                className={[
+                  'absolute inset-y-0 cursor-pointer rounded',
+                  starOptions.length === 1
+                    ? 'inset-x-0'
+                    : v < star
+                      ? 'left-0 w-1/2'
+                      : 'right-0 w-1/2',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                  'focus-visible:ring-offset-1 focus-visible:ring-offset-base',
+                ].join(' ')}
+              />
+            ))}
+          </span>
         );
       })}
     </div>

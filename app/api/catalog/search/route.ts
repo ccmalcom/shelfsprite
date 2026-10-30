@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { withApi, ApiError } from '@/lib/server/http';
 import { getDb } from '@/lib/server/db';
-import { searchBooks } from '@/lib/server/catalog';
+import { plausibleYear, searchBooks } from '@/lib/server/catalog';
 import { checkRateLimit, RATE_LIMITS, rateLimitExceededResponse } from '@/lib/server/ratelimit';
 
 const Query = z.object({
@@ -47,16 +47,23 @@ export const GET = withApi('/api/catalog/search', async (req, ctx) => {
   return Response.json(
     hits
       .filter((h) => h.title)
-      .map((h) => ({
-        source: h.source ?? 'unknown',
-        catalog_id: h.resolved_id ?? null,
-        title: h.title ?? '',
-        author: h.author ?? null,
-        year: h.year ?? null,
-        isbn13: h.isbn13 ?? null,
-        cover_url: h.cover_url ?? null,
-        subjects: h.subjects ?? null,
-        description: h.description ?? null,
-      }))
+      .map((h) => {
+        // Readers check a hit by its original year (Beloved, 1987), so show that when Open
+        // Library gave one. A Google Books year alone is an edition's, and says so.
+        const firstYear = plausibleYear(h.first_publish_year);
+        const year = firstYear ?? plausibleYear(h.year);
+        return {
+          source: h.source ?? 'unknown',
+          catalog_id: h.resolved_id ?? null,
+          title: h.title ?? '',
+          author: h.author ?? null,
+          year,
+          year_kind: firstYear ? 'first_published' : year ? 'edition' : null,
+          isbn13: h.isbn13 ?? null,
+          cover_url: h.cover_url ?? null,
+          subjects: h.subjects ?? null,
+          description: h.description ?? null,
+        };
+      })
   );
 });

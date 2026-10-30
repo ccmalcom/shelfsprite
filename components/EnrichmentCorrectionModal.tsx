@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { BookOpen } from 'lucide-react';
-import { api, type Book, type CatalogResult } from '@/lib/api';
+import { api, catalogYearLabel, type Book, type CatalogResult } from '@/lib/api';
 import { Button, Modal, useToast } from '@/components/ui';
 
 interface Props {
@@ -184,7 +184,7 @@ export default function EnrichmentCorrectionModal({
                       <p className="truncate text-sm font-medium text-text">{r.title}</p>
                       <p className="truncate text-xs text-faint">
                         {r.author ?? 'Unknown author'}
-                        {r.year ? ` · ${r.year}` : ''}
+                        {catalogYearLabel(r)}
                       </p>
                     </div>
                   </button>
@@ -221,7 +221,7 @@ export default function EnrichmentCorrectionModal({
               <p className="truncate font-semibold text-text">{selected.title}</p>
               <p className="truncate text-sm text-muted">
                 {selected.author ?? 'Unknown author'}
-                {selected.year ? ` · ${selected.year}` : ''}
+                {catalogYearLabel(selected)}
               </p>
             </div>
             <button

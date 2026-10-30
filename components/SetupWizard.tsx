@@ -3,7 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, X } from 'lucide-react';
 import { mutate } from 'swr';
 import {
   api,
@@ -337,7 +337,9 @@ function UploadStep({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="mb-1 text-xl font-semibold text-text">Import your library</h2>
+        <h2 className="mb-1 text-xl font-semibold text-text">
+          Import from Goodreads or StoryGraph
+        </h2>
         <p className="text-sm text-muted">
           Export a CSV from Goodreads (My Books &rsaquo; Import/Export) or The StoryGraph (Manage
           Account &rsaquo; Export), then drop it here.
@@ -380,7 +382,9 @@ function UploadStep({
           <div className="space-y-2">
             <BookOpen className="mx-auto h-10 w-10 text-faint" />
             <p className="font-medium text-text">Drop your CSV here, or click to browse</p>
-            <p className="text-xs text-faint">goodreads_library_export.csv</p>
+            <p className="text-xs text-faint">
+              Goodreads or StoryGraph export, detected automatically
+            </p>
           </div>
         )}
       </label>
@@ -434,7 +438,8 @@ function UploadStep({
 
 // ── Step: Manual ──────────────────────────────────────────────────────────────
 
-function ManualStep({ onDone }: { onDone: () => void }) {
+export function ManualStep({ onDone }: { onDone: () => void }) {
+  const toast = useToast();
   const [books, setBooks] = useState<Book[]>([]);
   const [adding, setAdding] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -445,13 +450,40 @@ function ManualStep({ onDone }: { onDone: () => void }) {
     onDone();
   }
 
+  async function handleRate(book: Book, rating: number) {
+    try {
+      const saved = await api.setBookFeedback(book.id, { rating });
+      setBooks((prev) =>
+        prev.map((b) =>
+          b.id === book.id
+            ? { ...b, app_rating: saved.app_rating, effective_rating: saved.effective_rating }
+            : b
+        )
+      );
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'That rating did not save.');
+    }
+  }
+
+  async function handleRemove(book: Book) {
+    try {
+      await api.removeBook(book.id);
+      setBooks((prev) => prev.filter((b) => b.id !== book.id));
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : `${book.title} could not be removed.`);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
         <h2 className="mb-1 text-xl font-semibold text-text">Build your starter library</h2>
+        {/* The numbers are lib/server/recSignal.ts's COLD_START_RATED and COLD_START_LOVED:
+            below them the first picks come from the broader cold-start path. */}
         <p className="text-sm text-muted">
-          Add a handful of books you&apos;ve read and rate them. Five or six favorites are enough to
-          start reading you. Add the rest whenever.
+          Add books you&apos;ve read and rate them. For the best first picks, add at least 12,
+          including 8 you loved (4 stars or more). Fewer works too, but the picks will be broader.
+          Add the rest whenever.
         </p>
       </div>
 
@@ -482,15 +514,23 @@ function ManualStep({ onDone }: { onDone: () => void }) {
                 <p className="truncate text-sm font-medium text-text">{b.title}</p>
                 <p className="truncate text-xs text-faint">{b.author ?? 'Unknown author'}</p>
               </div>
-              {b.effective_rating ? (
-                <span className="shrink-0">
-                  {/* Not '\u2605'.repeat(rating): repeat() truncates its count, so a
-                      4.5 rendered four stars while aria-label said "4.5". */}
-                  <StarRating value={b.effective_rating} readOnly size={14} />
-                </span>
-              ) : (
-                <span className="shrink-0 text-xs text-faint">unrated</span>
-              )}
+              <span className="shrink-0">
+                <StarRating
+                  value={b.effective_rating ?? 0}
+                  onChange={(rating) => void handleRate(b, rating)}
+                  allowHalf
+                  size={16}
+                  label={`Rating for ${b.title}`}
+                />
+              </span>
+              <button
+                type="button"
+                onClick={() => void handleRemove(b)}
+                aria-label={`Remove ${b.title}`}
+                className="shrink-0 rounded p-1 text-faint transition hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <X className="h-4 w-4" aria-hidden="true" />
+              </button>
             </li>
           ))}
         </ul>
@@ -527,6 +567,16 @@ function ManualStep({ onDone }: { onDone: () => void }) {
 // ── Step: Enrich ──────────────────────────────────────────────────────────────
 
 const ENRICH_POLL_MS = 2000;
+// Observed pace is about half a second a book (13 books took ~7 s), so a flat
+// "5 to 10 minutes" overstated small libraries by two orders of magnitude.
+const ENRICH_SECONDS_PER_BOOK = 0.5;
+
+/** A time estimate for enriching `count` newly imported books. */
+export function enrichEstimate(count: number): string {
+  const minutes = Math.round((count * ENRICH_SECONDS_PER_BOOK) / 60);
+  if (minutes < 1) return 'Usually under a minute for a library this size.';
+  return `About ${minutes} minute${minutes === 1 ? '' : 's'} for ${count.toLocaleString('en-US')} books.`;
+}
 
 function EnrichStep({ ingestResult, onDone }: { ingestResult: IngestResult; onDone: () => void }) {
   const [jobId, setJobId] = useState<string | null>(null);
@@ -586,8 +636,8 @@ function EnrichStep({ ingestResult, onDone }: { ingestResult: IngestResult; onDo
         <p className="text-sm text-muted">
           <strong className="text-text">{ingestResult.inserted}</strong> books in
           {ingestResult.skipped > 0 && ` (${ingestResult.skipped} already existed)`}. Now we fetch
-          what the CSV left out (covers, page counts, genres) from Open Library and Google Books.
-          About <strong className="text-text">5–10 minutes</strong> for a typical library.
+          what the CSV left out (covers, page counts, genres) from Open Library and Google Books.{' '}
+          {enrichEstimate(ingestResult.inserted)}
         </p>
       </div>
 
@@ -697,15 +747,15 @@ export function ProfileStep({ onDone }: { onDone: () => void }) {
         />
         <h2 className="mb-1 text-xl font-semibold text-text">Build your taste profile</h2>
         <p className="text-sm text-muted">
-          This is the good part: Claude reads every rating and review you just imported and works
-          out what you actually like. 30–60 seconds.
+          This is the good part: Claude reads every rating and review in your library and works out
+          what you actually like. 30–60 seconds.
         </p>
       </div>
 
       <div className="rounded-xl border border-border bg-elevated p-4 text-sm text-muted space-y-1.5">
         <p>Creates your initial taste traits from your library</p>
         <p>Required before running recommendations</p>
-        <p>Uses your configured Anthropic API key</p>
+        <p>Uses your Anthropic API key</p>
       </div>
 
       {loading && (
