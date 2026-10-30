@@ -237,6 +237,14 @@ export function buildScreenSeedPrompt(
       pyJsonDumps(signal.less_like_titles) +
       '.';
   }
+  // Emitted only when populated, so the pinned prompt is unchanged (genreSuppression.ts).
+  if (signal.genre_suppression.suppressed.length) {
+    steering +=
+      ' Do not propose titles in these genres: the viewer recently skipped titles in them ' +
+      'as the wrong genre: ' +
+      pyJsonDumps(signal.genre_suppression.suppressed) +
+      '.';
+  }
   const directive = (signal.directive_text ?? '').trim();
   if (directive) steering += "\n\nThe viewer's own standing instructions: " + directive;
   const owned = signal.owned_list.length
@@ -283,6 +291,24 @@ function screenSteeringBlock(signal: ScreenSignal): string {
       .join(', ');
     lines.push('FREQUENT REJECT REASONS: ' + reasons);
   }
+  const { suppressed, soft } = signal.genre_suppression;
+  if (suppressed.length) {
+    lines.push(
+      'WRONG-GENRE SKIPS (genres of titles the viewer recently skipped as the wrong genre; ' +
+        'candidates carrying them were already removed, so heavily penalize any candidate ' +
+        'that is still the same kind of title):\n' +
+        pyJsonDumps(suppressed)
+    );
+  }
+  if (soft.length) {
+    lines.push(
+      'SOFT WRONG-GENRE SKIPS (the viewer skipped a title in these genres as the wrong ' +
+        'genre but rates other titles in them highly, so the skip was likely about ' +
+        'something else; treat it as a mild signal only, never a reason to drop the ' +
+        'genre):\n' +
+        pyJsonDumps(soft)
+    );
+  }
   const directive = (signal.directive_text ?? '').trim();
   if (directive) {
     lines.push(
@@ -295,7 +321,9 @@ function screenSteeringBlock(signal: ScreenSignal): string {
   lines.push(
     'Favor candidates resembling the more-like titles; penalize candidates resembling the ' +
       'less-like titles; penalize candidates matching frequent reject reasons (too_long means ' +
-      "runtime or season count); weight trait influence by each trait's `user_weight`: traits " +
+      'runtime or season count; too_similar means too close to what they have already seen; ' +
+      'already_known means the pick was no discovery, so favor less obvious titles); weight ' +
+      "trait influence by each trait's `user_weight`: traits " +
       'with a lower weight should influence the score less (0.0 = ignore, 1.0 = normal).'
   );
   return lines.join('\n\n');

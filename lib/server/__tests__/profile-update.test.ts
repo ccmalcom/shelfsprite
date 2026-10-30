@@ -179,6 +179,41 @@ describe('updateTasteProfile keeps trait ids stable (recommendations cite them)'
       await close();
     }
   });
+  it('matches a stored claim with echoed ids to its stripped rewrite exactly', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as Seed);
+      // Trait 1 as stored before the write-time guard: its cited ids echoed into the claim.
+      await db
+        .update(schema.tasteTraits)
+        .set({ claim: IDEA_SF.replace(' science fiction', ' science fiction (1, 2)') })
+        .where(eq(schema.tasteTraits.id, 1));
+      const client = fakeClaude([
+        reviseResponse([
+          // Claude returns the trait in clean text, as CLAIM_TEXT_RULE asks.
+          { claim: IDEA_SF, polarity: 'positive', exhibits: [1, 2], inference_confidence: 0.9 },
+          {
+            claim: STANDALONE,
+            polarity: 'positive',
+            exhibits: [2, 13],
+            contrasts: [12],
+            inference_confidence: 0.8,
+          },
+        ]),
+      ]);
+
+      await updateTasteProfile(db, client, 'local');
+
+      const after = await traitsById(db);
+      expect([...after.keys()]).toEqual([1, 2, 3, 4]);
+      expect(after.get(1)!.claim).toBe(IDEA_SF);
+      // Read as readers see it, the claim did not change, so this is no reword: the reveal
+      // line, which a reword clears, survives.
+      expect(after.get(1)!.revealLine).toBe('You read to argue with civilizations.');
+    } finally {
+      await close();
+    }
+  });
 });
 
 describe('updateTasteProfile', () => {

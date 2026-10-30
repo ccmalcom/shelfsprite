@@ -18,6 +18,8 @@ interface Props {
   pickLabel: string;
   onPick: (candidate: ScreenCandidate) => void;
   busy?: boolean;
+  /** Told when the Film/TV choice changes, so a parent can restore it on the next mount. */
+  onTypeChange?: (type: MediaType) => void;
 }
 
 /**
@@ -31,6 +33,7 @@ export default function CatalogSearch({
   pickLabel,
   onPick,
   busy = false,
+  onTypeChange,
 }: Props) {
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState<MediaType>(initialType);
@@ -65,7 +68,10 @@ export default function CatalogSearch({
               type="button"
               role="radio"
               aria-checked={type === t}
-              onClick={() => setType(t)}
+              onClick={() => {
+                setType(t);
+                onTypeChange?.(t);
+              }}
               className={[
                 'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
                 type === t ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text',

@@ -107,7 +107,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
   return (
     <div className="editorial-page fade-in space-y-8">
       <PageHeading
-        eyebrow="The reader behind the ratings"
+        eyebrow={isScreen ? 'The viewer behind the ratings' : 'The reader behind the ratings'}
         title="Your taste profile"
         description={
           screenEnabled
@@ -169,7 +169,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
             titleEvidence={titleEvidence}
             onBuildProfile={handleBuildProfile}
           />
-          <CustomInstructions />
+          <CustomInstructions section={section} />
           {isScreen ? (
             titles ? (
               <ScreenStats titles={titles} />

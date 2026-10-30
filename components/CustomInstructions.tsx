@@ -27,7 +27,18 @@ function constraintChips(c: DirectiveConstraints): string[] {
   return chips;
 }
 
-export default function CustomInstructions() {
+/**
+ * The standing directive editor. One record serves both sections: its prose and hard filters
+ * steer book and screen picks alike, but favorite authors and subjects are read by the book
+ * recommender only. In the screen section the copy speaks of films and shows, and the
+ * favorites sit under a label that says they steer book picks.
+ */
+export default function CustomInstructions({
+  section = 'books',
+}: {
+  section?: 'books' | 'screen';
+}) {
+  const isScreen = section === 'screen';
   const { mutate } = useSWRConfig();
   const { data } = useSWR<Directive>(DIRECTIVE_KEY, getDirective);
   const { data: suggestions } = useSWR<PreferenceSuggestions>(
@@ -116,27 +127,63 @@ export default function CustomInstructions() {
           Help me write this
         </Button>
       </div>
-      <p className="text-sm text-muted">
-        Tell the recommender what you want in your own words: &ldquo;more nonfiction this
-        year&rdquo;, &ldquo;nothing bleak&rdquo;, &ldquo;short books&rdquo;. This steers every
-        recommendation.
-      </p>
+      {isScreen ? (
+        <p className="text-sm text-muted">
+          Tell the recommender what you want in your own words: &ldquo;more limited series&rdquo;,
+          &ldquo;nothing bleak&rdquo;, &ldquo;films under two hours&rdquo;. These instructions steer
+          every recommendation, books and screen alike.
+        </p>
+      ) : (
+        <p className="text-sm text-muted">
+          Tell the recommender what you want in your own words: &ldquo;more nonfiction this
+          year&rdquo;, &ldquo;nothing bleak&rdquo;, &ldquo;short books&rdquo;. This steers every
+          recommendation.
+        </p>
+      )}
       <Textarea
         rows={4}
         value={effectiveText}
         disabled={!loaded}
         onChange={(e) => setText(e.target.value)}
-        placeholder="More character-driven literary fiction. No grimdark. Keep it under 400 pages."
+        placeholder={
+          isScreen
+            ? 'Slow, character-driven dramas. Nothing gory. Prefer limited series to long-running shows.'
+            : 'More character-driven literary fiction. No grimdark. Keep it under 400 pages.'
+        }
       />
-      <FavoritesFields
-        authors={effectiveConstraints.prefer_authors ?? []}
-        subjects={effectiveConstraints.prefer_subjects ?? []}
-        excludeAuthors={effectiveConstraints.exclude_authors ?? []}
-        excludeSubjects={effectiveConstraints.exclude_subjects ?? []}
-        suggestions={suggestions}
-        disabled={!loaded}
-        onChange={setFavorites}
-      />
+      {isScreen ? (
+        <section aria-labelledby="book-favorites-heading" className="space-y-3">
+          <div>
+            <h4 id="book-favorites-heading" className="text-sm font-semibold text-text">
+              Book favorites
+            </h4>
+            <p className="text-xs text-muted">
+              Favorite authors and subjects steer book picks only. They are shared with your books
+              profile.
+            </p>
+          </div>
+          <FavoritesFields
+            authors={effectiveConstraints.prefer_authors ?? []}
+            subjects={effectiveConstraints.prefer_subjects ?? []}
+            excludeAuthors={effectiveConstraints.exclude_authors ?? []}
+            excludeSubjects={effectiveConstraints.exclude_subjects ?? []}
+            suggestions={suggestions}
+            suggestionsLabel="From your books"
+            disabled={!loaded}
+            onChange={setFavorites}
+          />
+        </section>
+      ) : (
+        <FavoritesFields
+          authors={effectiveConstraints.prefer_authors ?? []}
+          subjects={effectiveConstraints.prefer_subjects ?? []}
+          excludeAuthors={effectiveConstraints.exclude_authors ?? []}
+          excludeSubjects={effectiveConstraints.exclude_subjects ?? []}
+          suggestions={suggestions}
+          disabled={!loaded}
+          onChange={setFavorites}
+        />
+      )}
       {chips.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {chips.map((c) => (

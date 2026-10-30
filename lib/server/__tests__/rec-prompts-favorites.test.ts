@@ -19,6 +19,7 @@ const signal = (constraints: Record<string, unknown>): RecSignal =>
     less_like: [],
     reject_reason_counts: new Map(),
     rejected_with_notes: [],
+    genre_suppression: { suppressed: [], soft: [] },
     directive_text: null,
     directive_constraints: constraints,
   }) as unknown as RecSignal;

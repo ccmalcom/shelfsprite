@@ -5,7 +5,7 @@ import { makeTestDb, loadSeed } from './helpers/pglite';
 import { setupTestEnv } from './helpers/testEnv';
 import { installHttpReplay } from './helpers/httpReplay';
 import { schema } from '../db';
-import { runDiscover } from '../recDiscoverRun';
+import { parseReferenceBooks, runDiscover } from '../recDiscoverRun';
 import type { ClaudeClient } from '../claude';
 
 const DISCOVER_QUERY = 'something like The Fifth Season but gentler';
@@ -306,6 +306,170 @@ describe('runDiscover', () => {
       restore();
       await close();
     }
+  });
+
+  test('"like Gilead" resolves Gilead first and seeds retrieval with its author and subjects', async () => {
+    // QA 2026-10-30: "a quiet novel like Gilead but not about religion" returned three
+    // omnibuses, because the facet queries went to the catalog as free text and the named
+    // book was never looked up.
+    const requested: string[] = [];
+    const gilead = {
+      title: 'Gilead',
+      author: 'Marilynne Robinson',
+      subjects: [
+        'Fiction',
+        'Clergy',
+        'Fathers and sons',
+        'Religious fiction',
+        'Epistolary fiction',
+        'Domestic fiction',
+      ],
+    };
+    const olDoc = (b: { title: string; author: string; subjects?: string[] }, i: number) => ({
+      key: `/works/OLG${i}W`,
+      title: b.title,
+      author_name: [b.author],
+      subject: b.subjects ?? ['Fiction'],
+      first_publish_year: 2000,
+      language: ['eng'],
+    });
+    const router = (url: URL): unknown => {
+      const q = (
+        url.searchParams.get('q') ??
+        url.searchParams.get('title') ??
+        url.searchParams.get('author') ??
+        ''
+      ).toLowerCase();
+      if (url.host === 'www.googleapis.com') {
+        if (q.includes('quiet introspective')) {
+          return {
+            items: [
+              'J. M. Barrie Complete Novels',
+              'A Literary Cavalcade-V',
+              'Illustrated literature of all nations [8 novels]',
+              'Stoner',
+            ].map((title, i) => ({
+              id: `gq${i}`,
+              volumeInfo: {
+                title,
+                authors: [title === 'Stoner' ? 'John Williams' : 'Various'],
+                categories: ['Fiction'],
+                description: `${title}, described.`,
+              },
+            })),
+          };
+        }
+        if (q.includes('gilead')) {
+          return {
+            items: [
+              {
+                id: 'ggilead',
+                volumeInfo: {
+                  title: 'Gilead',
+                  authors: ['Marilynne Robinson'],
+                  categories: ['Fiction'],
+                  description: 'A letter from an old preacher.',
+                },
+              },
+            ],
+          };
+        }
+        return {};
+      }
+      if (url.pathname === '/search.json') {
+        if (url.searchParams.get('author') === 'Marilynne Robinson') {
+          return {
+            docs: [
+              gilead,
+              { title: 'Housekeeping', author: 'Marilynne Robinson' },
+              { title: 'Home', author: 'Marilynne Robinson' },
+              { title: 'Lila', author: 'Marilynne Robinson', subjects: ['Fiction', 'Religion'] },
+              { title: 'Jack', author: 'Marilynne Robinson' },
+            ].map(olDoc),
+          };
+        }
+        if (q.includes('gilead')) return { docs: [olDoc(gilead, 9)] };
+        return {};
+      }
+      const subject = /^\/subjects\/(.+)\.json$/.exec(url.pathname)?.[1];
+      const bySubject: Record<string, [string, string]> = {
+        epistolary_fiction: ['84, Charing Cross Road', 'Helene Hanff'],
+        domestic_fiction: ['Plainsong', 'Kent Haruf'],
+      };
+      if (subject && bySubject[subject]) {
+        const [title, name] = bySubject[subject];
+        return { works: [{ key: `/works/OLS${subject}W`, title, authors: [{ name }] }] };
+      }
+      return {};
+    };
+    const original = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL) => {
+      const url = String(input instanceof Request ? input.url : input);
+      requested.push(url);
+      return new Response(JSON.stringify(router(new URL(url))), { status: 200 });
+    }) as typeof fetch;
+    const savedRps = process.env.MYLIBRARY_REQ_PER_SEC;
+    process.env.MYLIBRARY_REQ_PER_SEC = '1000000';
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as any);
+      const client = fakeClient(
+        {
+          interpretation: 'A quiet, interior literary novel like Gilead, without religion.',
+          queries: [{ query: 'quiet introspective literary novel', rationale: 'mood' }],
+          reference_books: [
+            { title: 'Gilead', author: 'Marilynne Robinson' },
+            { title: '   ' },
+            { title: 'Gilead', author: 'Marilynne Robinson' },
+          ],
+          constraints: { exclude_subjects: ['religion'] },
+        },
+        [0, 1, 2, 3, 4, 5].map((i) => ({ candidate_index: i, score: 0.9 - i / 20, rationale: 'r' }))
+      );
+      const out: any = await runDiscover(
+        db,
+        client,
+        'local',
+        'a quiet novel like Gilead but not about religion',
+        10
+      );
+
+      expect(out.reference_books).toEqual(['Gilead by Marilynne Robinson']);
+      const text = client.calls[1].messages[0].content[1].text as string;
+      const seen = (JSON.parse(text.slice(text.indexOf('CANDIDATES (JSON):') + 19)) as any[]).map(
+        (c) => c.title
+      );
+      // The named book's author (two at most, Lila dropped by the stated exclusion) and its
+      // genre subjects reach the reranker, beside the free-text hit that was a real novel.
+      expect(seen.sort()).toEqual(
+        ['84, Charing Cross Road', 'Home', 'Housekeeping', 'Plainsong', 'Stoner'].sort()
+      );
+      // Gilead itself is the reference, never a candidate; the omnibuses never pass assembly.
+      // "Religious fiction" is never searched, since the reader ruled religion out.
+      expect(requested.some((u) => u.includes('/subjects/religious_fiction'))).toBe(false);
+      expect(requested.some((u) => u.includes('/subjects/epistolary_fiction'))).toBe(true);
+    } finally {
+      globalThis.fetch = original;
+      if (savedRps === undefined) delete process.env.MYLIBRARY_REQ_PER_SEC;
+      else process.env.MYLIBRARY_REQ_PER_SEC = savedRps;
+      await close();
+    }
+  });
+
+  test('parseReferenceBooks keeps titled, distinct entries, two at most', () => {
+    expect(
+      parseReferenceBooks([
+        { title: ' Piranesi ', author: 'Susanna Clarke' },
+        { title: 'Piranesi', author: 'Susanna Clarke' },
+        { author: 'No Title' },
+        { title: 'Gilead' },
+        { title: 'Third', author: 'X Y' },
+      ])
+    ).toEqual([
+      { title: 'Piranesi', author: 'Susanna Clarke' },
+      { title: 'Gilead', author: null },
+    ]);
+    expect(parseReferenceBooks(undefined)).toEqual([]);
   });
 
   test('sends the seed override to interpretation and the rerank override to ranking', async () => {

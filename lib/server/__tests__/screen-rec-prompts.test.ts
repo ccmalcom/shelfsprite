@@ -58,6 +58,7 @@ function signal(over: Partial<ScreenSignal> = {}): ScreenSignal {
     more_like_titles: ['Severance (2022)'],
     less_like_titles: [],
     reject_reason_counts: new Map([['too_long', 2]]),
+    genre_suppression: { suppressed: [], soft: [] },
     directive_text: 'No horror, please.',
     directive_constraints: {},
     ...over,

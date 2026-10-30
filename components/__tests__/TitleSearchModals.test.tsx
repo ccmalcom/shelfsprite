@@ -72,12 +72,13 @@ describe('CatalogSearch', () => {
 
 function renderAdd() {
   const onAdded = jest.fn();
+  const onClose = jest.fn();
   render(
     <ToastProvider>
-      <AddTitleModal onClose={jest.fn()} onAdded={onAdded} />
+      <AddTitleModal onClose={onClose} onAdded={onAdded} />
     </ToastProvider>
   );
-  return { onAdded };
+  return { onAdded, onClose };
 }
 
 async function pickHeat() {
@@ -167,6 +168,44 @@ describe('AddTitleModal', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('A review needs a rating');
     expect(addTitle).not.toHaveBeenCalled();
+  });
+
+  it('stays open after an add, keeping the media type and status, with a Done button', async () => {
+    const severance = makeCandidate({ media_type: 'tv', title: 'Severance', year: 2022 });
+    search.mockResolvedValue([severance]);
+    addTitle.mockImplementation(async () =>
+      makeTitle({ media_type: 'tv', title: 'Severance', year: 2022, status: 'want' })
+    );
+    const { onAdded, onClose } = renderAdd();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: 'TV show' }));
+    await searchFor('Severance');
+    fireEvent.click(await screen.findByRole('button', { name: 'Add: Severance (2022)' }));
+    fireEvent.change(screen.getByRole('combobox', { name: 'Status' }), {
+      target: { value: 'want' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+    await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(1));
+
+    // Back on a cleared search, still on TV, with a confirmation and Done.
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('');
+    expect(screen.getByRole('radio', { name: 'TV show' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.queryByRole('button', { name: 'Add: Severance (2022)' })).toBeNull();
+    // The toast is a status region too, so find the dialog's own line by its text.
+    expect(screen.getByText('Added Severance (2022)')).toHaveAttribute('role', 'status');
+    expect(onClose).not.toHaveBeenCalled();
+
+    // The next add searches TV again and keeps the chosen status.
+    await searchFor('Severance');
+    await waitFor(() => expect(search).toHaveBeenLastCalledWith('Severance', 'tv'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Add: Severance (2022)' }));
+    expect(screen.getByRole('combobox', { name: 'Status' })).toHaveValue('want');
+    fireEvent.click(screen.getByRole('button', { name: 'Add to library' }));
+    await waitFor(() => expect(onAdded).toHaveBeenCalledTimes(2));
+    expect(await screen.findByText('Added Severance (2022) \u00B7 2 so far')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    expect(onClose).toHaveBeenCalled();
   });
 
   it('shows the duplicate message from the server', async () => {

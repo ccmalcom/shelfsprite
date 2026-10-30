@@ -1,11 +1,33 @@
 'use client';
 
 import Link from 'next/link';
-import { Film, Tv } from 'lucide-react';
+import { BookOpen, Film, Tv } from 'lucide-react';
 import type { Book, TitleOut, TitleRec, Trait } from '@/lib/api';
 import { Button } from '@/components/ui';
 import TitleTile from '@/components/screen/TitleTile';
 import { mediaLabel, titleLabel } from '@/lib/screen';
+import { truncateAtWord } from '@/lib/truncate';
+
+/** Most trait reasons a card shows; the rationale above them already says the rest. */
+export const MAX_TRAIT_REASONS = 3;
+/** Characters of a trait claim a chip shows before cutting at a word boundary. */
+const TRAIT_LABEL_CHARS = 40;
+
+/**
+ * The cited trait ids a card shows as reasons, in citation order, at most
+ * `MAX_TRAIT_REASONS`. The reranker cites aversions too ("you avoid X, and this has none"),
+ * but an aversion is not a reason to watch something, so only loves the viewer still stands
+ * behind show, as on the book `SwipeCard`. An id whose trait is gone stays, so the card can
+ * say the evidence was removed.
+ */
+export function reasonTraitIds(ids: number[], traits: Map<number, Trait>): number[] {
+  return ids
+    .filter((id) => {
+      const t = traits.get(id);
+      return t === undefined || (t.polarity === 'reward' && t.status !== 'rejected');
+    })
+    .slice(0, MAX_TRAIT_REASONS);
+}
 
 const OUTCOME: Record<Exclude<TitleRec['status'], 'served'>, string> = {
   accepted: 'On your watchlist',
@@ -36,9 +58,11 @@ interface Props {
 
 /**
  * One screen recommendation (spec §7.2): tile, type, year, rationale and grounding chips. A
- * trait chip deep-links the profile row (§8); a title chip opens the title; a book chip opens
- * the book read-only. Evidence deleted since the run renders as plain text. No description:
- * the row stores no description source (§7.9).
+ * trait chip (reward traits only, at most `MAX_TRAIT_REASONS`, label cut at a word) deep-links
+ * the profile row (§8); a title chip opens the title; a book chip opens the book read-only.
+ * Title and book chips both carry a media icon and a screen-reader label, so a film and the
+ * novel it adapts never read as the same chip. Evidence deleted since the run renders as plain
+ * text. No description: the row stores no description source (§7.9).
  */
 export default function TitleRecCard({
   rec,
@@ -52,8 +76,8 @@ export default function TitleRecCard({
   onOpenTitle,
   onOpenBook,
 }: Props) {
-  const chipCount =
-    rec.grounded_trait_ids.length + rec.grounded_title_ids.length + rec.grounded_book_ids.length;
+  const traitIds = reasonTraitIds(rec.grounded_trait_ids, traits);
+  const chipCount = traitIds.length + rec.grounded_title_ids.length + rec.grounded_book_ids.length;
   const headingId = `rec-${rec.id}-title`;
 
   return (
@@ -88,13 +112,21 @@ export default function TitleRecCard({
 
         {chipCount > 0 && (
           <ul aria-label="Why this pick" className="flex flex-wrap gap-1.5">
-            {rec.grounded_trait_ids.map((id) => {
+            {traitIds.map((id) => {
               const t = traits.get(id);
+              const label = t ? truncateAtWord(t.claim, TRAIT_LABEL_CHARS) : '';
               return (
                 <li key={`trait-${id}`} className="min-w-0 max-w-full">
                   {t ? (
-                    <Link href={`/screen/profile?trait=${id}`} className={LIVE_CHIP}>
-                      <span className="truncate">{t.claim}</span>
+                    // The chip shows a short label; the full claim is the tooltip, the
+                    // accessible name, and one tap away on the profile row it links to.
+                    <Link
+                      href={`/screen/profile?trait=${id}`}
+                      className={LIVE_CHIP}
+                      title={label === t.claim ? undefined : t.claim}
+                      aria-label={t.claim}
+                    >
+                      <span className="truncate">{label}</span>
                     </Link>
                   ) : (
                     <span className={GONE_CHIP}>A trait no longer in your profile</span>
@@ -128,6 +160,8 @@ export default function TitleRecCard({
                 <li key={`book-${id}`}>
                   {b ? (
                     <button type="button" onClick={() => onOpenBook(b)} className={LIVE_CHIP}>
+                      <BookOpen className="h-3 w-3" aria-hidden="true" />
+                      <span className="sr-only">{'Book: '}</span>
                       {b.title}
                     </button>
                   ) : (

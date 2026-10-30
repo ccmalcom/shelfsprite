@@ -7,8 +7,9 @@
  * block that /recommend's reranker uses. Stage A reuses recPrompts' Haiku model and
  * token budget, exactly as Python does.
  *
- * Every string here is copied VERBATIM from Python and asserted byte-for-byte in
- * parity-discover-prompts.test.ts. Do not reflow or re-punctuate them.
+ * The strings began as VERBATIM copies of Python. Later additions: the authors field (#52)
+ * and reference_books (QA 2026-10-30), which recDiscoverRun resolves in the catalog. Do not
+ * reflow or re-punctuate them casually.
  */
 import type { AssembledCandidate } from './recAssemble';
 import { tasteAndLoved, type PromptBlock } from './recPrompts';
@@ -38,7 +39,8 @@ export const DISCOVER_SYSTEM =
   'asks for that book into 3-6 distinct facets (e.g. geological apocalypse setting; ' +
   'second-person narration; rage as the engine; found family under oppression) and emit one ' +
   'query per facet. Facets, not synonyms: six rewordings of the same idea retrieve the same ' +
-  'shelf six times.\n' +
+  'shelf six times. Also put a book named this way in REFERENCE_BOOKS, with its author: ' +
+  'it is looked up in the catalog to seed retrieval with its author and subjects.\n' +
   '- If the request is a mood or situation ("something gentle for a bad week", "a beach book ' +
   'that isn\'t dumb"), translate the mood into concrete catalog language: pacing, stakes, tone.\n' +
   '- Extract hard constraints ONLY when the reader states them: language, publication era ' +
@@ -83,6 +85,22 @@ export const DISCOVER_TOOL = {
         description:
           "Full names of authors whose OWN books the reader asked for ('my next Scalzi " +
           "read'). Omit for authors named only as a comparison ('like Scalzi').",
+      },
+      // Not in the Python original (QA 2026-10-30). The named book is resolved in the catalog
+      // and its author and subjects seed retrieval; it never enters the candidates itself.
+      reference_books: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: { type: 'string', description: 'The title as commonly published.' },
+            author: { type: 'string', description: "The author's full name, if you know it." },
+          },
+          required: ['title'],
+        },
+        description:
+          "Books the request names as a comparison ('a quiet novel like Gilead', 'something " +
+          "like Piranesi'), at most two. Omit when the request names no book.",
       },
       queries: {
         type: 'array',
@@ -141,7 +159,8 @@ export function buildInterpretPrompt(query: string, signal: RecSignal): PromptBl
   const taskPrompt =
     `The reader asked: "${query}"\n\n` +
     'Interpret this request. Emit search QUERIES (facets, not titles), any AUTHORS whose ' +
-    'own books they asked for, any hard CONSTRAINTS they stated (language, era, subjects ' +
+    'own books they asked for, any REFERENCE_BOOKS the request names as a comparison, any ' +
+    'hard CONSTRAINTS they stated (language, era, subjects ' +
     'to avoid; omit if unstated), and a one-sentence INTERPRETATION of what they want.';
 
   return [

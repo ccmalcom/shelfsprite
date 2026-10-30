@@ -23,6 +23,7 @@ interface GroupProps {
   values: string[];
   excluded: string[];
   suggestions: PreferenceSuggestion[];
+  suggestionsLabel: string;
   /** True for subjects, false for authors — mirrors cleanDirectiveConstraints, which
    *  lowercases prefer_subjects and preserves prefer_authors' case. Without this the
    *  chip a reader adds silently changes case on their next page load. */
@@ -41,6 +42,7 @@ function Group({
   values,
   excluded,
   suggestions,
+  suggestionsLabel,
   lowercase,
   isExcluded,
   disabled,
@@ -140,7 +142,7 @@ function Group({
       {error && <p className="text-sm text-danger">{error}</p>}
       {open.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs text-muted">From your library</p>
+          <p className="text-xs text-muted">{suggestionsLabel}</p>
           <div className="flex flex-wrap gap-2">
             {open.map((s) => (
               <button
@@ -179,6 +181,7 @@ export default function FavoritesFields({
   excludeAuthors,
   excludeSubjects,
   suggestions,
+  suggestionsLabel = 'From your library',
   disabled = false,
   onChange,
 }: {
@@ -187,6 +190,8 @@ export default function FavoritesFields({
   excludeAuthors: string[];
   excludeSubjects: string[];
   suggestions: PreferenceSuggestions | undefined;
+  /** Caption over the library suggestions; the screen profile says they come from books. */
+  suggestionsLabel?: string;
   /** True while the directive record is still loading. Editing then would build a
    *  constraints object out of an empty placeholder and drop the stored exclusions. */
   disabled?: boolean;
@@ -201,6 +206,7 @@ export default function FavoritesFields({
         values={authors}
         excluded={excludeAuthors}
         suggestions={suggestions?.authors ?? []}
+        suggestionsLabel={suggestionsLabel}
         lowercase={false}
         isExcluded={authorExcluded}
         disabled={disabled}
@@ -213,6 +219,7 @@ export default function FavoritesFields({
         values={subjects}
         excluded={excludeSubjects}
         suggestions={suggestions?.subjects ?? []}
+        suggestionsLabel={suggestionsLabel}
         lowercase
         isExcluded={subjectExcluded}
         disabled={disabled}

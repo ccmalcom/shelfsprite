@@ -202,4 +202,37 @@ describe('snapshotProposedClaims', () => {
       await close();
     }
   });
+
+  it('strips ids a stored claim echoes from its own citations, as traitOut does', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      const row = (claim: string, extra: Partial<typeof schema.tasteTraits.$inferInsert>) => ({
+        userId: 'local',
+        status: 'proposed',
+        claim,
+        polarity: 'reward',
+        inferenceConfidence: 0.8,
+        ...extra,
+      });
+      await db.insert(schema.tasteTraits).values([
+        // The production example: book ids cited by the trait, echoed into its text.
+        row('The two books with racial injustice at their core (1138, 1140) are rated 5 and 4.5.', {
+          exhibits: [1138],
+          contrasts: [1140],
+        }),
+        // Title ids are the trait's citations too.
+        row('Rewards slow-burn thrillers (42) on screen.', { exhibitTitleIds: [42] }),
+        // A year, or ids the trait does not cite, are not citations and stay.
+        row('Loves Orwell (1984) and late Le Guin (7, 8).', { exhibits: [7] }),
+      ]);
+
+      expect(await snapshotProposedClaims(db, 'local')).toEqual([
+        reward('The two books with racial injustice at their core are rated 5 and 4.5.'),
+        reward('Rewards slow-burn thrillers on screen.'),
+        reward('Loves Orwell (1984) and late Le Guin (7, 8).'),
+      ]);
+    } finally {
+      await close();
+    }
+  });
 });

@@ -19,7 +19,7 @@ import { errorMessage, traitsWarning } from '@/lib/screen';
 import { invalidateScreenState } from '@/lib/screenCache';
 import { useScreenSettings } from '@/lib/useScreenSettings';
 
-/** "ScreenSprite — movies & TV" (spec §7.4), mounted at /settings#screen. */
+/** "ScreenSprite: movies and TV" (spec §7.4), mounted at /settings#screen. */
 export default function ScreenSettingsCard() {
   const toast = useToast();
   const { settings, error, mutate: mutateSettings } = useScreenSettings();
@@ -122,7 +122,7 @@ export default function ScreenSettingsCard() {
   return (
     <Card>
       <h2 className="mb-1 font-display text-lg font-semibold text-text">
-        {'ScreenSprite \u2014 movies & TV'}
+        ScreenSprite: movies and TV
       </h2>
 
       {settings === undefined ? (

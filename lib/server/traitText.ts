@@ -30,6 +30,37 @@ export function stripIdCitations(text: string, knownIds: Iterable<number>): stri
         .trim();
 }
 
+/** A trait row's four citation columns, as drizzle returns them (jsonb, so loosely typed). */
+export interface TraitCitations {
+  exhibits?: unknown;
+  contrasts?: unknown;
+  exhibitTitleIds?: unknown;
+  contrastTitleIds?: unknown;
+}
+
+function idList(raw: unknown): number[] {
+  return Array.isArray(raw) ? raw.filter((i): i is number => typeof i === 'number') : [];
+}
+
+/** The ids a trait cites, book and title alike: the ids Claude might have echoed into its text. */
+export function traitCitedIds(t: TraitCitations): number[] {
+  return [
+    ...idList(t.exhibits),
+    ...idList(t.contrasts),
+    ...idList(t.exhibitTitleIds),
+    ...idList(t.contrastTitleIds),
+  ];
+}
+
+/**
+ * A stored trait's claim as readers see it: stripped against the trait's own citations. Every
+ * read path that shows a stored claim (traitOut, the refresh summary's snapshots) goes through
+ * this, so rows stored before the write-time guard read the same everywhere.
+ */
+export function readerClaim(claim: string, t: TraitCitations): string {
+  return stripIdCitations(claim, traitCitedIds(t));
+}
+
 // Prompt rules shared by the full and incremental builds, book and screen variants. Each is one
 // rule line in the prompts' indented list style.
 

@@ -23,7 +23,12 @@ import {
 } from './claudeErrors';
 import { modelFor } from './models';
 import { matchRevisedClaims, normalizeClaim } from './profileDiff';
-import { CLAIM_TEXT_RULE, DISTINCT_EVIDENCE_RULE, stripIdCitations } from './traitText';
+import {
+  CLAIM_TEXT_RULE,
+  DISTINCT_EVIDENCE_RULE,
+  readerClaim,
+  stripIdCitations,
+} from './traitText';
 import { readRebuildReason } from './profileMeta';
 import { readScreenToggledAt } from './screenSettings';
 import { assertScreenToggleUnchanged, screenVariantActive } from './screenProfile';
@@ -507,16 +512,26 @@ export async function persistProposedTraits(
     // the whole proposed set gave every kept trait a new id on each refresh, even one that
     // changed nothing, and every existing citation then rendered as a missing trait.
     // Matching uses the same rules as the refresh summary (profileDiff.ts), so what the
-    // banner calls unchanged or reworded is exactly what keeps its id.
-    const existing = await tx
-      .select({
-        id: schema.tasteTraits.id,
-        claim: schema.tasteTraits.claim,
-        polarity: schema.tasteTraits.polarity,
-      })
-      .from(schema.tasteTraits)
-      .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')))
-      .orderBy(asc(schema.tasteTraits.id));
+    // banner calls unchanged or reworded is exactly what keeps its id. That includes reading a
+    // prior claim as the banner does (readerClaim), so a row stored with ids in its text, before
+    // the write-time guard, matches its own stripped text exactly instead of as a reword.
+    const existing = (
+      await tx
+        .select({
+          id: schema.tasteTraits.id,
+          claim: schema.tasteTraits.claim,
+          polarity: schema.tasteTraits.polarity,
+          exhibits: schema.tasteTraits.exhibits,
+          contrasts: schema.tasteTraits.contrasts,
+          exhibitTitleIds: schema.tasteTraits.exhibitTitleIds,
+          contrastTitleIds: schema.tasteTraits.contrastTitleIds,
+        })
+        .from(schema.tasteTraits)
+        .where(
+          and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed'))
+        )
+        .orderBy(asc(schema.tasteTraits.id))
+    ).map((r) => ({ id: r.id, claim: readerClaim(r.claim, r), polarity: r.polarity }));
     const matches = matchRevisedClaims(existing, rows);
 
     const keptIds = new Set<number>();

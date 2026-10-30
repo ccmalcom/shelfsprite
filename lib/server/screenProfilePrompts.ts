@@ -17,78 +17,90 @@ import { CLAIM_TEXT_RULE, DISTINCT_EVIDENCE_RULE, LOCKED_TRAITS_RULE } from './t
 
 const ID_ARRAY = { type: 'array', items: { type: 'integer' } };
 
-export const SCREEN_TRAIT_INPUT_SCHEMA = {
-  type: 'object',
-  properties: {
-    traits: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          claim: {
-            type: 'string',
-            description:
-              'A specific, falsifiable claim about what drives this ' +
-              "person's ratings, e.g. 'Rewards dense political " +
-              "world-building over fast plotting.' Avoid generic " +
-              'genre statements. When the evidence spans books and ' +
-              'films or shows, phrase the claim medium-neutrally.',
+/**
+ * The screen trait schema, naming where each id namespace comes from: the full build's prompt
+ * labels its data LIBRARY DATA and SCREEN DATA, while the revise prompt sends a BOOKS map and a
+ * TITLES map. The revise tool once reused the full build's schema, so its field descriptions sent
+ * the model to sections the revise prompt does not have.
+ */
+function screenTraitSchema(books: string, titles: string) {
+  return {
+    type: 'object',
+    properties: {
+      traits: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            claim: {
+              type: 'string',
+              description:
+                'A specific, falsifiable claim about what drives this ' +
+                "person's ratings, e.g. 'Rewards dense political " +
+                "world-building over fast plotting.' Avoid generic " +
+                'genre statements. When the evidence spans books and ' +
+                'films or shows, phrase the claim medium-neutrally.',
+            },
+            polarity: {
+              type: 'string',
+              enum: ['reward', 'aversion'],
+              description:
+                "'reward' = trait associated with higher ratings; " +
+                "'aversion' = trait shared by lower-rated items.",
+            },
+            exhibits: {
+              ...ID_ARRAY,
+              description:
+                `Book ids (from ${books} only) that EXHIBIT the trait: ` +
+                "for a 'reward', the high-rated books showing it; for an " +
+                "'aversion', the low-rated or DNF books showing it. May be " +
+                'empty when the trait rests on films or shows alone.',
+            },
+            contrasts: {
+              ...ID_ARRAY,
+              description:
+                `Book ids (from ${books} only) that anchor the CONTRAST — ` +
+                'the counter-examples that make the distinction sharp. May be empty.',
+            },
+            exhibit_titles: {
+              ...ID_ARRAY,
+              description:
+                `Title ids (from ${titles} only) of films and shows that ` +
+                'EXHIBIT the trait, under the same polarity rule as ' +
+                "`exhibits`: high-rated for a 'reward', low-rated or dropped " +
+                "for an 'aversion'. May be empty when the trait rests on books " +
+                'alone, but every trait needs at least one exhibit in ' +
+                '`exhibits` or `exhibit_titles`.',
+            },
+            contrast_titles: {
+              ...ID_ARRAY,
+              description: `Title ids (from ${titles} only) that anchor the CONTRAST. May be empty.`,
+            },
+            inference_confidence: {
+              type: 'number',
+              description: '0..1 — how strongly the evidence supports the claim.',
+            },
           },
-          polarity: {
-            type: 'string',
-            enum: ['reward', 'aversion'],
-            description:
-              "'reward' = trait associated with higher ratings; " +
-              "'aversion' = trait shared by lower-rated items.",
-          },
-          exhibits: {
-            ...ID_ARRAY,
-            description:
-              'Book ids (from LIBRARY DATA only) that EXHIBIT the trait: ' +
-              "for a 'reward', the high-rated books showing it; for an " +
-              "'aversion', the low-rated or DNF books showing it. May be " +
-              'empty when the trait rests on films or shows alone.',
-          },
-          contrasts: {
-            ...ID_ARRAY,
-            description:
-              'Book ids (from LIBRARY DATA only) that anchor the CONTRAST — ' +
-              'the counter-examples that make the distinction sharp. May be empty.',
-          },
-          exhibit_titles: {
-            ...ID_ARRAY,
-            description:
-              'Title ids (from SCREEN DATA only) of films and shows that ' +
-              'EXHIBIT the trait, under the same polarity rule as ' +
-              "`exhibits`: high-rated for a 'reward', low-rated or dropped " +
-              "for an 'aversion'. May be empty when the trait rests on books " +
-              'alone, but every trait needs at least one exhibit in ' +
-              '`exhibits` or `exhibit_titles`.',
-          },
-          contrast_titles: {
-            ...ID_ARRAY,
-            description:
-              'Title ids (from SCREEN DATA only) that anchor the CONTRAST. May be empty.',
-          },
-          inference_confidence: {
-            type: 'number',
-            description: '0..1 — how strongly the evidence supports the claim.',
-          },
+          required: [
+            'claim',
+            'polarity',
+            'exhibits',
+            'contrasts',
+            'exhibit_titles',
+            'contrast_titles',
+            'inference_confidence',
+          ],
         },
-        required: [
-          'claim',
-          'polarity',
-          'exhibits',
-          'contrasts',
-          'exhibit_titles',
-          'contrast_titles',
-          'inference_confidence',
-        ],
       },
     },
-  },
-  required: ['traits'],
-};
+    required: ['traits'],
+  };
+}
+
+export const SCREEN_TRAIT_INPUT_SCHEMA = screenTraitSchema('LIBRARY DATA', 'SCREEN DATA');
+
+/** The revise tool's schema: the same fields, pointed at the revise prompt's BOOKS and TITLES maps. */
+export const SCREEN_REVISE_INPUT_SCHEMA = screenTraitSchema('the BOOKS map', 'the TITLES map');
 
 export const SCREEN_PROFILE_TOOL = {
   name: 'record_taste_traits',
@@ -107,7 +119,7 @@ export const SCREEN_REVISE_TOOL = {
     'confidence or evidence as warranted), drop traits the new evidence contradicts, and add ' +
     'new traits the changes reveal. Cite only book ids and title ids present in the provided ' +
     'data, each in its own field.',
-  input_schema: SCREEN_TRAIT_INPUT_SCHEMA,
+  input_schema: SCREEN_REVISE_INPUT_SCHEMA,
 };
 
 export const SCREEN_PROFILE_SYSTEM =
@@ -239,6 +251,9 @@ export function buildScreenUpdatePrompt(
     'How to revise:\n' +
     '  - Keep traits that still hold. Raise/lower `inference_confidence` if the new evidence ' +
     'strengthens or weakens them, and add/remove cited ids as fitting.\n' +
+    '  - A current trait whose cited books and titles are none of the changed ones still holds: ' +
+    'return it, unless a rule below retires it. Films and shows are added evidence, never a ' +
+    'replacement for books: do not drop a book trait because titles were added.\n' +
     '  - Drop a trait whose evidence the changes now contradict (e.g. the person re-rated its ' +
     'key exhibit, or a new review states the opposite).\n' +
     '  - Add new traits the changes reveal — especially anything stated outright in a review.\n' +
@@ -249,7 +264,9 @@ export function buildScreenUpdatePrompt(
     DISTINCT_EVIDENCE_RULE +
     CLAIM_TEXT_RULE +
     '  - Return the COMPLETE revised trait set (the unchanged traits too), 6-12 traits, via the ' +
-    'revise_taste_traits tool.\n\n' +
+    'revise_taste_traits tool. Traits the user locked in (under User Feedback) are stored ' +
+    'separately: they are not part of this set and do not count toward it. Never drop a trait ' +
+    'that still holds to stay within 12; return more instead.\n\n' +
     `CHANGED BOOK IDS (the edits driving this update): ${pyRepr(changedIds)}\n` +
     `CHANGED TITLE IDS (the edits driving this update): ${pyRepr(changedTitleIds)}\n\n` +
     'CURRENT TRAITS (JSON):\n' +

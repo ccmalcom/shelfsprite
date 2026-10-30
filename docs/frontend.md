@@ -118,6 +118,19 @@ copy says ScreenSprite; code, routes and keys say `screen`.
 - **Reject picker.** `components/RejectReasonPicker.tsx` is shared by `/swipe` (book vocabulary)
   and `/screen` (`SCREEN_REJECT_REASONS`). An empty reason list is sent as a bare
   `{status: 'rejected'}` to the screen route, which refuses an empty list.
+- **Recommendation card.** `TitleRecCard` shows at most three trait reasons
+  (`MAX_TRAIT_REASONS`), rewards only and never a dismissed trait, as on the book `SwipeCard`;
+  each chip is cut at a word boundary (`lib/truncate.ts`) with the full claim as its tooltip and
+  accessible name. Title and book evidence chips both carry a media icon and a screen-reader
+  label (`Film:`, `TV:`, `Book:`), so a film and the novel it adapts never read alike.
+- **Adding titles.** `AddTitleModal` stays open after each add, like `AddBookModal`: the search
+  clears, the Film/TV choice (held by the modal, since `CatalogSearch` unmounts while a pick is
+  open) and the status carry over, a status line names the last title added, and Cancel becomes
+  Done.
+- **Custom instructions.** One directive record serves both sections. `/screen/profile` passes
+  `section="screen"`: screen examples and placeholder, and the favorites under a "Book
+  favorites" label, since only the book recommender reads `prefer_authors`/`prefer_subjects`.
+  The eyebrow there reads "The viewer behind the ratings".
 
 ## Routes (`app/`)
 

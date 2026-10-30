@@ -51,9 +51,14 @@ function rec(over: Partial<typeof schema.titleRecommendations.$inferInsert>) {
 }
 
 describe('screen reject vocabulary', () => {
-  test('is the book list without its book-only codes, in the book order', () => {
-    const bookOnly = new Set(['tried_author', 'too_similar', 'not_out_yet', 'not_my_kind']);
-    expect([...SCREEN_REJECT_REASONS]).toEqual(REJECT_REASONS.filter((r) => !bookOnly.has(r)));
+  test('is the book list without its book-only codes, in the book order, then screen codes', () => {
+    const bookOnly = new Set(['tried_author', 'not_out_yet', 'not_my_kind']);
+    const screenOnly = ['already_known'];
+    expect([...SCREEN_REJECT_REASONS]).toEqual([
+      ...REJECT_REASONS.filter((r) => !bookOnly.has(r)),
+      ...screenOnly,
+    ]);
+    for (const r of bookOnly) expect(SCREEN_REJECT_REASONS).not.toContain(r);
   });
 });
 

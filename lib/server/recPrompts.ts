@@ -2,8 +2,10 @@
  * Port of recommend.py's two /recommend prompts (_SEED_TOOL/_SEED_SYSTEM and
  * _RANK_TOOL/_RANK_SYSTEM) plus their builders.
  *
- * Every string here is copied VERBATIM from Python and asserted byte-for-byte in
- * parity-recommend-prompts.test.ts. Do not reflow or re-punctuate them.
+ * The seed strings are copied VERBATIM from Python. The rerank tool's low_confidence field,
+ * its "up to n" task wording and the cold-start title-seed prompt are later additions
+ * (QA 2026-10-30). recommend-run.test.ts asserts all three calls byte-for-byte against
+ * fixtures/claude/prompts.json, so do not reflow or re-punctuate them casually.
  */
 import { readPreferences } from './preferences';
 import { modelFor } from './models';
@@ -64,9 +66,98 @@ export const SEED_SYSTEM =
   'distinguishing traits (what separates their 5-star from 4-star books), not generic ' +
   'bestsellers.';
 
+// --- stage 1c (cold start only): adjacent real titles ------------------------
+//
+// New, not a Python port, so no byte-parity constraint; recommend-run.test.ts pins it against
+// fixtures/claude/prompts.json (recommend_title_seed). Modeled on SCREEN_SEED_TOOL: under the
+// cold-start threshold the metadata pool is a few subject keyword searches, which free-text
+// catalogs answer with keyword-titled filler, so Claude names the established books next to
+// the library. Each name is a LOOKUP: titleSeedPool resolves it through searchBooks, keeps it
+// only when the catalog's own title and author match, and the reranker still decides.
+
+/** Titles asked for. Twelve, one small Haiku call: about 40 output tokens each. */
+export const TITLE_SEED_COUNT = 12;
+export const TITLE_SEED_MAX_TOKENS = 1200;
+/** Library titles listed as off-limits. A cold-start library is small; this bounds a long to-read shelf. */
+export const TITLE_SEED_LIBRARY_SAMPLE = 40;
+
+export const TITLE_SEED_TOOL = {
+  name: 'propose_adjacent_books' as const,
+  description:
+    "Name real, well-known, already-published books adjacent to this reader's library. " +
+    'Each is looked up by title and author in a public book catalog, and one the catalog ' +
+    'does not hold is dropped.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      books: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            title: {
+              type: 'string',
+              description:
+                'The title as commonly published in English, with no series name, number ' +
+                'or subtitle.',
+            },
+            author: {
+              type: 'string',
+              description: "The author's full name as commonly credited.",
+            },
+            reason: {
+              type: 'string',
+              description: 'Which loved book or trait this book sits next to.',
+            },
+          },
+          required: ['title', 'author', 'reason'],
+        },
+      },
+    },
+    required: ['books'],
+  },
+};
+
+export const TITLE_SEED_SYSTEM =
+  'You help a reader whose library is still small find the well-loved books next to it. You ' +
+  'name specific, real, already-published books, each with its author, that readers of ' +
+  'their favorites widely go on to read: the established books of the genres and moods they ' +
+  'rate highly, and other books by authors they loved. You prefer books with a real ' +
+  'readership over obscure, self-published or keyword-titled ones, you never name a book ' +
+  'already in their library, and you write each title and author the way the book is ' +
+  'commonly published in English. Your names are catalog lookups, not recommendations: a ' +
+  'separate step ranks whatever the catalog finds.';
+
+/** The cold-start title-seed call's message content. */
+export function buildTitleSeedPrompt(signal: RecSignal, count: number): PromptBlock[] {
+  const owned = [...new Set(signal.library_titles)].slice(0, TITLE_SEED_LIBRARY_SAMPLE);
+  const taskPrompt =
+    'This reader has rated only a few books; their taste profile and loved books are above. ' +
+    `Name up to ${count} well-known books adjacent to them: mostly books by other authors ` +
+    'that readers of these favorites commonly love next, plus at most two more books by any ' +
+    "one author they loved. Cover the reader's range rather than one corner of it." +
+    (owned.length
+      ? ' Do not name any of these, which they already have or turned down: ' +
+        pyJsonDumps(owned) +
+        '.'
+      : '');
+  return [
+    { type: 'text', text: tasteAndLoved(signal), cache_control: { type: 'ephemeral' } },
+    { type: 'text', text: taskPrompt },
+  ];
+}
+
 // --- stage 2: rerank + explain ---------------------------------------------
 
 export const RANK_MAX_TOKENS = 4000;
+
+/**
+ * The smallest deck served when the reranker returned at least this many picks: confident
+ * picks first, then its low_confidence ones by score until the deck reaches it. Five is half
+ * the default batch of ten, enough for a swipe session to feel like one, and small enough
+ * that a thin pool is not padded back to ten with doubtful books.
+ */
+export const MIN_DECK = 5;
 
 /** The rerank model (lib/server/models.ts), read at call time. */
 export function rankModel(): string {
@@ -112,6 +203,17 @@ export const RANK_TOOL = {
               type: 'array',
               items: { type: 'integer' },
               description: 'Library book ids this candidate is most like.',
+            },
+            // Not in the Python original (QA 2026-10-30). Optional, so a pick that omits it
+            // counts as confident; recommendRun serves flagged picks only to reach MIN_DECK.
+            low_confidence: {
+              type: 'boolean',
+              description:
+                'true when you would not press this book on the reader yourself: the fit is ' +
+                'a stretch you cannot tie to a specific mechanism, the catalog metadata is ' +
+                'too thin to judge it, or the edition or authorship looks doubtful (a ' +
+                'summary, a companion, a keyword-titled or pseudonymous mill book). Flagged ' +
+                'picks are served only when there are too few confident ones.',
             },
           },
           required: [
@@ -200,6 +302,14 @@ export function buildSeedPrompt(signal: RecSignal, nQueries: number): PromptBloc
       pyJsonDumps(preferences.prefer_subjects) +
       '.';
   }
+  // Emitted only when populated, like the favorites above (genreSuppression.ts).
+  if (signal.genre_suppression.suppressed.length) {
+    steering +=
+      ' Do not chase these genres: the reader recently skipped books in them as the ' +
+      'wrong genre: ' +
+      pyJsonDumps(signal.genre_suppression.suppressed) +
+      '.';
+  }
 
   const taskPrompt =
     "A reader's taste profile and a sample of their loved books are above. Propose " +
@@ -259,6 +369,25 @@ export function userSteeringBlock(signal: RecSignal): string {
       .join(', ');
     lines.push('FREQUENT REJECT REASONS: ' + reasons);
   }
+  // Both emitted only when populated, so the pinned no-skip prompt is unchanged.
+  const { suppressed, soft } = signal.genre_suppression;
+  if (suppressed.length) {
+    lines.push(
+      'WRONG-GENRE SKIPS (genres of books the reader recently skipped as the wrong ' +
+        'genre; candidates carrying them were already removed, so heavily penalize any ' +
+        'candidate that is still the same kind of book):\n' +
+        pyJsonDumps(suppressed)
+    );
+  }
+  if (soft.length) {
+    lines.push(
+      'SOFT WRONG-GENRE SKIPS (the reader skipped a book in these genres as the wrong ' +
+        'genre but rates other books in them highly, so the skip was likely about ' +
+        'something else; treat it as a mild signal only, never a reason to drop the ' +
+        'genre):\n' +
+        pyJsonDumps(soft)
+    );
+  }
   if (directiveText) {
     lines.push(
       "CUSTOM INSTRUCTIONS (the reader's own standing guidance, in their words; honor " +
@@ -308,8 +437,15 @@ export function buildRerankPrompt(
 
   const profileContext = tasteAndLoved(signal) + rejectedBlock + userSteeringBlock(signal);
 
+  // Up to n, not exactly n (QA 2026-10-30): a deck padded to n with picks the reranker
+  // itself doubted served "a stretch" and "metadata is thin" rationales. The floor clause
+  // gives recommendRun's MIN_DECK backfill something to draw on.
+  const floor = Math.min(MIN_DECK, n);
   const taskPrompt =
-    `Rank the best ${n} candidates for this reader and explain each. Choose ONLY from ` +
+    `Rank up to ${n} of the best candidates for this reader and explain each. Return ` +
+    `fewer than ${n} rather than padding the list with weak fits: if fewer than ${floor} ` +
+    `are strong, add the next-best up to ${floor} picks and mark those low_confidence. ` +
+    'Choose ONLY from ' +
     'the CANDIDATES list (cite each by its `idx`). Score 0..1 for fit. Penalize ' +
     "anything that trips an aversion trait or resembles a rejected book's noted reason. " +
     'Ground every pick in specific trait ids ' +

@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import { afterEach, beforeEach, describe, test, expect } from 'vitest';
 import { asc, eq } from 'drizzle-orm';
 // Snapshot of the prompt as recorded at the Python cutover (2026-08-14). This is
 // no longer a cross-backend parity check — it is a regression guard proving the
@@ -12,8 +12,14 @@ import { makeTestDb, loadSeed } from './helpers/pglite';
 import { setupTestEnv } from './helpers/testEnv';
 import { installHttpReplay } from './helpers/httpReplay';
 import { fakeClaude } from './helpers/fakeClaude';
+import {
+  coldSeedQueriesResponse,
+  coldStartSeed,
+  installFakeCatalog,
+  titleSeedResponse,
+} from './helpers/coldStartFixture';
 import { schema } from '../db';
-import { runRecommend } from '../recommendRun';
+import { confidentDeck, lowConfidence, parseTitleSeeds, runRecommend } from '../recommendRun';
 
 const PROFILED_AT = '2026-08-01 00:00:00'; // mirrors _prepare_recommend in the generator
 
@@ -307,5 +313,242 @@ describe('runRecommend reroll (#135)', () => {
       restore();
       await close();
     }
+  });
+});
+
+describe('runRecommend cold start (QA 2026-10-30)', () => {
+  setupTestEnv();
+  let savedRps: string | undefined;
+  beforeEach(() => {
+    savedRps = process.env.MYLIBRARY_REQ_PER_SEC;
+    process.env.MYLIBRARY_REQ_PER_SEC = '1000000';
+  });
+  afterEach(() => {
+    if (savedRps === undefined) delete process.env.MYLIBRARY_REQ_PER_SEC;
+    else process.env.MYLIBRARY_REQ_PER_SEC = savedRps;
+  });
+
+  async function coldDb() {
+    const { db, close } = await makeTestDb();
+    await loadSeed(db, coldStartSeed());
+    return { db, close };
+  }
+
+  function candidateTitles(call: { params: Record<string, any> }): string[] {
+    const text = call.params.messages[0].content[1].text as string;
+    const list = JSON.parse(text.slice(text.indexOf('CANDIDATES (JSON):') + 19)) as any[];
+    return list.map((c) => c.title);
+  }
+
+  test('asks for adjacent real titles, keeps only those the catalog holds, and pins them', async () => {
+    const { db, close } = await coldDb();
+    const restore = installFakeCatalog();
+    const client = fakeClaude([
+      coldSeedQueriesResponse,
+      titleSeedResponse,
+      rerankResponse([0, 1, 2, 3, 4]),
+    ] as any);
+    try {
+      const out = (await runRecommend(db, client, 'local', opts())) as any;
+      expect(out.cold_start).toBe(true);
+      // One extra call, and only one: seed queries, title seeds, rerank.
+      expect(client.calls.map((c) => (c.params as any).tools[0].name)).toEqual([
+        'propose_search_queries',
+        'propose_adjacent_books',
+        'rank_recommendations',
+      ]);
+      expect(client.calls[1].params).toEqual((prompts as any).recommend_title_seed.kwargs);
+
+      // Blank and repeated seeds are dropped before any lookup.
+      expect(out.title_seeds).toEqual([
+        "Emily Wilde's Encyclopaedia of Faeries by Heather Fawcett",
+        'Nettle & Bone by T. Kingfisher',
+        'The Long Way to a Small, Angry Planet by Becky Chambers',
+        'Under the Whispering Door by TJ Klune',
+        'Bookshops & Bonedust by Travis Baldree',
+        'Legends & Lattes by Travis Baldree',
+        'A Book No Catalog Holds by Nobody Real',
+      ]);
+      // Resolved: the four the catalog holds under their own author. Bookshops & Bonedust
+      // finds only someone else's summary; the owned book and the invented one find nothing.
+      expect(out.pool_title_seed).toBe(4);
+
+      const titles = candidateTitles(client.calls[2]);
+      // Every resolved seed reaches the reranker (capPool pins them; see rec-assemble.test.ts).
+      expect(titles).toEqual(
+        expect.arrayContaining([
+          "Emily Wilde's Encyclopaedia of Faeries",
+          'Nettle & Bone',
+          'The Long Way to a Small, Angry Planet',
+          'Under the Whispering Door',
+        ])
+      );
+      // The seeds are lookups, not picks: the filler still reaches the reranker, which decides.
+      expect(titles).toContain('Tea Shop of Whimsy');
+      // Never a study aid that names a seed, nor the unreleased title, nor (in this mostly
+      // fiction library) the nonfiction companions.
+      for (const gone of [
+        "Study Guide: Emily Wilde's Encyclopaedia of Faeries",
+        'Summary of Bookshops & Bonedust',
+        'Ninth Life of an Erstwhile Witch',
+        "Miyazaki and the Hero's Journey",
+        'Ghiblipedia',
+        'Legends & Lattes',
+      ]) {
+        expect(titles).not.toContain(gone);
+      }
+
+      const rows = await db
+        .select()
+        .from(schema.recommendations)
+        .where(eq(schema.recommendations.runId, out.run_id));
+      // Persisted picks are catalog candidates; the seed reason records how one was found.
+      expect(rows.filter((r) => r.seedReason?.startsWith('title:')).length).toBeGreaterThan(0);
+    } finally {
+      restore();
+      await close();
+    }
+  });
+
+  test('a library past the cold-start threshold makes no title-seed call', async () => {
+    const { db, close } = await seeded();
+    const restore = installHttpReplay(httpFixtures as any);
+    const client = fakeClaude([seedResponse, rerankResponse([0, 1])] as any);
+    try {
+      const out = (await runRecommend(db, client, 'local', opts())) as any;
+      expect(out.cold_start).toBe(false);
+      expect(client.calls).toHaveLength(2);
+      expect(out.title_seeds).toEqual([]);
+      expect(out.pool_title_seed).toBe(0);
+    } finally {
+      restore();
+      await close();
+    }
+  });
+
+  test('use_claude_seeds=false skips the title seeds too', async () => {
+    const { db, close } = await coldDb();
+    const restore = installFakeCatalog();
+    const client = fakeClaude([rerankResponse([0])] as any);
+    try {
+      const out = (await runRecommend(db, client, 'local', {
+        n: 10,
+        useMetadata: true,
+        useClaudeSeeds: false,
+      })) as any;
+      expect(client.calls).toHaveLength(1);
+      expect(out.title_seeds).toEqual([]);
+    } finally {
+      restore();
+      await close();
+    }
+  });
+});
+
+describe('runRecommend short decks (QA 2026-10-30)', () => {
+  setupTestEnv();
+
+  /** A rerank of `count` picks; `flagged` set low_confidence, `prose` doubt the book in words. */
+  const ranked = (count: number, flagged: number[], prose: number[] = []) => ({
+    content: [
+      {
+        type: 'tool_use',
+        name: 'rank_recommendations',
+        input: {
+          recommendations: Array.from({ length: count }, (_, idx) => ({
+            candidate_index: idx,
+            score: 1 - idx * 0.05,
+            rationale: prose.includes(idx)
+              ? 'A stretch, and the metadata is thin, so the authorship looks questionable.'
+              : `Because reasons ${idx}.`,
+            grounded_trait_ids: [1],
+            grounded_book_ids: [1],
+            ...(flagged.includes(idx) ? { low_confidence: true } : {}),
+          })),
+        },
+      },
+    ],
+    usage: null,
+  });
+
+  async function run(response: unknown) {
+    const { db, close } = await seeded();
+    const restore = installHttpReplay(httpFixtures as any);
+    const client = fakeClaude([seedResponse, response] as any);
+    try {
+      const out = (await runRecommend(db, client, 'local', opts())) as any;
+      const rows = await db
+        .select()
+        .from(schema.recommendations)
+        .where(eq(schema.recommendations.runId, out.run_id));
+      return { out, rows };
+    } finally {
+      restore();
+      await close();
+    }
+  }
+
+  test('serves only the confident picks when there are at least five', async () => {
+    const { out, rows } = await run(ranked(10, [6, 7, 8], [9]));
+    expect(out.served).toBe(6);
+    expect(out.held_back).toBe(4);
+    expect(rows).toHaveLength(6);
+    expect(out.recommendations.map((r: any) => r.rank)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(rows.every((r) => !/metadata is thin/.test(r.rationale ?? ''))).toBe(true);
+  });
+
+  test('backfills the best doubted picks up to the five-card floor', async () => {
+    const { out, rows } = await run(ranked(10, [2, 3, 4, 5, 6, 7, 8, 9]));
+    expect(out.served).toBe(5);
+    expect(out.held_back).toBe(5);
+    // Confident 0 and 1, then the three best-scored doubted picks.
+    expect(rows.map((r) => r.rationale).sort()).toEqual(
+      [0, 1, 2, 3, 4].map((i) => `Because reasons ${i}.`).sort()
+    );
+  });
+
+  test('never pads past what the reranker returned', async () => {
+    const { out } = await run(ranked(3, [2]));
+    expect(out.served).toBe(3);
+    expect(out.held_back).toBe(0);
+  });
+
+  test('the rerank prompt asks for up to n and names the floor', () => {
+    const kwargs = (prompts as any).recommend_rerank.kwargs;
+    const text = kwargs.messages[0].content[1].text as string;
+    expect(text).toContain('Rank up to 10 of the best candidates');
+    expect(text).toContain('if fewer than 5 are strong');
+    const item = kwargs.tools[0].input_schema.properties.recommendations.items;
+    expect(item.properties.low_confidence.type).toBe('boolean');
+    // Optional: a pick that omits it counts as confident.
+    expect(item.required).not.toContain('low_confidence');
+  });
+});
+
+describe('confidentDeck / lowConfidence / parseTitleSeeds', () => {
+  const pick = (id: number, low: boolean) => ({ id, low_confidence: low });
+
+  test('keeps confident picks, then fills to min(MIN_DECK, n) in the given order', () => {
+    const byScore = [pick(1, true), pick(2, false), pick(3, true), pick(4, false)];
+    expect(confidentDeck(byScore, 10).picks.map((p) => p.id)).toEqual([1, 2, 3, 4]);
+    expect(confidentDeck(byScore, 3).picks.map((p) => p.id)).toEqual([1, 2, 4]);
+    expect(confidentDeck(byScore, 3).heldBack).toBe(1);
+  });
+
+  test('reads the flag or a rationale that doubts the book, not an honest stretch', () => {
+    expect(lowConfidence({ low_confidence: true, rationale: 'x' })).toBe(true);
+    expect(lowConfidence({ rationale: 'The catalog metadata is thin here.' })).toBe(true);
+    expect(lowConfidence({ rationale: 'Authorship looks questionable.' })).toBe(true);
+    expect(lowConfidence({ rationale: 'A reach, but the voice is The Remains of the Day.' })).toBe(
+      false
+    );
+    expect(lowConfidence({ low_confidence: false, rationale: 'Spare and wintry.' })).toBe(false);
+  });
+
+  test('parseTitleSeeds drops blanks and repeats and caps the list', () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({ title: `T${i}`, author: 'A B' }));
+    expect(parseTitleSeeds({ books: many })).toHaveLength(12);
+    expect(parseTitleSeeds({ books: [{ title: 'X' }, { author: 'Y' }, 'junk'] })).toEqual([]);
+    expect(parseTitleSeeds(null)).toEqual([]);
   });
 });

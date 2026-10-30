@@ -11,6 +11,12 @@
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import {
+  countLovedGenres,
+  deriveGenreSuppression,
+  type GenreSuppression,
+} from './genreSuppression';
+import { readPreferences } from './preferences';
+import {
   LOVED_MIN,
   loadDirective,
   loadTraitPayloads,
@@ -87,6 +93,8 @@ export interface ScreenSignal {
   more_like_titles: string[];
   less_like_titles: string[];
   reject_reason_counts: Map<string, number>;
+  /** Genres recent "wrong genre" skips suppress (genreSuppression.ts). */
+  genre_suppression: GenreSuppression;
   directive_text: string | null;
   directive_constraints: Record<string, unknown>;
 }
@@ -157,6 +165,7 @@ export async function buildScreenSignal(db: Db, userId: string): Promise<ScreenS
   const favorite_titles: FavoriteTitle[] = [];
   const genreCounts = new Map<string, number>();
   const peopleCounts = new Map<string, number>();
+  const lovedGenreCounts = new Map<string, number>();
   const languages: string[] = [];
   const titleById = new Map<number, { title: string; year: number | null }>();
 
@@ -177,6 +186,7 @@ export async function buildScreenSignal(db: Db, userId: string): Promise<ScreenS
     const genres = stringList(e?.genres);
     const people = stringList(type === 'movie' ? e?.directors : e?.creators);
     for (const g of genres) genreCounts.set(g, (genreCounts.get(g) ?? 0) + 1);
+    countLovedGenres(lovedGenreCounts, genres);
     for (const p of people) peopleCounts.set(p, (peopleCounts.get(p) ?? 0) + 1);
     loved_titles.push({
       id: t.id,
@@ -264,6 +274,11 @@ export async function buildScreenSignal(db: Db, userId: string): Promise<ScreenS
 
   const traits = await loadTraitPayloads(db, userId);
   const { directive_text, directive_constraints } = await loadDirective(db, userId);
+  const genre_suppression = deriveGenreSuppression(
+    rejected.map((r) => ({ rejectReasons: r.rejectReasons, genres: r.genres })),
+    lovedGenreCounts,
+    readPreferences(directive_constraints).prefer_subjects
+  );
 
   return {
     traits,
@@ -283,6 +298,7 @@ export async function buildScreenSignal(db: Db, userId: string): Promise<ScreenS
     more_like_titles,
     less_like_titles,
     reject_reason_counts,
+    genre_suppression,
     directive_text,
     directive_constraints,
   };

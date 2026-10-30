@@ -13,6 +13,13 @@ import { schema, type Db } from './db';
 // Type-only, so there is no runtime cycle even though recAssemble imports RecSignal back.
 import type { AssembleSignal } from './recAssemble';
 import { surname } from './dedup';
+import {
+  countLovedGenres,
+  deriveGenreSuppression,
+  type GenreSuppression,
+} from './genreSuppression';
+import { readPreferences } from './preferences';
+import { mostlyFiction } from './libraryShape';
 import { dedupKey, seriesInfo } from './recFilters';
 import { effectiveRating, pyFloat, round2, type PyFloat } from './serialize';
 
@@ -68,8 +75,16 @@ export interface RecSignal {
   /** Map, not an object: _user_steering_block joins these in insertion order. */
   reject_reason_counts: Map<string, number>;
   rejected_with_notes: RejectedNote[];
+  /** Genres recent "wrong genre" skips suppress (genreSuppression.ts). */
+  genre_suppression: GenreSuppression;
   directive_text: string | null;
   directive_constraints: Record<string, unknown>;
+  /**
+   * The RATED books are mostly fiction (libraryShape.mostlyFiction), so nonfiction companions
+   * to fiction (study guides, encyclopedias, criticism, art books) are off the deck. False for
+   * a mixed, nonfiction or unclassifiable library.
+   */
+  mostly_fiction: boolean;
 }
 
 /**
@@ -163,7 +178,9 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
   const loved: LovedBook[] = [];
   const subjectCounts = new Map<string, number>();
   const authorCounts = new Map<string, number>();
+  const lovedGenreCounts = new Map<string, number>();
   let rated_count = 0;
+  const ratedSubjects: string[][] = [];
 
   for (const { b, enr } of rows) {
     library_keys.add(dedupKey(b.title, b.author));
@@ -184,11 +201,15 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
     if (b.author) library_authors.add(surname(b.author));
 
     const rating = effectiveRating(b.appRating, b.goodreadsRating);
-    if (rating !== null) rated_count++;
+    const subjects = ((enr?.subjects as string[] | null) ?? []) as string[];
+    if (rating !== null) {
+      rated_count++;
+      ratedSubjects.push(subjects);
+    }
     if (rating === null || rating < LOVED_MIN) continue;
 
-    const subjects = ((enr?.subjects as string[] | null) ?? []) as string[];
     for (const s of subjects) subjectCounts.set(s, (subjectCounts.get(s) ?? 0) + 1);
+    countLovedGenres(lovedGenreCounts, subjects);
     if (b.author) authorCounts.set(b.author, (authorCounts.get(b.author) ?? 0) + 1);
     // Python's `b.date_read or b.date_added`: a date object is never falsy, so this
     // is a plain null-coalesce, not a truthiness fallback.
@@ -274,6 +295,11 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
   }
 
   const { directive_text, directive_constraints } = await loadDirective(db, userId);
+  const genre_suppression = deriveGenreSuppression(
+    reasonRows.map((r) => ({ rejectReasons: r.rejectReasons, genres: r.subjects })),
+    lovedGenreCounts,
+    readPreferences(directive_constraints).prefer_subjects
+  );
 
   return {
     library_keys,
@@ -291,8 +317,10 @@ export async function buildSignal(db: Db, userId: string): Promise<RecSignal> {
     less_like,
     reject_reason_counts,
     rejected_with_notes,
+    genre_suppression,
     directive_text,
     directive_constraints,
+    mostly_fiction: mostlyFiction(ratedSubjects),
   };
 }
 
