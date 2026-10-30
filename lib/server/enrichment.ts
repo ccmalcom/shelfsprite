@@ -14,6 +14,7 @@ import type { Db } from './db';
 import { books, enrichment } from './schema';
 import { eq } from 'drizzle-orm';
 import { surname, normalizeTitle } from './dedup';
+import { candidateAuthor, candidatePublishers, isPublisherLikeAuthor } from './publisherAuthor';
 import { STRONG_SIM, titleSim } from './similarity';
 import type { BookRow } from './books';
 import { effectiveRating, serializeResolutionConfidence, utcnowTs } from './serialize';
@@ -92,11 +93,39 @@ export function scoreCandidates(
   return { candidate: best, label: 'LOW' };
 }
 
+/**
+ * A match whose authorship rests on a publisher or brand string ("Blockbuster Story")
+ * is not a confident match: keep it LOW so the book surfaces for correction. That is
+ * the library book's own author being brand-like (an earlier recommendation or a manual
+ * add can carry one in), or, for a book with no author, the matched record's. A real
+ * author on the book with a brand on the record keeps its label: enrichment never
+ * copies the record's author, and the search path's author check already fails there.
+ */
+export function demoteBrandAuthorMatch(
+  book: Pick<BookRow, 'author'>,
+  result: ResolutionResult
+): ResolutionResult {
+  if (!result.candidate || (result.label !== 'HIGH' && result.label !== 'MEDIUM')) return result;
+  const publishers = candidatePublishers(result.candidate.raw);
+  const brandAuthor = book.author
+    ? isPublisherLikeAuthor(book.author, publishers)
+    : isPublisherLikeAuthor(candidateAuthor(result.candidate), publishers);
+  return brandAuthor ? { ...result, label: 'LOW' } : result;
+}
+
 /** Python enrich._resolve_one: ISBN trust and catalog order are intentional. */
 export async function resolveOne(
   db: Db,
   book: Pick<BookRow, 'title' | 'author' | 'isbn13'>,
   catalog: EnrichmentCatalog = productionCatalog
+): Promise<ResolutionResult> {
+  return demoteBrandAuthorMatch(book, await resolveByCatalog(db, book, catalog));
+}
+
+async function resolveByCatalog(
+  db: Db,
+  book: Pick<BookRow, 'title' | 'author' | 'isbn13'>,
+  catalog: EnrichmentCatalog
 ): Promise<ResolutionResult> {
   if (book.isbn13) {
     const openLibraryIsbn = await catalog.openlibraryByIsbn(db, book.isbn13);

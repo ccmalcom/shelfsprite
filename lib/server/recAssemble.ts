@@ -17,6 +17,7 @@ import {
   type Candidate,
 } from './catalog';
 import type { Db } from './db';
+import { hasPublisherAuthor } from './publisherAuthor';
 import {
   allowedLanguages,
   applyAuthorCaps,
@@ -254,6 +255,8 @@ export function assemble(
     if (isTranslatedLibraryEdition(cand, signal.library_titles, signal.library_authors)) return;
     if (isLearnerEdition(cand)) return;
     if (isCollectionEdition(cand)) return;
+    // A publisher or brand in the author field is unresolved authorship (publisherAuthor.ts).
+    if (hasPublisherAuthor(cand)) return;
 
     const existing = byKey.get(key);
     if (existing === undefined) {

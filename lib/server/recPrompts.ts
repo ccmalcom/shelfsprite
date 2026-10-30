@@ -200,6 +200,14 @@ export function buildSeedPrompt(signal: RecSignal, nQueries: number): PromptBloc
       pyJsonDumps(preferences.prefer_subjects) +
       '.';
   }
+  // Emitted only when populated, like the favorites above (genreSuppression.ts).
+  if (signal.genre_suppression.suppressed.length) {
+    steering +=
+      ' Do not chase these genres: the reader recently skipped books in them as the ' +
+      'wrong genre: ' +
+      pyJsonDumps(signal.genre_suppression.suppressed) +
+      '.';
+  }
 
   const taskPrompt =
     "A reader's taste profile and a sample of their loved books are above. Propose " +
@@ -258,6 +266,25 @@ export function userSteeringBlock(signal: RecSignal): string {
       .map(([r, c]) => `${r}: ${c} times`)
       .join(', ');
     lines.push('FREQUENT REJECT REASONS: ' + reasons);
+  }
+  // Both emitted only when populated, so the pinned no-skip prompt is unchanged.
+  const { suppressed, soft } = signal.genre_suppression;
+  if (suppressed.length) {
+    lines.push(
+      'WRONG-GENRE SKIPS (genres of books the reader recently skipped as the wrong ' +
+        'genre; candidates carrying them were already removed, so heavily penalize any ' +
+        'candidate that is still the same kind of book):\n' +
+        pyJsonDumps(suppressed)
+    );
+  }
+  if (soft.length) {
+    lines.push(
+      'SOFT WRONG-GENRE SKIPS (the reader skipped a book in these genres as the wrong ' +
+        'genre but rates other books in them highly, so the skip was likely about ' +
+        'something else; treat it as a mild signal only, never a reason to drop the ' +
+        'genre):\n' +
+        pyJsonDumps(soft)
+    );
   }
   if (directiveText) {
     lines.push(

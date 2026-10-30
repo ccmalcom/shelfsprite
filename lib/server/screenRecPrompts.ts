@@ -237,6 +237,14 @@ export function buildScreenSeedPrompt(
       pyJsonDumps(signal.less_like_titles) +
       '.';
   }
+  // Emitted only when populated, so the pinned prompt is unchanged (genreSuppression.ts).
+  if (signal.genre_suppression.suppressed.length) {
+    steering +=
+      ' Do not propose titles in these genres: the viewer recently skipped titles in them ' +
+      'as the wrong genre: ' +
+      pyJsonDumps(signal.genre_suppression.suppressed) +
+      '.';
+  }
   const directive = (signal.directive_text ?? '').trim();
   if (directive) steering += "\n\nThe viewer's own standing instructions: " + directive;
   const owned = signal.owned_list.length
@@ -282,6 +290,24 @@ function screenSteeringBlock(signal: ScreenSignal): string {
       .map(([r, c]) => `${r}: ${c} times`)
       .join(', ');
     lines.push('FREQUENT REJECT REASONS: ' + reasons);
+  }
+  const { suppressed, soft } = signal.genre_suppression;
+  if (suppressed.length) {
+    lines.push(
+      'WRONG-GENRE SKIPS (genres of titles the viewer recently skipped as the wrong genre; ' +
+        'candidates carrying them were already removed, so heavily penalize any candidate ' +
+        'that is still the same kind of title):\n' +
+        pyJsonDumps(suppressed)
+    );
+  }
+  if (soft.length) {
+    lines.push(
+      'SOFT WRONG-GENRE SKIPS (the viewer skipped a title in these genres as the wrong ' +
+        'genre but rates other titles in them highly, so the skip was likely about ' +
+        'something else; treat it as a mild signal only, never a reason to drop the ' +
+        'genre):\n' +
+        pyJsonDumps(soft)
+    );
   }
   const directive = (signal.directive_text ?? '').trim();
   if (directive) {

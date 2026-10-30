@@ -13,6 +13,7 @@
  */
 import type { Db } from './db';
 import { authorExcluded, subjectExcluded } from './exclusions';
+import { hitsSuppressedGenre } from './genreSuppression';
 import { logDebug } from './log';
 import { SEED_RESERVE_SHARE } from './recAssemble';
 import {
@@ -764,7 +765,8 @@ export async function assembleScreenPool(
   signal: Pick<
     ScreenSignal,
     'owned_qids' | 'owned_tvmaze_ids' | 'owned_keys' | 'directive_constraints'
-  >,
+  > &
+    Partial<Pick<ScreenSignal, 'genre_suppression'>>,
   mediaFilter: MediaFilter,
   deadline: Deadline
 ): Promise<ScreenPoolCandidate[]> {
@@ -775,7 +777,9 @@ export async function assembleScreenPool(
     (c) =>
       allows(mediaFilter, c.media_type) &&
       !(c.media_type === 'tv' && c.tvmaze_id === null) &&
-      !signal.owned_keys.has(normalizeTitleKey(c.title, c.year))
+      !signal.owned_keys.has(normalizeTitleKey(c.title, c.year)) &&
+      // Recent "wrong genre" skips (genreSuppression.ts). Genres exist only after hydration.
+      !hitsSuppressedGenre(c.genres, signal.genre_suppression?.suppressed ?? [])
   );
   return capHits(
     applyPersonCap(applyScreenDirective(kept, signal.directive_constraints)),

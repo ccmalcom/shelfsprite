@@ -191,6 +191,15 @@ concurrent enrichment or user correction wins.
   rerank.
 - `recFilters.ts` — reusable language, series, fuzzy-duplicate, learner-edition, author-cap,
   directive, and discovery constraints.
+- `publisherAuthor.ts` — the conservative publisher/imprint/brand-as-author test
+  (`isPublisherLikeAuthor`, `hasPublisherAuthor`). `assemble` drops a candidate whose author is
+  one, and enrichment keeps a match resting on one at `LOW`. A trailing word that can be a
+  surname (Press, House, Story) needs corroboration, so real authors with those names survive.
+- `genreSuppression.ts` — "Wrong genre" feedback. The primary subjects (books) or genres (screen)
+  of the most recent `wrong_genre` rejections are suppressed: `runRecommend` drops pool entries
+  sharing one before `assemble`, `assembleScreenPool` drops hydrated candidates, and both
+  rerank and seed prompts name them. A genre on two or more loved items, or a favorite subject,
+  stays a soft reranker hint instead.
 - `recPrompts.ts` / `recommendRun.ts` — query-seed and rerank prompt construction plus the main
   two-stage orchestration. `runRecommend` persists only validated catalog candidates returned by
   the rerank tool.

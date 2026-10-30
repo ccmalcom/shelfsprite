@@ -23,6 +23,7 @@ import {
 } from './claudeErrors';
 import { schema, type Db } from './db';
 import { ApiError } from './errors';
+import { dropSuppressedGenreEntries } from './genreSuppression';
 import { logDebug } from './log';
 import { preferredAuthorSurnames, readPreferences } from './preferences';
 import { asIdList } from './profileBuild';
@@ -161,7 +162,12 @@ export async function runRecommend(
     seedEntries = await seedPool(db, seedQueries, PER_QUERY);
   }
 
-  let candidates = assemble(metaPool, seedEntries, signal, MAX_CANDIDATES, preferredSurnames);
+  // Recent "wrong genre" skips take their genre out of retrieval, before the cap.
+  const [metaKept, seedKept] = dropSuppressedGenreEntries(
+    [metaPool, seedEntries],
+    signal.genre_suppression.suppressed
+  );
+  let candidates = assemble(metaKept, seedKept, signal, MAX_CANDIDATES, preferredSurnames);
   candidates = applyDirectiveConstraints(candidates, directiveConstraints);
   await fillOlDescriptions(db, candidates);
   candidates = dropUnstartedLaterSeries(candidates, signal.library_authors);
