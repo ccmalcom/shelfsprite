@@ -17,7 +17,8 @@ import { serializeResolutionConfidence, tsToIso, utcnowTs } from './serialize';
 export const MEDIA_FILTERS = ['both', 'movie', 'tv'] as const satisfies readonly MediaFilter[];
 
 /**
- * Spec §6.7: the book list (recs.ts#REJECT_REASONS) without `tried_author`, in the same order,
+ * Spec §6.7: the book list (recs.ts#REJECT_REASONS) without its book-only codes (`tried_author`
+ * and the reading-specific additions after `wrong_vibe`), in the same order,
  * so the 422 detail lists codes the way the book route does. `too_long` means runtime or
  * season count.
  */

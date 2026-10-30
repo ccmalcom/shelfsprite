@@ -2,12 +2,12 @@
 
 import PageHeading from '@/components/PageHeading';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR, { mutate } from 'swr';
 import {
   api,
-  type Book,
+  type BookFeedbackRequest,
   type Recommendation,
   type Trait,
   REJECT_REASONS,
@@ -18,7 +18,7 @@ import {
 import { Button, Spinner, useToast } from '@/components/ui';
 import SwipeCard from '@/components/SwipeCard';
 import RejectReasonPicker from '@/components/RejectReasonPicker';
-import BookEditModal from '@/components/BookEditModal';
+import AlreadyReadModal, { type AlreadyReadVerdict } from '@/components/AlreadyReadModal';
 import { useFeedbackPrompt } from '@/hooks/useFeedbackPrompt';
 import ShelfSprite from '@/components/ShelfSprite';
 
@@ -26,7 +26,8 @@ export default function SwipePage() {
   const router = useRouter();
   const toast = useToast();
   const [dismissed, setDismissed] = useState<Set<number>>(new Set());
-  const [reviewing, setReviewing] = useState<Book | null>(null);
+  // "Already read" asks for the rating BEFORE the verdict is saved, so Cancel undoes nothing.
+  const [readPending, setReadPending] = useState<Recommendation | null>(null);
   const [pendingRejectId, setPendingRejectId] = useState<number | null>(null);
   const [rerolling, setRerolling] = useState(false);
 
@@ -49,8 +50,29 @@ export default function SwipePage() {
 
   const total = (recs ?? []).filter((r) => r.status === 'served' || dismissed.has(r.id));
 
+  // A rating or a taste signal can flip the profile to dirty, and the app-wide re-profile
+  // banner then drops in above the deck and shoves the card down mid-swipe. Hold the
+  // profile-status refresh until the batch is done, or until the reader leaves the deck.
+  const statusStaleRef = useRef(false);
+  const deckDoneRef = useRef(false);
+  const flushStatus = useCallback(() => {
+    if (!statusStaleRef.current) return;
+    statusStaleRef.current = false;
+    void mutate(PROFILE_STATUS_KEY);
+  }, []);
+  // A save that lands after the last card is gone refreshes right away.
+  const refreshStatusLater = useCallback(() => {
+    statusStaleRef.current = true;
+    if (deckDoneRef.current) flushStatus();
+  }, [flushStatus]);
+  // Leaving mid-deck: the rest of the app should see the change.
+  useEffect(() => flushStatus, [flushStatus]);
+
   useEffect(() => {
+    deckDoneRef.current = pending.length === 0 && (recs ?? []).length > 0;
+    if (deckDoneRef.current) flushStatus();
     if (dismissed.size > 0 && pending.length === 0 && recs && recs.length > 0) {
+      // The hook itself waits for any open dialog to close before it shows.
       fireRecsPrompt();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -62,12 +84,13 @@ export default function SwipePage() {
         setPendingRejectId(recId);
         return;
       }
+      if (status === 'already_read') {
+        setReadPending(recs?.find((r) => r.id === recId) ?? null);
+        return;
+      }
       setDismissed((prev) => new Set([...prev, recId]));
       try {
-        const result = await api.feedback(recId, { status });
-        if (status === 'already_read' && result.book) {
-          setReviewing(result.book);
-        }
+        await api.feedback(recId, { status });
       } catch (e) {
         toast.error(e instanceof Error ? e.message : "That verdict didn't save. Try it again.");
         setDismissed((prev) => {
@@ -77,26 +100,63 @@ export default function SwipePage() {
         });
       }
     },
-    [toast]
+    [recs, toast]
   );
 
-  const handleTasteSignal = useCallback(async (rec: Recommendation, direction: 'more' | 'less') => {
-    try {
-      await recordTasteSignal({
-        target_kind: 'rec',
-        direction,
-        snapshot: {
-          title: rec.title,
-          author: rec.author,
-          subjects: rec.subjects,
-          isbn13: rec.isbn13,
-        },
-      });
-      void mutate(PROFILE_STATUS_KEY);
-    } catch (e) {
-      console.error('taste signal failed', e);
-    }
-  }, []);
+  const confirmAlreadyRead = useCallback(
+    async (rec: Recommendation, verdict: AlreadyReadVerdict) => {
+      setReadPending(null);
+      setDismissed((prev) => new Set([...prev, rec.id]));
+      let saved = false;
+      try {
+        const result = await api.feedback(rec.id, { status: 'already_read' });
+        saved = true;
+        if (result.book && verdict.rating > 0) {
+          const req: BookFeedbackRequest = { rating: verdict.rating };
+          if (verdict.review) req.review = verdict.review;
+          await api.setBookFeedback(result.book.id, req);
+        }
+        refreshStatusLater();
+      } catch (e) {
+        if (saved) {
+          // The book is shelved as read; only the rating missed. Keep the card dismissed.
+          refreshStatusLater();
+          toast.error(
+            "It's on your read shelf, but the rating didn't save. Rate it from your library."
+          );
+          return;
+        }
+        toast.error(e instanceof Error ? e.message : "That verdict didn't save. Try it again.");
+        setDismissed((prev) => {
+          const next = new Set(prev);
+          next.delete(rec.id);
+          return next;
+        });
+      }
+    },
+    [refreshStatusLater, toast]
+  );
+
+  const handleTasteSignal = useCallback(
+    async (rec: Recommendation, direction: 'more' | 'less') => {
+      try {
+        await recordTasteSignal({
+          target_kind: 'rec',
+          direction,
+          snapshot: {
+            title: rec.title,
+            author: rec.author,
+            subjects: rec.subjects,
+            isbn13: rec.isbn13,
+          },
+        });
+        refreshStatusLater();
+      } catch (e) {
+        console.error('taste signal failed', e);
+      }
+    },
+    [refreshStatusLater]
+  );
 
   const submitReject = useCallback(
     async (reasons: string[]) => {
@@ -188,13 +248,6 @@ export default function SwipePage() {
             See your to-read shelf
           </Button>
         </div>
-        {reviewing && (
-          <BookEditModal
-            book={reviewing}
-            listKey="recommendations"
-            onClose={() => setReviewing(null)}
-          />
-        )}
         {recsModal}
       </>
     );
@@ -334,11 +387,12 @@ export default function SwipePage() {
           </Button>
         </div>
       </div>
-      {reviewing && (
-        <BookEditModal
-          book={reviewing}
-          listKey="recommendations"
-          onClose={() => setReviewing(null)}
+      {readPending && (
+        <AlreadyReadModal
+          title={readPending.title}
+          author={readPending.author}
+          onConfirm={(verdict) => void confirmAlreadyRead(readPending, verdict)}
+          onCancel={() => setReadPending(null)}
         />
       )}
       {recsModal}

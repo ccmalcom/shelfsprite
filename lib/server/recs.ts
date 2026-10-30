@@ -2,8 +2,10 @@ import { and, eq, isNotNull } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import { todayIsoDate, tsToIso } from './serialize';
 import { sameWork } from './dedup';
+import { cardChips, cardYear, plainDescription } from './recDisplay';
 
-/** Port of schemas.py::RecommendationOut (note: no reject_reasons field). */
+/** Port of schemas.py::RecommendationOut (note: no reject_reasons field). The row keeps
+ *  the raw catalog fields; the wire carries the card's view of them (recDisplay.ts). */
 export function recOut(r: typeof schema.recommendations.$inferSelect) {
   return {
     id: r.id,
@@ -11,11 +13,11 @@ export function recOut(r: typeof schema.recommendations.$inferSelect) {
     rank: r.rank,
     title: r.title,
     author: r.author,
-    year: r.year,
+    year: cardYear(r.year, r.description),
     isbn13: r.isbn13,
     cover_url: r.coverUrl,
-    subjects: r.subjects,
-    description: r.description,
+    subjects: cardChips(r.subjects as unknown[] | null),
+    description: plainDescription(r.description),
     catalog_source: r.catalogSource,
     catalog_id: r.catalogId,
     retrieval_pool: r.retrievalPool,
@@ -39,6 +41,11 @@ export const REJECT_REASONS = [
   'not_now',
   'overhyped',
   'wrong_vibe',
+  // Book-only additions (QA 2026-10). reject_reasons is a json column, so a new code needs
+  // no migration; the rerank prompt reads the codes verbatim, so they say what they mean.
+  'too_similar',
+  'not_out_yet',
+  'not_my_kind',
 ] as const;
 
 type RecRow = typeof schema.recommendations.$inferSelect;
@@ -65,7 +72,8 @@ export async function ensureLibraryBook(db: Db, rec: RecRow, shelf: string, user
       title: rec.title,
       author: rec.author,
       isbn13: rec.isbn13,
-      yearPublished: rec.year,
+      // The card's year, so a mis-dated catalog edition does not land on the shelf either.
+      yearPublished: cardYear(rec.year, rec.description),
       exclusiveShelf: shelf,
       // Without it a swiped book has no date added, so it sinks below every imported
       // book in the to-read shelf's "Date added" sort (#138).

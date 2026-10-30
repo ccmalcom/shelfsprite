@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { BookOpen } from 'lucide-react';
 import { Badge } from '@/components/ui';
 import type { Recommendation, Trait } from '@/lib/api';
+import { truncateAtWord } from '@/lib/truncate';
 
 interface Props {
   rec: Recommendation;
@@ -25,8 +26,12 @@ export default function SwipeCard({ rec, traits, onDecide, zIndex = 0, isTop }: 
   const rejectOpacity = useTransform(x, [-DRAG_THRESHOLD, 0], [1, 0]);
   const [descExpanded, setDescExpanded] = useState(false);
 
+  // The reranker cites aversions too ("you avoid X, and this has none"), but a cited
+  // aversion is not a match, so only loves the reader still stands behind show here.
   const traitIds = new Set(rec.grounded_trait_ids ?? []);
-  const matchedTraits = traits.filter((t) => traitIds.has(t.id)).slice(0, 5);
+  const matchedTraits = traits
+    .filter((t) => traitIds.has(t.id) && t.polarity === 'reward' && t.status !== 'rejected')
+    .slice(0, 5);
 
   const cardRef = useRef<HTMLDivElement>(null);
 
@@ -52,7 +57,7 @@ export default function SwipeCard({ rec, traits, onDecide, zIndex = 0, isTop }: 
   }
 
   const desc = rec.description;
-  const descShort = desc && desc.length > 180 ? desc.slice(0, 177) + '\u2026' : desc;
+  const descShort = desc ? truncateAtWord(desc, 180) : desc;
 
   return (
     <motion.div
@@ -90,7 +95,7 @@ export default function SwipeCard({ rec, traits, onDecide, zIndex = 0, isTop }: 
       </motion.div>
 
       {/* Cover image */}
-      <div className="relative h-56 w-full bg-elevated">
+      <div className="relative h-40 w-full shrink-0 bg-elevated sm:h-56">
         {rec.cover_url ? (
           <Image
             src={rec.cover_url}
@@ -114,6 +119,14 @@ export default function SwipeCard({ rec, traits, onDecide, zIndex = 0, isTop }: 
           <p className="text-sm text-muted">
             {rec.author ?? 'Unknown author'}
             {rec.year ? ` · ${rec.year}` : ''}
+          </p>
+        </div>
+
+        {/* Rationale (why for you): first after the title, so it reads without scrolling */}
+        <div>
+          <p className="mb-1 font-mono text-xs uppercase tracking-widest text-faint">Why for you</p>
+          <p className="text-sm leading-relaxed text-text">
+            {rec.rationale || 'Retrieved from your taste profile. No note from the reranker.'}
           </p>
         </div>
 
@@ -145,14 +158,6 @@ export default function SwipeCard({ rec, traits, onDecide, zIndex = 0, isTop }: 
           </div>
         )}
 
-        {/* Rationale (why for you) */}
-        <div>
-          <p className="mb-1 font-mono text-xs uppercase tracking-widest text-faint">Why for you</p>
-          <p className="text-sm leading-relaxed text-text">
-            {rec.rationale || 'Retrieved from your taste profile. No note from the reranker.'}
-          </p>
-        </div>
-
         {/* Matched taste traits */}
         {matchedTraits.length > 0 && (
           <div>
@@ -161,8 +166,8 @@ export default function SwipeCard({ rec, traits, onDecide, zIndex = 0, isTop }: 
             </p>
             <div className="flex flex-wrap gap-1.5">
               {matchedTraits.map((t) => (
-                <Badge key={t.id} variant={t.polarity === 'reward' ? 'accent' : 'warning'}>
-                  {t.claim.length > 40 ? t.claim.slice(0, 38) + '\u2026' : t.claim}
+                <Badge key={t.id} variant="accent">
+                  {truncateAtWord(t.claim, 40)}
                 </Badge>
               ))}
             </div>

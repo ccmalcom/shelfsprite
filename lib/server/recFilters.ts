@@ -304,6 +304,44 @@ export function applyAuthorCaps<T extends { author?: string | null }>(
   return kept;
 }
 
+/**
+ * The served deck's own library-author cap. applyAuthorCaps holds library authors to
+ * 40% of the candidate POOL, which still leaves the reranker enough of them to fill
+ * half a ten-card deck. This takes the first `n` of `ordered` (already in serve order)
+ * with library authors at most 40% of the deck, then backfills with the skipped
+ * library-author picks when there are not enough others: a small pool yields a full
+ * deck, never a starved one. Preferred authors are exempt, as in applyAuthorCaps.
+ * Serve order is kept.
+ */
+export function capDeckLibraryAuthors<T extends { author?: string | null }>(
+  ordered: T[],
+  n: number,
+  libraryAuthors: Set<string>,
+  preferredAuthors: Set<string> = new Set()
+): T[] {
+  const size = Math.min(n, ordered.length);
+  const maxLib = Math.max(1, Math.trunc(size * MAX_LIBRARY_AUTHOR_SHARE));
+  const isLib = (c: T) => {
+    const a = surname(c.author ?? null);
+    return libraryAuthors.has(a) && !preferredAuthors.has(a);
+  };
+  const chosen = new Set<T>();
+  let lib = 0;
+  for (const c of ordered) {
+    if (chosen.size >= size) break;
+    if (isLib(c)) {
+      if (lib >= maxLib) continue;
+      lib++;
+    }
+    chosen.add(c);
+  }
+  for (const c of ordered) {
+    if (chosen.size >= size) break;
+    chosen.add(c);
+  }
+  return ordered.filter((c) => chosen.has(c));
+}
+
 /** Re-exported so this module stays the one import site for candidate predicates.
  *  The definition lives in exclusions.ts, which the favorites editor also imports;
  *  recFilters cannot be that home because it pulls similarity.ts into any bundle. */

@@ -803,6 +803,9 @@ export const REJECT_REASONS: Record<string, string> = {
   not_now: 'Not in the mood',
   overhyped: 'Feels overhyped',
   wrong_vibe: 'Wrong vibe',
+  too_similar: "Too similar to what I've read",
+  not_out_yet: 'Not out yet',
+  not_my_kind: 'Not the kind of book I read',
 };
 
 /**
