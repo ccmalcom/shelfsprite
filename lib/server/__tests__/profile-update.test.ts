@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { makeTestDb, loadSeed } from './helpers/pglite';
 import { fakeClaude } from './helpers/fakeClaude';
 import seedJson from './fixtures/seed.json';
@@ -84,6 +84,102 @@ function fullBuildResponse() {
     usage: { input_tokens: 5, output_tokens: 5 },
   };
 }
+
+/** Every trait row for `local`, by id: what a recommendation's trait citations resolve against. */
+async function traitsById(db: Awaited<ReturnType<typeof makeTestDb>>['db']) {
+  const rows = await db
+    .select()
+    .from(schema.tasteTraits)
+    .where(eq(schema.tasteTraits.userId, 'local'))
+    .orderBy(asc(schema.tasteTraits.id));
+  return new Map(rows.map((r) => [r.id, r]));
+}
+
+describe('updateTasteProfile keeps trait ids stable (recommendations cite them)', () => {
+  const IDEA_SF = 'Drawn to idea-driven science fiction that interrogates political systems.';
+  const STANDALONE = 'Prefers standalone novels over long series commitments.';
+
+  it('keeps every id across an update whose revised set is unchanged', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as Seed);
+      const client = fakeClaude([
+        reviseResponse([
+          {
+            claim: IDEA_SF,
+            polarity: 'positive',
+            exhibits: [1, 2, 3],
+            contrasts: [],
+            inference_confidence: 0.9,
+          },
+          {
+            claim: STANDALONE,
+            polarity: 'positive',
+            exhibits: [2, 13],
+            contrasts: [12],
+            inference_confidence: 0.8,
+          },
+        ]),
+      ]);
+
+      await updateTasteProfile(db, client, 'local');
+
+      const after = await traitsById(db);
+      // Seeded proposed traits 1 and 3, confirmed 2 and rejected 4: the same ids, nothing new.
+      expect([...after.keys()]).toEqual([1, 2, 3, 4]);
+      expect(after.get(1)!.status).toBe('proposed');
+      expect(after.get(1)!.claim).toBe(IDEA_SF);
+      // Evidence and confidence are refreshed in place; the reveal line survives.
+      expect(after.get(1)!.exhibits).toEqual([1, 2, 3]);
+      expect(after.get(1)!.inferenceConfidence).toBe(0.9);
+      expect(after.get(1)!.revealLine).toBe('You read to argue with civilizations.');
+      expect(after.get(3)!.claim).toBe(STANDALONE);
+    } finally {
+      await close();
+    }
+  });
+
+  it('updates a reworded trait in place and deletes only the trait it drops', async () => {
+    const { db, close } = await makeTestDb();
+    try {
+      await loadSeed(db, seedJson as Seed);
+      const reworded = IDEA_SF.replace(/\.$/, ' and the people who run them.');
+      const client = fakeClaude([
+        reviseResponse([
+          {
+            claim: reworded,
+            polarity: 'positive',
+            exhibits: [1, 2],
+            contrasts: [],
+            inference_confidence: 0.9,
+          },
+          {
+            claim: 'Rewards problem-solving under pressure.',
+            polarity: 'reward',
+            exhibits: [3],
+            contrasts: [],
+            inference_confidence: 0.7,
+          },
+        ]),
+      ]);
+
+      await updateTasteProfile(db, client, 'local');
+
+      const after = await traitsById(db);
+      expect(after.get(1)!.claim).toBe(reworded);
+      expect(after.get(1)!.status).toBe('proposed');
+      // The old reveal line narrated the old wording, so it is cleared for regeneration.
+      expect(after.get(1)!.revealLine).toBeNull();
+      expect(after.has(3)).toBe(false); // dropped
+      expect(after.get(2)!.status).toBe('confirmed'); // verdicted traits untouched
+      expect(after.get(4)!.status).toBe('rejected');
+      const added = [...after.values()].filter((r) => r.id > 4);
+      expect(added.map((r) => r.claim)).toEqual(['Rewards problem-solving under pressure.']);
+    } finally {
+      await close();
+    }
+  });
+});
 
 describe('updateTasteProfile', () => {
   it('revises the trait set from the seeded changes', async () => {

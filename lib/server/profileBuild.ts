@@ -3,7 +3,7 @@
  * _build_prompt, extract_taste_profile). Strings are copied verbatim from Python —
  * prompt parity is asserted byte-for-byte in parity-prompts.test.ts.
  */
-import { and, eq, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lt, or } from 'drizzle-orm';
 import { schema, type Db } from './db';
 import { trackedToolCall } from './anthropic';
 import { toolInput, type ClaudeClient, type ClaudeMessage } from './claude';
@@ -22,6 +22,7 @@ import {
   PROFILE_EMPTY_MESSAGE,
 } from './claudeErrors';
 import { modelFor } from './models';
+import { matchRevisedClaims, normalizeClaim } from './profileDiff';
 import { readRebuildReason } from './profileMeta';
 import { readScreenToggledAt } from './screenSettings';
 import { assertScreenToggleUnchanged, screenVariantActive } from './screenProfile';
@@ -438,13 +439,14 @@ export interface PersistOptions {
 
 /**
  * Shared persistence tail of profile.extract_taste_profile and
- * profile.update_taste_profile: replace the user's prior 'proposed' traits with the
- * newly derived set and stamp profile_meta, all inside one transaction. Node cannot
- * hold a single Python-style session across the Claude call (db.ts uses max: 1, so
- * touching `db` inside an open transaction deadlocks) — both callers run this only
- * AFTER their Claude call has already resolved, matching Python's own write-nothing-
- * before-the-call behavior. Returns the number of traits saved. `runStartedAt` is the
- * caller's pre-read timestamp (see markProfiled).
+ * profile.update_taste_profile: reconcile the user's prior 'proposed' traits with the
+ * newly derived set (kept and reworded traits updated in place so their ids survive,
+ * dropped ones deleted, new ones inserted) and stamp profile_meta, all inside one
+ * transaction. Node cannot hold a single Python-style session across the Claude call
+ * (db.ts uses max: 1, so touching `db` inside an open transaction deadlocks) — both
+ * callers run this only AFTER their Claude call has already resolved, matching Python's
+ * own write-nothing-before-the-call behavior. Returns the number of traits saved.
+ * `runStartedAt` is the caller's pre-read timestamp (see markProfiled).
  */
 export async function persistProposedTraits(
   db: Db,
@@ -463,11 +465,8 @@ export async function persistProposedTraits(
       await assertScreenToggleUnchanged(tx, userId, opts.expectedScreenToggledAt);
     }
 
-    await tx
-      .delete(schema.tasteTraits)
-      .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')));
-
-    let n = 0;
+    const rows: (typeof schema.tasteTraits.$inferInsert & { claim: string; polarity: string })[] =
+      [];
     for (const t of traits) {
       const exhibits = asIdList(t.exhibits, validIds);
       const contrasts = asIdList(t.contrasts, validIds);
@@ -481,7 +480,7 @@ export async function persistProposedTraits(
       if (titleEvidence && exhibits.length === 0 && titleEvidence.exhibitTitleIds.length === 0) {
         continue;
       }
-      await tx.insert(schema.tasteTraits).values({
+      rows.push({
         userId,
         claim: String(t.claim ?? '').trim(),
         // Python's `t.get("polarity", "reward")` returns None on an explicit `null`
@@ -490,14 +489,69 @@ export async function persistProposedTraits(
         polarity: String(t.polarity ?? 'reward'),
         exhibits,
         contrasts,
-        ...(titleEvidence ?? {}),
+        // Null on the book variant, as a freshly inserted book-only trait would have.
+        exhibitTitleIds: titleEvidence?.exhibitTitleIds ?? null,
+        contrastTitleIds: titleEvidence?.contrastTitleIds ?? null,
         inferenceConfidence: Number(t.inference_confidence ?? 0.0),
         status: 'proposed',
       });
-      n++;
+    }
+
+    // Recommendation runs cite traits by id, so a trait the new set keeps or rewords is
+    // updated IN PLACE; only traits it actually drops are deleted. Deleting and re-inserting
+    // the whole proposed set gave every kept trait a new id on each refresh, even one that
+    // changed nothing, and every existing citation then rendered as a missing trait.
+    // Matching uses the same rules as the refresh summary (profileDiff.ts), so what the
+    // banner calls unchanged or reworded is exactly what keeps its id.
+    const existing = await tx
+      .select({
+        id: schema.tasteTraits.id,
+        claim: schema.tasteTraits.claim,
+        polarity: schema.tasteTraits.polarity,
+      })
+      .from(schema.tasteTraits)
+      .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.status, 'proposed')))
+      .orderBy(asc(schema.tasteTraits.id));
+    const matches = matchRevisedClaims(existing, rows);
+
+    const keptIds = new Set<number>();
+    for (const m of matches) if (m !== null) keptIds.add(existing[m].id);
+    const droppedIds = existing.filter((e) => !keptIds.has(e.id)).map((e) => e.id);
+    if (droppedIds.length) {
+      await tx
+        .delete(schema.tasteTraits)
+        .where(
+          and(eq(schema.tasteTraits.userId, userId), inArray(schema.tasteTraits.id, droppedIds))
+        );
+    }
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      const m = matches[i];
+      if (m === null) {
+        await tx.insert(schema.tasteTraits).values(row);
+        continue;
+      }
+      const prior = existing[m];
+      // The user's note and weight on the trait carry over. A reveal line narrates the old
+      // wording, so a reword clears it for regeneration; an exact match keeps it.
+      const reworded = normalizeClaim(prior.claim) !== normalizeClaim(row.claim);
+      await tx
+        .update(schema.tasteTraits)
+        .set({
+          claim: row.claim,
+          polarity: row.polarity,
+          exhibits: row.exhibits,
+          contrasts: row.contrasts,
+          exhibitTitleIds: row.exhibitTitleIds,
+          contrastTitleIds: row.contrastTitleIds,
+          inferenceConfidence: row.inferenceConfidence,
+          ...(reworded ? { revealLine: null } : {}),
+        })
+        .where(and(eq(schema.tasteTraits.userId, userId), eq(schema.tasteTraits.id, prior.id)));
     }
     await markProfiled(tx, kind, userId, runStartedAt, observedRebuildReason);
-    return n;
+    return rows.length;
   });
 }
 

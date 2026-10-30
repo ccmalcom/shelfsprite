@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { diffProposedClaims, snapshotProposedClaims, type ProposedClaim } from './profileDiff';
+import {
+  diffProposedClaims,
+  matchRevisedClaims,
+  snapshotProposedClaims,
+  type ProposedClaim,
+} from './profileDiff';
 import { makeTestDb } from '@/lib/server/__tests__/helpers/pglite';
 import { setupTestEnv } from '@/lib/server/__tests__/helpers/testEnv';
 import * as schema from './schema';
@@ -135,6 +140,23 @@ describe('diffProposedClaims', () => {
     const out = diffProposedClaims(before, after);
     expect(out.unchanged).toBe(1);
     expect(out.dropped).toEqual([]);
+  });
+});
+
+describe('matchRevisedClaims', () => {
+  it('continues exact matches and rewords, never across polarity, each prior row once', () => {
+    const before = [
+      reward('Rewards dense prose'),
+      aversion('Avoids military SF'),
+      reward('Rewards novellas'),
+    ];
+    const after = [
+      aversion("Avoids military SF unless it's satirical"), // reword of 1
+      reward('rewards  dense prose'), // exact match of 0
+      reward('Rewards dense prose'), // duplicate: 0 is taken, so new
+      aversion('Rewards novellas'), // polarity flip: new, and 2 is dropped
+    ];
+    expect(matchRevisedClaims(before, after)).toEqual([1, 0, null, null]);
   });
 });
 

@@ -2,8 +2,9 @@
  * Diff of a user's PROPOSED taste-trait claims across a profile refresh, for the
  * post-refresh summary in ReprofileBanner (issue #81).
  *
- * Only `status = 'proposed'` rows participate: persistProposedTraits deletes and
- * re-inserts exactly those, so confirmed/rejected verdicts cannot pollute the diff.
+ * Only `status = 'proposed'` rows participate: persistProposedTraits rewrites exactly
+ * those (updating kept/reworded ones in place via matchRevisedClaims, deleting dropped
+ * ones), so confirmed/rejected verdicts cannot pollute the diff.
  */
 import { and, eq } from 'drizzle-orm';
 import type { Db } from './db';
@@ -41,7 +42,7 @@ export interface ProfileChanges {
 export const REWORD_THRESHOLD = 0.8;
 
 /** Claims are compared case- and whitespace-insensitively; display keeps the original. */
-function normalizeClaim(claim: string): string {
+export function normalizeClaim(claim: string): string {
   return claim.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
@@ -154,6 +155,56 @@ export function diffProposedClaims(
     reworded,
     unchanged,
   };
+}
+
+/**
+ * Which existing proposed trait each revised trait continues, by the same rules as
+ * diffProposedClaims: an exact match (same polarity and normalized text) first, then
+ * same-polarity rewords paired greedily, best score first. Returns, for each `after` entry,
+ * the index into `before` it continues, or null when it is a new trait.
+ *
+ * persistProposedTraits uses this to update a kept or reworded trait in place, so its id --
+ * which every recommendation run cites -- survives the refresh. Unlike the diff it does not
+ * dedupe: each `before` row is continued by at most one `after` entry, in input order.
+ */
+export function matchRevisedClaims(
+  before: ProposedClaim[],
+  after: ProposedClaim[]
+): Array<number | null> {
+  const b = before.map((c) => normalizeClaim(c.claim));
+  const a = after.map((c) => normalizeClaim(c.claim));
+  const out: Array<number | null> = after.map(() => null);
+  const usedBefore = new Set<number>();
+
+  for (let ai = 0; ai < after.length; ai++) {
+    if (!a[ai]) continue;
+    const key = claimKey(after[ai].polarity, a[ai]);
+    for (let bi = 0; bi < before.length; bi++) {
+      if (usedBefore.has(bi) || !b[bi]) continue;
+      if (claimKey(before[bi].polarity, b[bi]) !== key) continue;
+      out[ai] = bi;
+      usedBefore.add(bi);
+      break;
+    }
+  }
+
+  const scored: Array<{ score: number; d: number; a: number }> = [];
+  for (let bi = 0; bi < before.length; bi++) {
+    if (usedBefore.has(bi) || !b[bi]) continue;
+    for (let ai = 0; ai < after.length; ai++) {
+      if (out[ai] !== null || !a[ai]) continue;
+      if (before[bi].polarity !== after[ai].polarity) continue;
+      const score = claimSimilarity(b[bi], a[ai]);
+      if (score >= REWORD_THRESHOLD) scored.push({ score, d: bi, a: ai });
+    }
+  }
+  scored.sort((x, y) => y.score - x.score || x.d - y.d || x.a - y.a);
+  for (const { d, a: ai } of scored) {
+    if (usedBefore.has(d) || out[ai] !== null) continue;
+    out[ai] = d;
+    usedBefore.add(d);
+  }
+  return out;
 }
 
 /** Read the user's current proposed claims. Cheap: two columns, no joins. */

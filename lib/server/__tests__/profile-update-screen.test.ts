@@ -114,6 +114,46 @@ describe('updateTasteProfile, screen variant', () => {
     });
   });
 
+  it('keeps the ids of cited traits across a revise that changes nothing', async () => {
+    await withScreen(async (db, t) => {
+      // A skip-style feedback change: Claude is called, and returns the same trait set.
+      await stamp(db, t.dune, { appRating: 3 });
+      const before = await db
+        .select()
+        .from(schema.tasteTraits)
+        .where(eq(schema.tasteTraits.userId, 'local'))
+        .orderBy(asc(schema.tasteTraits.id));
+      const proposed = before.filter((r) => r.status === 'proposed');
+      const client = fakeClaude([
+        revise(
+          proposed.map((r) => ({
+            claim: r.claim,
+            polarity: r.polarity,
+            exhibits: r.exhibits,
+            contrasts: r.contrasts ?? [],
+            exhibit_titles: [t.arrival],
+            contrast_titles: [],
+            inference_confidence: r.inferenceConfidence,
+          }))
+        ),
+      ]);
+
+      await updateTasteProfile(db, client, 'local');
+
+      const after = await db
+        .select()
+        .from(schema.tasteTraits)
+        .where(eq(schema.tasteTraits.userId, 'local'))
+        .orderBy(asc(schema.tasteTraits.id));
+      expect(after.map((r) => [r.id, r.claim, r.status])).toEqual(
+        before.map((r) => [r.id, r.claim, r.status])
+      );
+      for (const r of after.filter((x) => x.status === 'proposed')) {
+        expect(r.exhibitTitleIds).toEqual([t.arrival]);
+      }
+    });
+  });
+
   it('says "already up to date" when nothing changed', async () => {
     await withScreen(async (db) => {
       const client = fakeClaude([]);
