@@ -255,6 +255,7 @@ interface OpenLibraryDoc {
   subject?: string[];
   cover_i?: number;
   first_publish_year?: number;
+  publish_year?: number[];
   language?: string[];
 }
 
@@ -285,7 +286,43 @@ export async function googleBooksQuery(db: Db, q: string, maxResults = 5): Promi
   });
 }
 
-const OL_FIELDS = 'key,title,author_name,first_publish_year,cover_i,isbn,subject,language';
+const OL_FIELDS =
+  'key,title,author_name,first_publish_year,publish_year,cover_i,isbn,subject,language';
+
+/** How far a work's earliest edition may sit before the next one and still count. */
+const STRAY_EDITION_GAP = 10;
+/** Fewer editions than this and every one is trusted: a gap may be real. */
+const STRAY_EDITION_MIN = 5;
+
+/**
+ * A work's first publication year from an Open Library search doc. first_publish_year is
+ * just the earliest year on ANY edition, so one mis-dated record drags it early: QA saw
+ * Middlemarch (1871) shown as 1800 and The Buried Giant (2015) as 2001. When the doc lists
+ * every edition's year, an earliest year held by a single edition that stands
+ * STRAY_EDITION_GAP or more years before the next one is taken for a stray and skipped.
+ * Works with few editions keep first_publish_year, since a lone first edition followed
+ * by a late reprint is real there. Exported for unit tests.
+ */
+export function olFirstYear(doc: {
+  first_publish_year?: number | null;
+  publish_year?: unknown;
+}): number | null {
+  const first = doc.first_publish_year ?? null;
+  if (!Array.isArray(doc.publish_year)) return first;
+  const years = doc.publish_year
+    .filter((y): y is number => typeof y === 'number' && Number.isInteger(y))
+    .sort((a, b) => a - b);
+  if (years.length < STRAY_EDITION_MIN || (first != null && first !== years[0])) return first;
+  let i = 0;
+  while (
+    years.length - (i + 1) >= STRAY_EDITION_MIN &&
+    years[i + 1] !== years[i] &&
+    years[i + 1] - years[i] >= STRAY_EDITION_GAP
+  ) {
+    i++;
+  }
+  return years[i];
+}
 
 function olDocToCandidate(doc: any): Candidate {
   const coverId = doc.cover_i;
@@ -297,7 +334,7 @@ function olDocToCandidate(doc: any): Candidate {
     author: (doc.author_name ?? [null])[0] ?? null,
     subjects: (doc.subject ?? []).slice(0, 25),
     cover_url: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null,
-    year: doc.first_publish_year ?? null,
+    year: olFirstYear(doc),
     isbn13: isbns.find((i) => i.length === 13 && /^\d+$/.test(i)) ?? null,
     language: normLang(doc.language),
     raw: doc,
@@ -425,7 +462,7 @@ export async function openlibraryEnrichmentSearch(
       author: (doc.author_name ?? [null])[0] ?? null,
       subjects: (doc.subject ?? []).slice(0, 25),
       cover_url: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null,
-      year: doc.first_publish_year ?? null,
+      year: olFirstYear(doc),
       language: normLang(doc.language),
       raw: doc,
     };

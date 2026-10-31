@@ -606,7 +606,11 @@ export function ManualStep({
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-elevated/40 p-8 text-center">
           <BookOpen className="mb-2 h-8 w-8 text-faint" />
           <p className="text-sm text-muted">
-            Empty shelf. Add the first book, the one you&apos;d make everyone read.
+            {existing.length > 0
+              ? `Nothing added here yet. The ${existing.length} ${
+                  existing.length === 1 ? 'book' : 'books'
+                } you've already rated count toward the meter below.`
+              : 'Empty shelf. Add the first book, the one you’d make everyone read.'}
           </p>
         </div>
       ) : (

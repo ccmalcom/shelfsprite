@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { plausibleYear, rankSearchResults, type Candidate } from '../catalog';
+import { olFirstYear, plausibleYear, rankSearchResults, type Candidate } from '../catalog';
 
 /**
  * Unit tests for the add-book search order, on hand-built pools shaped like the ones QA
@@ -132,5 +132,39 @@ describe('plausibleYear', () => {
     expect(plausibleYear(0, now)).toBeNull();
     expect(plausibleYear(null, now)).toBeNull();
     expect(plausibleYear(1987.5, now)).toBeNull();
+  });
+});
+
+// QA saw Middlemarch (1871) as 1800 and The Buried Giant (2015) as 2001: Open Library's
+// first_publish_year is the earliest year on any edition, mis-dated records included.
+describe('olFirstYear', () => {
+  it('skips a lone mis-dated edition far before the rest', () => {
+    const doc = { first_publish_year: 1800, publish_year: [1800, 1871, 1872, 1874, 1900, 1994] };
+    expect(olFirstYear(doc)).toBe(1871);
+  });
+
+  it('skips a stray edition on a recent book', () => {
+    const doc = { first_publish_year: 2001, publish_year: [2016, 2015, 2001, 2015, 2017, 2015] };
+    expect(olFirstYear(doc)).toBe(2015);
+  });
+
+  it('keeps an earliest year that more than one edition shares', () => {
+    const doc = { first_publish_year: 1800, publish_year: [1800, 1800, 1871, 1872, 1874, 1900] };
+    expect(olFirstYear(doc)).toBe(1800);
+  });
+
+  it('keeps a first edition followed a few years later by reprints', () => {
+    const doc = { first_publish_year: 1965, publish_year: [1965, 1972, 1973, 2003, 2006, 2007] };
+    expect(olFirstYear(doc)).toBe(1965);
+  });
+
+  it('trusts first_publish_year when the work has few editions', () => {
+    const doc = { first_publish_year: 1960, publish_year: [1960, 1999, 2004, 2010] };
+    expect(olFirstYear(doc)).toBe(1960);
+  });
+
+  it('falls back to first_publish_year when editions are not listed', () => {
+    expect(olFirstYear({ first_publish_year: 1987 })).toBe(1987);
+    expect(olFirstYear({})).toBeNull();
   });
 });

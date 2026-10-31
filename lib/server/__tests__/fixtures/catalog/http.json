@@ -1590,7 +1590,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=dune&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=dune&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 45152,
@@ -5323,7 +5323,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?title=dune&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=dune&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 20977,
@@ -8767,7 +8767,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=ancillary+justice&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=ancillary+justice&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 15,
@@ -16510,7 +16510,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?title=ancillary+justice&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=ancillary+justice&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 4,
@@ -16749,7 +16749,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=9780316246620&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=9780316246620&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 1,
@@ -16841,7 +16841,7 @@
    "totalItems": 0
   }
  },
- "https://openlibrary.org/search.json?title=9780316246620&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=9780316246620&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -19964,7 +19964,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=the+androids+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=the+androids+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 20,
@@ -22059,7 +22059,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?title=the+androids+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=the+androids+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 4,
@@ -23811,7 +23811,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=the+android%27s+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=the+android%27s+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 20,
@@ -24649,7 +24649,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?title=the+android%27s+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=the+android%27s+dream&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 4,
@@ -26224,7 +26224,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=lock+in+scalzi&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=lock+in+scalzi&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 5,
@@ -26722,7 +26722,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?title=lock+in+scalzi&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=lock+in+scalzi&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -28372,7 +28372,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=scalzi+lock+in&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=scalzi+lock+in&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 5,
@@ -28543,7 +28543,7 @@
    "totalItems": 0
   }
  },
- "https://openlibrary.org/search.json?title=scalzi+lock+in&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?title=scalzi+lock+in&limit=25&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,

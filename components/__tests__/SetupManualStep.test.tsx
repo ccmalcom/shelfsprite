@@ -187,6 +187,29 @@ describe('setup manual step', () => {
     );
   });
 
+  it('says the library already counts instead of "Empty shelf" when it has ratings', async () => {
+    mockStats.mockResolvedValue({ by_star: { '5': 8, '3': 4 } });
+    render(
+      <ToastProvider>
+        <ManualStep onDone={jest.fn()} />
+      </ToastProvider>
+    );
+    expect(
+      await screen.findByText(/The 12 books you've already rated count toward the meter/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Empty shelf/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the "Empty shelf" prompt for a library with no ratings', async () => {
+    render(
+      <ToastProvider>
+        <ManualStep onDone={jest.fn()} />
+      </ToastProvider>
+    );
+    await waitFor(() => expect(mockStats).toHaveBeenCalled());
+    expect(screen.getByText(/Empty shelf/)).toBeInTheDocument();
+  });
+
   it('states the real cold-start threshold rather than "five or six favorites"', () => {
     renderWithTwoBooks();
     expect(screen.getByText(/at least 12, including 8 you loved/)).toBeInTheDocument();

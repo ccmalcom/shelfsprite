@@ -101,7 +101,7 @@ describe('discoveryPool', () => {
           status: 200,
           body: { items: [{ id: 'g1', volumeInfo: { title: 'G' } }] },
         },
-        'https://openlibrary.org/search.json?q=cozy+fantasy&limit=2&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
+        'https://openlibrary.org/search.json?q=cozy+fantasy&limit=2&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
           { status: 200, body: { docs: [{ key: '/works/OL1W', title: 'O' }] } },
       },
       (u) => seen.push(u)
