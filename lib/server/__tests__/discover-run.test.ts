@@ -112,7 +112,7 @@ describe('runDiscover', () => {
     // #52: "my next John Scalzi read" used to become "books like Scalzi", so no query
     // ever fetched his books, and the per-author cap would have kept at most two anyway.
     const OL_FIELDS =
-      'fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage';
+      'fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage';
     const restore = installHttpReplay({
       [`https://openlibrary.org/search.json?author=John+Scalzi&limit=20&${OL_FIELDS}`]: {
         status: 200,
@@ -199,7 +199,7 @@ describe('runDiscover', () => {
 
   test('an author request with no facet queries still retrieves', async () => {
     const restore = installHttpReplay({
-      'https://openlibrary.org/search.json?author=John+Scalzi&limit=20&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
+      'https://openlibrary.org/search.json?author=John+Scalzi&limit=20&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
         { status: 200, body: { docs: [{ title: 'Redshirts', author_name: ['John Scalzi'] }] } },
     });
     const { db, close } = await makeTestDb();
@@ -287,7 +287,7 @@ describe('runDiscover', () => {
     // HttpReplayMissError, which catalog.ts propagates rather than swallowing.
     const restore = installHttpReplay({
       'https://www.googleapis.com/books/v1/volumes?q=zzzz+nothing&maxResults=8': { status: 404 },
-      'https://openlibrary.org/search.json?q=zzzz+nothing&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
+      'https://openlibrary.org/search.json?q=zzzz+nothing&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
         { status: 404 },
     });
     try {

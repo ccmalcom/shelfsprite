@@ -153,6 +153,7 @@ export default function PasteImport({
         initialUnmatched={stage.unmatched}
         baselineRatings={baselineRatings}
         note={stage.note}
+        chooseShelf
         onAdded={onAdded}
         onBack={() => setStage({ kind: 'input' })}
         backLabel="Edit the list"

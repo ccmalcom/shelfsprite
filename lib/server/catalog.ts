@@ -255,6 +255,7 @@ interface OpenLibraryDoc {
   subject?: string[];
   cover_i?: number;
   first_publish_year?: number;
+  publish_year?: number[];
   language?: string[];
 }
 
@@ -285,7 +286,43 @@ export async function googleBooksQuery(db: Db, q: string, maxResults = 5): Promi
   });
 }
 
-const OL_FIELDS = 'key,title,author_name,first_publish_year,cover_i,isbn,subject,language';
+const OL_FIELDS =
+  'key,title,author_name,first_publish_year,publish_year,cover_i,isbn,subject,language';
+
+/** How far a work's earliest edition may sit before the next one and still count. */
+const STRAY_EDITION_GAP = 10;
+/** Fewer editions than this and every one is trusted: a gap may be real. */
+const STRAY_EDITION_MIN = 5;
+
+/**
+ * A work's first publication year from an Open Library search doc. first_publish_year is
+ * just the earliest year on ANY edition, so one mis-dated record drags it early: QA saw
+ * Middlemarch (1871) shown as 1800 and The Buried Giant (2015) as 2001. When the doc lists
+ * every edition's year, an earliest year held by a single edition that stands
+ * STRAY_EDITION_GAP or more years before the next one is taken for a stray and skipped.
+ * Works with few editions keep first_publish_year, since a lone first edition followed
+ * by a late reprint is real there. Exported for unit tests.
+ */
+export function olFirstYear(doc: {
+  first_publish_year?: number | null;
+  publish_year?: unknown;
+}): number | null {
+  const first = doc.first_publish_year ?? null;
+  if (!Array.isArray(doc.publish_year)) return first;
+  const years = doc.publish_year
+    .filter((y): y is number => typeof y === 'number' && Number.isInteger(y))
+    .sort((a, b) => a - b);
+  if (years.length < STRAY_EDITION_MIN || (first != null && first !== years[0])) return first;
+  let i = 0;
+  while (
+    years.length - (i + 1) >= STRAY_EDITION_MIN &&
+    years[i + 1] !== years[i] &&
+    years[i + 1] - years[i] >= STRAY_EDITION_GAP
+  ) {
+    i++;
+  }
+  return years[i];
+}
 
 function olDocToCandidate(doc: any): Candidate {
   const coverId = doc.cover_i;
@@ -297,7 +334,7 @@ function olDocToCandidate(doc: any): Candidate {
     author: (doc.author_name ?? [null])[0] ?? null,
     subjects: (doc.subject ?? []).slice(0, 25),
     cover_url: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null,
-    year: doc.first_publish_year ?? null,
+    year: olFirstYear(doc),
     isbn13: isbns.find((i) => i.length === 13 && /^\d+$/.test(i)) ?? null,
     language: normLang(doc.language),
     raw: doc,
@@ -425,7 +462,7 @@ export async function openlibraryEnrichmentSearch(
       author: (doc.author_name ?? [null])[0] ?? null,
       subjects: (doc.subject ?? []).slice(0, 25),
       cover_url: coverId ? `https://covers.openlibrary.org/b/id/${coverId}-M.jpg` : null,
-      year: doc.first_publish_year ?? null,
+      year: olFirstYear(doc),
       language: normLang(doc.language),
       raw: doc,
     };
@@ -603,12 +640,38 @@ export function searchScore(query: string, cand: Candidate): number {
   return score;
 }
 
+/**
+ * What a record costs when its title is another hit's title with that hit's author tacked
+ * on ("Middlemarch George Eliot", "Middlemarch, by George Eliot"). Such records are reprints
+ * and study notes, and a query naming the author matches their whole title exactly (100),
+ * above the book itself (95). Enough to drop them below it, not below unrelated titles.
+ */
+const AUTHOR_APPENDED_PENALTY = 15;
+
+/**
+ * The titles in this pool that are another hit's title plus that hit's author. Judged
+ * against the pool, not against any list of author names, so "Becoming Jane Austen" is left
+ * alone unless the pool also holds a book called "Becoming" by Jane Austen.
+ */
+function authorAppendedTitles(candidates: Candidate[]): Set<string> {
+  const keys = new Set<string>();
+  for (const c of candidates) {
+    const title = normFull(c.title);
+    if (!title || hasUnknownAuthor(c)) continue;
+    const author = normFull(c.author);
+    keys.add(`${title} ${author}`);
+    keys.add(`${title} by ${author}`);
+  }
+  return keys;
+}
+
 /** Orders deduplicated search hits, best first. Exported for unit tests. */
 export function rankSearchResults(query: string, candidates: Candidate[]): Candidate[] {
+  const appended = authorAppendedTitles(candidates);
   // Python sorted by the tuple (match, hasCover, hasIsbn, year) DESCENDING; the first
   // element is now searchScore. Array.sort is stable, so full ties keep insertion order.
   const key = (c: Candidate) => [
-    searchScore(query, c),
+    searchScore(query, c) - (appended.has(normFull(c.title)) ? AUTHOR_APPENDED_PENALTY : 0),
     c.cover_url ? 1 : 0,
     c.isbn13 ? 1 : 0,
     plausibleYear(c.year) ?? 0,

@@ -140,6 +140,29 @@ describe('PasteImport', () => {
     expect(await screen.findByText('Added 2 books.')).toBeInTheDocument();
   });
 
+  it('adds the whole list to the shelf the reader picks', async () => {
+    catalogAnswers({
+      Circe: { best: hit('Circe', 'Madeline Miller') },
+      Dune: { best: hit('Dune', 'Frank Herbert') },
+    });
+    await pasteAndMatch('Circe\nDune');
+
+    const shelves = screen.getByRole('radiogroup', { name: 'Add these to' });
+    expect(within(shelves).getByRole('radio', { name: 'Read' })).toHaveAttribute(
+      'aria-checked',
+      'true'
+    );
+    fireEvent.click(within(shelves).getByRole('radio', { name: 'To read' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add 2 books' }));
+
+    await waitFor(() =>
+      expect(mockAddBooks).toHaveBeenCalledWith([
+        expect.objectContaining({ title: 'Circe', shelf: 'to-read' }),
+        expect.objectContaining({ title: 'Dune', shelf: 'to-read' }),
+      ])
+    );
+  });
+
   it('swaps a wrong match for an alternative with "Not this book"', async () => {
     catalogAnswers({
       'The Road': {

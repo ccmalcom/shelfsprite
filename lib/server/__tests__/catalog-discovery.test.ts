@@ -56,7 +56,7 @@ describe('openlibraryAuthor', () => {
   test('searches by author and maps docs to candidates', async () => {
     const { db, close } = await makeTestDb();
     const restore = installHttpReplay({
-      'https://openlibrary.org/search.json?author=John+Scalzi&limit=2&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
+      'https://openlibrary.org/search.json?author=John+Scalzi&limit=2&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage':
         {
           status: 200,
           body: {

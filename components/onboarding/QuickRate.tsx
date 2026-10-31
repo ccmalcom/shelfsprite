@@ -5,6 +5,7 @@ import type { Book, BookMatchResult, CatalogMatch } from '@/lib/api';
 import {
   QUICK_RATE_GENRES,
   QUICK_RATE_MAX_GENRES,
+  QUICK_RATE_MAX_TILES,
   QUICK_RATE_MIN_GENRES,
   quickRatePicks,
 } from '@/lib/quickRatePicks';
@@ -44,6 +45,8 @@ export default function QuickRate({
   const [genres, setGenres] = useState<string[]>([]);
   const [tiles, setTiles] = useState<Tile[]>([]);
   const [loading, setLoading] = useState<{ done: number; total: number } | null>(null);
+  // Whether the catalogs resolved anything, so an empty grid can say why it is empty.
+  const [resolvedAny, setResolvedAny] = useState(false);
   const run = useRef(0);
 
   useEffect(() => {
@@ -64,15 +67,18 @@ export default function QuickRate({
   }
 
   async function loadGrid() {
-    const picks = quickRatePicks(genres);
+    // Every pick for these genres, best known first. A pick that does not resolve, or that
+    // the reader already shelved, is left out, and the next pick takes its place.
+    const picks = quickRatePicks(genres, Infinity);
+    const results: (BookMatchResult | undefined)[] = picks.map(() => undefined);
     const id = ++run.current;
     setTiles([]);
-    setLoading({ done: 0, total: picks.length });
+    setResolvedAny(false);
     setStage('grid');
-    const toTiles = (results: (BookMatchResult | undefined)[]) => {
+    const toTiles = () => {
       const out: Tile[] = [];
       for (const [i, r] of results.entries()) {
-        // Only resolved catalog records are shown; a book already shelved is left out.
+        if (out.length >= QUICK_RATE_MAX_TILES) break;
         if (r?.status !== 'matched' || r.best.in_library) continue;
         out.push({
           key: `pick-${i}`,
@@ -83,19 +89,32 @@ export default function QuickRate({
       }
       return out;
     };
-    await matchInBatches(picks, 'strict', {
-      isCancelled: () => id !== run.current,
-      onProgress: (results) => {
-        if (id !== run.current) return;
-        const fresh = toTiles(results);
-        // Keep ratings already given while later batches arrive.
-        setTiles((prev) =>
-          fresh.map((t) => ({ ...t, rating: prev.find((p) => p.key === t.key)?.rating ?? 0 }))
-        );
-        setLoading({ done: results.filter(Boolean).length, total: picks.length });
-      },
-    });
-    if (id === run.current) setLoading(null);
+    let next = 0;
+    // Match only as many picks as the grid still has room for, then top up from the rest.
+    while (next < picks.length) {
+      const need = QUICK_RATE_MAX_TILES - toTiles().length;
+      if (need <= 0) break;
+      const start = next;
+      const round = picks.slice(start, start + need);
+      next += round.length;
+      setLoading({ done: results.filter(Boolean).length, total: next });
+      await matchInBatches(round, 'strict', {
+        isCancelled: () => id !== run.current,
+        onProgress: (got) => {
+          if (id !== run.current) return;
+          for (const [i, r] of got.entries()) if (r) results[start + i] = r;
+          if (got.some((r) => r?.status === 'matched')) setResolvedAny(true);
+          const fresh = toTiles();
+          // Keep ratings already given while later batches arrive.
+          setTiles((prev) =>
+            fresh.map((t) => ({ ...t, rating: prev.find((p) => p.key === t.key)?.rating ?? 0 }))
+          );
+          setLoading({ done: results.filter(Boolean).length, total: next });
+        },
+      });
+      if (id !== run.current) return;
+    }
+    setLoading(null);
   }
 
   function rate(key: string, rating: number) {
@@ -185,7 +204,9 @@ export default function QuickRate({
 
       {!loading && tiles.length === 0 ? (
         <p className="rounded-xl border border-dashed border-border bg-elevated/40 p-6 text-center text-sm text-muted">
-          We could not reach the catalogs just now. Try again in a minute, or add books another way.
+          {resolvedAny
+            ? 'You already have every book we would show for these genres. Try other genres, or add books another way.'
+            : 'We could not reach the catalogs just now. Try again in a minute, or add books another way.'}
         </p>
       ) : (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Books to rate">

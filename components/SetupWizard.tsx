@@ -490,7 +490,30 @@ export function ManualStep({
   const [adding, setAdding] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [mode, setMode] = useState<ManualMode>(initialMode);
-  const ratings = books.map((b) => b.effective_rating);
+  // Ratings already in the library when this step opened, from an earlier import or an
+  // earlier visit to setup. The cold-start rule counts the whole library, so the meter does
+  // too. Read once, before the reader can add anything here, so nothing is counted twice.
+  const [existing, setExisting] = useState<number[]>([]);
+  useEffect(() => {
+    let live = true;
+    api
+      .stats()
+      .then((s) => {
+        if (!live || !s?.by_star) return;
+        setExisting(
+          Object.entries(s.by_star).flatMap(([star, n]) =>
+            Array.from({ length: n }, () => Number(star))
+          )
+        );
+      })
+      .catch(() => {
+        // The meter falls back to this step's own books.
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+  const ratings = [...existing, ...books.map((b) => b.effective_rating)];
 
   function handleBulkAdded(added: Book[]) {
     setBooks((prev) => [...prev, ...added]);
@@ -583,7 +606,11 @@ export function ManualStep({
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-elevated/40 p-8 text-center">
           <BookOpen className="mb-2 h-8 w-8 text-faint" />
           <p className="text-sm text-muted">
-            Empty shelf. Add the first book, the one you&apos;d make everyone read.
+            {existing.length > 0
+              ? `Nothing added here yet. The ${existing.length} ${
+                  existing.length === 1 ? 'book' : 'books'
+                } you've already rated count toward the meter below.`
+              : 'Empty shelf. Add the first book, the one you’d make everyone read.'}
           </p>
         </div>
       ) : (
@@ -628,7 +655,7 @@ export function ManualStep({
         </ul>
       )}
 
-      {books.length > 0 && <ColdStartMeter ratings={ratings} />}
+      {(books.length > 0 || existing.length > 0) && <ColdStartMeter ratings={ratings} />}
 
       <div className="grid gap-2 sm:grid-cols-3">
         <Button variant="secondary" onClick={() => setAdding(true)}>

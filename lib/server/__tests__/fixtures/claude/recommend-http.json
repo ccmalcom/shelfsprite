@@ -24166,7 +24166,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=literary+fantasy+found+family&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=literary+fantasy+found+family&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 5,
@@ -29173,7 +29173,7 @@
    ]
   }
  },
- "https://openlibrary.org/search.json?q=gentle+epic+fantasy+hopeful+tone&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?q=gentle+epic+fantasy+hopeful+tone&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -29186,7 +29186,7 @@
    "docs": []
   }
  },
- "https://openlibrary.org/search.json?author=Ursula+K.+Le+Guin&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?author=Ursula+K.+Le+Guin&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -29194,7 +29194,7 @@
    "docs": []
   }
  },
- "https://openlibrary.org/search.json?author=Frank+Herbert&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?author=Frank+Herbert&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -29202,7 +29202,7 @@
    "docs": []
   }
  },
- "https://openlibrary.org/search.json?author=Andy+Weir&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?author=Andy+Weir&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -29210,7 +29210,7 @@
    "docs": []
   }
  },
- "https://openlibrary.org/search.json?author=J.R.R.+Tolkien&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?author=J.R.R.+Tolkien&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -29218,7 +29218,7 @@
    "docs": []
   }
  },
- "https://openlibrary.org/search.json?author=Brandon+Sanderson&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?author=Brandon+Sanderson&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,
@@ -29226,7 +29226,7 @@
    "docs": []
   }
  },
- "https://openlibrary.org/search.json?author=Ted+Chiang&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
+ "https://openlibrary.org/search.json?author=Ted+Chiang&limit=8&fields=key%2Ctitle%2Cauthor_name%2Cfirst_publish_year%2Cpublish_year%2Ccover_i%2Cisbn%2Csubject%2Clanguage": {
   "status": 200,
   "body": {
    "numFound": 0,

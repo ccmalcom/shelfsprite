@@ -8,6 +8,7 @@ import {
   type AddBookRequest,
   type Book,
   type CatalogResult,
+  type Shelf,
 } from '@/lib/api';
 import { sameWork } from '@/lib/server/dedup';
 import { Badge, Button, StarRating, useToast } from '@/components/ui';
@@ -38,14 +39,14 @@ export interface UnmatchedLine {
 }
 
 /** The POST /books body for a confirmed row: the same fields AddBookModal sends. */
-export function addRequestFor(row: ReviewRow): AddBookRequest {
+export function addRequestFor(row: ReviewRow, shelf: Shelf = 'read'): AddBookRequest {
   const b = row.book;
   return {
     title: b.title,
     author: b.author,
     year: b.year,
     isbn13: b.isbn13,
-    shelf: 'read',
+    shelf,
     rating: row.rating > 0 ? row.rating : undefined,
     cover_url: b.cover_url,
     subjects: b.subjects,
@@ -54,6 +55,14 @@ export function addRequestFor(row: ReviewRow): AddBookRequest {
     catalog_id: b.catalog_id,
   };
 }
+
+/** The shelves a reviewed list can go to, in AddBookModal's order and wording. */
+export const BULK_SHELF_OPTIONS: { value: Shelf; label: string }[] = [
+  { value: 'read', label: 'Read' },
+  { value: 'currently-reading', label: 'Reading' },
+  { value: 'to-read', label: 'To read' },
+  { value: 'did-not-finish', label: 'DNF' },
+];
 
 type Flag = 'in-library' | 'listed-twice' | null;
 
@@ -84,6 +93,7 @@ export default function BulkReview({
   initialUnmatched = [],
   baselineRatings,
   note,
+  chooseShelf = false,
   onAdded,
   onBack,
   backLabel = 'Back',
@@ -96,6 +106,11 @@ export default function BulkReview({
    */
   baselineRatings?: ReadonlyArray<number | null | undefined>;
   note?: string;
+  /**
+   * Offer a shelf for the whole list. A pasted list can be a reading history or a wish list;
+   * quick-rate picks are books the reader has rated, so they always go to Read.
+   */
+  chooseShelf?: boolean;
   onAdded: (books: Book[]) => void;
   onBack?: () => void;
   backLabel?: string;
@@ -106,6 +121,7 @@ export default function BulkReview({
   const [swapping, setSwapping] = useState<string | null>(null);
   const [searching, setSearching] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [shelf, setShelf] = useState<Shelf>('read');
 
   const flags = flagsFor(rows);
   const addable = rows.filter((_, i) => flags[i] === null);
@@ -144,7 +160,7 @@ export default function BulkReview({
     if (addable.length === 0) return;
     setSaving(true);
     try {
-      const result = await api.addBooks(addable.map(addRequestFor));
+      const result = await api.addBooks(addable.map((row) => addRequestFor(row, shelf)));
       const added = result.added.length;
       const parts = [`Added ${added} book${added === 1 ? '' : 's'}.`];
       if (result.duplicates.length > 0) {
@@ -170,6 +186,36 @@ export default function BulkReview({
       {ratings && <ColdStartMeter ratings={ratings} />}
 
       {note && <p className="text-xs text-faint">{note}</p>}
+
+      {chooseShelf && (
+        <div>
+          <span id="bulk-shelf-label" className="mb-2 block text-xs font-medium text-muted">
+            Add these to
+          </span>
+          <div
+            role="radiogroup"
+            aria-labelledby="bulk-shelf-label"
+            className="flex flex-wrap gap-1 rounded-lg border border-border bg-elevated p-1"
+          >
+            {BULK_SHELF_OPTIONS.map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={shelf === o.value}
+                onClick={() => setShelf(o.value)}
+                className={[
+                  'flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition',
+                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                  shelf === o.value ? 'bg-surface text-text shadow' : 'text-muted hover:text-text',
+                ].join(' ')}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {rows.length > 0 ? (
         <ul className="space-y-2" aria-label="Books to add">
