@@ -34,7 +34,7 @@
     "next": "^16.4.3",
     "postgres": "^3.4.9",
     "react": "^18",
-    "react-dom": "^18",
+    "react-dom": "^19",
     "swr": "^2",
     "zod": "^4.6.7"
   },
@@ -46,7 +46,7 @@
     "@testing-library/react": "^16.3.3",
     "@types/node": "^20",
     "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react-dom": "^19",
     "autoprefixer": "^10",
     "dotenv": "^18.0.9",
     "drizzle-kit": "^0.31.11",
