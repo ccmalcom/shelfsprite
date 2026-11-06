@@ -288,6 +288,29 @@ CSS variables in `globals.css`: `--bg #161412`, `--accent #FF5C3A` (persimmon), 
 - Genre breakdown labels: `w-24 sm:w-40`; genre filter row: `flex-wrap`.
 - SetupWizard: drop zone padding `p-6 sm:p-10`; outer wrapper `py-6 sm:py-12`.
 
+## Installable app (PWA)
+
+ShelfSprite installs from Chrome ("Add to Home screen" / "Install app") as a standalone app.
+
+- **Manifest:** `app/manifest.ts`, served at `/manifest.webmanifest`. Icons live in
+  `public/icons/` (192 and 512, `any` and `maskable`) and are regenerated from `app/icon.svg`
+  with `node scripts/generate-pwa-icons.mjs`. Theme and background are the `--bg` token.
+- **Service worker:** `public/sw.js`, registered by `components/ServiceWorkerRegistrar.tsx` in
+  production builds only, as `/sw.js?v=<build id>`. `NEXT_PUBLIC_SW_BUILD_ID` comes from
+  `next.config.mjs` (the deploy's commit SHA), so every deploy installs a fresh worker that deletes
+  the previous deploy's caches. `next.config.mjs` serves `/sw.js` with `no-store`.
+- **What it caches:** only content-hashed `/_next/static/*` output (cache-first) and the
+  self-contained `public/offline.html` plus the icons (precached). Page HTML, RSC payloads,
+  `/api/*`, `/auth/*`, `/_next/image`, non-GET requests, requests with an `Authorization` header,
+  and all cross-origin requests (Supabase included) bypass the worker entirely, so signed-in data
+  never reaches Cache Storage. A navigation that fails at the network shows `offline.html`; a
+  server error is passed through as-is. `lib/__tests__/serviceWorker.test.ts` pins these rules.
+- **Proxy:** `proxy.ts` excludes `manifest.webmanifest`, `sw.js` and `offline.html` from the
+  page gate. Chrome fetches the manifest without cookies, so gating it would redirect to `/login`
+  and silently make the app uninstallable.
+- **Kill switch:** the comment at the top of `public/sw.js` has a self-unregistering body to
+  deploy if the worker ever misbehaves.
+
 ## Accessibility
 
 Modals trap focus + Escape + restore. `useReducedMotion()` in SwipeCard. `motion-safe:animate-pulse/spin` on skeletons/spinners. `aria-live` regions via toast roles. All cover `<img>` have `alt`. Focus-visible rings on all interactive elements. No `window.confirm` anywhere (ToReadTab uses inline two-step confirm).

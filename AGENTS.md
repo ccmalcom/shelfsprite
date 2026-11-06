@@ -38,7 +38,8 @@ scope them to; they are readable only by admins. Do not "fix" it by adding a `us
 - `utils/supabase/` — browser and middleware Supabase clients; `hooks/` — shared React hooks.
 - `scripts/` — operator scripts run by hand: `rotate-encryption-key.ts`
   (`npm run db:rotate-encryption-key`), `stamp-baseline.ts` (one-time adoption of an existing
-  database, not for a fresh one), `screen-classes.ts`, fixture recorders and the benchmark.
+  database, not for a fresh one), `screen-classes.ts`, `generate-pwa-icons.mjs` (install icons
+  from `app/icon.svg`), fixture recorders and the benchmark.
 
 See `docs/architecture.md` for the server module map, `docs/frontend.md` for UI and client
 patterns, `docs/hosting.md` for deployment and operational history, and `docs/conventions.md` for
@@ -144,7 +145,12 @@ Server tests run in that deliberate local mode via `vitest.setup.ts`, which sets
 
 ### Page middleware versus API authentication
 
-`proxy.ts` must keep `api` in the matcher's negative lookahead. The proxy gates page
+`proxy.ts` must keep `api` in the matcher's negative lookahead, and must keep excluding
+`manifest.webmanifest`, `sw.js` and `offline.html`: Chrome fetches the manifest without cookies,
+so gating it redirects to `/login` and makes the installable app silently uninstallable. The
+service worker (`public/sw.js`) caches only hashed `/_next/static/*` output and its offline page;
+it must never cache HTML, RSC payloads, `/api/*` or anything carrying credentials (see
+`docs/frontend.md`). The proxy gates page
 routes only; API handlers perform their own bearer authentication through `withApi`, and internal
 enrichment routes validate `CRON_SECRET`. When the proxy once matched `/api/*`, cookieless
 internal tick requests were redirected to `/login`. The bug stayed invisible for a long stretch
