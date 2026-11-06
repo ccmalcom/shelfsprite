@@ -1,8 +1,9 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Bricolage_Grotesque, Inter, JetBrains_Mono } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import './globals.css';
 import { ToastProvider } from '@/components/ui';
+import { ServiceWorkerRegistrar } from '@/components/ServiceWorkerRegistrar';
 
 const displayFont = Bricolage_Grotesque({
   subsets: ['latin'],
@@ -35,6 +36,18 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
+  // The installed app's name and status bar on iOS, which ignores most of the web manifest.
+  appleWebApp: {
+    capable: true,
+    title: 'ShelfSprite',
+    statusBarStyle: 'black',
+  },
+};
+
+// Matches --bg in globals.css and the manifest's theme_color, so the browser chrome and the
+// installed app's status bar blend into the page.
+export const viewport: Viewport = {
+  themeColor: '#191613',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -49,6 +62,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="min-h-screen bg-base text-text antialiased" suppressHydrationWarning>
         <ToastProvider>{children}</ToastProvider>
         <Analytics />
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );
