@@ -304,7 +304,10 @@ ShelfSprite installs from Chrome ("Add to Home screen" / "Install app") as a sta
   `/api/*`, `/auth/*`, `/_next/image`, non-GET requests, requests with an `Authorization` header,
   and all cross-origin requests (Supabase included) bypass the worker entirely, so signed-in data
   never reaches Cache Storage. A navigation that fails at the network shows `offline.html`; a
-  server error is passed through as-is. `lib/__tests__/serviceWorker.test.ts` pins these rules.
+  server error is passed through as-is. Every Cache Storage call is best-effort: if a cache
+  can't be opened, read or written (a full disk throws `QuotaExceededError`), the request goes to
+  the network as if the worker weren't there, and a failed precache still lets the worker install
+  so activation can clear old caches. `lib/__tests__/serviceWorker.test.ts` pins these rules.
 - **Proxy:** `proxy.ts` excludes `manifest.webmanifest`, `sw.js` and `offline.html` from the
   page gate. Chrome fetches the manifest without cookies, so gating it would redirect to `/login`
   and silently make the app uninstallable.

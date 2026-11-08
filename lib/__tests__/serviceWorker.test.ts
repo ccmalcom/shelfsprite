@@ -92,6 +92,10 @@ function loadWorker(fetchImpl: jest.Mock = jest.fn()) {
     console,
   });
 
+  // Work a fetch handler hands to event.waitUntil (a background cache write). Tests await it
+  // through settle() before they inspect Cache Storage.
+  const extended: Promise<unknown>[] = [];
+
   async function dispatchFetch(request: FakeRequest, preloadResponse?: Promise<unknown>) {
     let responded: Promise<Response> | undefined;
     listeners.fetch({
@@ -100,8 +104,15 @@ function loadWorker(fetchImpl: jest.Mock = jest.fn()) {
       respondWith: (p: Promise<Response>) => {
         responded = p;
       },
+      waitUntil: (p: Promise<unknown>) => {
+        extended.push(p);
+      },
     });
     return responded;
+  }
+
+  async function settle() {
+    await Promise.all(extended);
   }
 
   async function dispatchLifecycle(type: 'install' | 'activate') {
@@ -114,7 +125,7 @@ function loadWorker(fetchImpl: jest.Mock = jest.fn()) {
     await pending;
   }
 
-  return { self, caches, fetchImpl, dispatchFetch, dispatchLifecycle };
+  return { self, caches, fetchImpl, dispatchFetch, dispatchLifecycle, settle };
 }
 
 const ok = (body = 'ok', headers: Record<string, string> = {}) => {
@@ -223,6 +234,7 @@ describe('service worker', () => {
     const chunk = () => new FakeRequest('/_next/static/chunks/app-3f9a.js');
 
     expect(await (await sw.dispatchFetch(chunk()))!.text()).toBe('chunk');
+    await sw.settle();
     expect(await (await sw.dispatchFetch(chunk()))!.text()).toBe('chunk');
 
     expect(sw.fetchImpl).toHaveBeenCalledTimes(1);
@@ -236,6 +248,80 @@ describe('service worker', () => {
   ])('does not store a build asset response %s', async (_label, response) => {
     const sw = loadWorker(jest.fn(async () => response));
     await sw.dispatchFetch(new FakeRequest('/_next/static/chunks/app-3f9a.js'));
+    await sw.settle();
     expect(sw.caches.totalEntries()).toBe(0);
+  });
+
+  describe('when Cache Storage fails', () => {
+    const quotaExceeded = () =>
+      Object.assign(new Error('The quota has been exceeded.'), { name: 'QuotaExceededError' });
+    const immutable = () => ok('chunk', { 'cache-control': 'public, max-age=31536000, immutable' });
+    const chunk = () => new FakeRequest('/_next/static/chunks/app-3f9a.js');
+
+    afterEach(() => jest.restoreAllMocks());
+
+    it('still returns a build asset from the network when storing it is refused', async () => {
+      const sw = loadWorker(jest.fn(async () => immutable()));
+      jest.spyOn(FakeCache.prototype, 'put').mockRejectedValue(quotaExceeded());
+
+      const response = await sw.dispatchFetch(chunk());
+
+      expect(await response!.text()).toBe('chunk');
+      await expect(sw.settle()).resolves.toBeUndefined();
+    });
+
+    it('fetches a build asset from the network when the cache cannot be opened', async () => {
+      const sw = loadWorker(jest.fn(async () => immutable()));
+      jest.spyOn(sw.caches, 'open').mockRejectedValue(new Error('SecurityError'));
+
+      const response = await sw.dispatchFetch(chunk());
+
+      expect(await response!.text()).toBe('chunk');
+      expect(sw.fetchImpl).toHaveBeenCalledTimes(1);
+    });
+
+    it('fetches a build asset from the network when reading the cache fails', async () => {
+      const sw = loadWorker(jest.fn(async () => immutable()));
+      jest.spyOn(FakeCache.prototype, 'match').mockRejectedValue(new Error('UnknownError'));
+
+      const response = await sw.dispatchFetch(chunk());
+
+      expect(await response!.text()).toBe('chunk');
+    });
+
+    it('fetches an install icon from the network when the cache cannot be opened', async () => {
+      const sw = loadWorker(jest.fn(async () => ok('icon')));
+      jest.spyOn(sw.caches, 'open').mockRejectedValue(new Error('SecurityError'));
+
+      const response = await sw.dispatchFetch(new FakeRequest('/icons/icon-192.png'));
+
+      expect(await response!.text()).toBe('icon');
+    });
+
+    it('still installs when precaching the offline page fails', async () => {
+      const sw = loadWorker();
+      jest.spyOn(FakeCache.prototype, 'addAll').mockRejectedValue(quotaExceeded());
+
+      await expect(sw.dispatchLifecycle('install')).resolves.toBeUndefined();
+      expect(sw.self.skipWaiting).toHaveBeenCalled();
+    });
+
+    it('still takes control of open pages when old caches cannot be listed', async () => {
+      const sw = loadWorker();
+      jest.spyOn(sw.caches, 'keys').mockRejectedValue(new Error('UnknownError'));
+
+      await expect(sw.dispatchLifecycle('activate')).resolves.toBeUndefined();
+      expect(sw.self.clients.claim).toHaveBeenCalled();
+    });
+
+    it('passes the network error on when the offline page cannot be read', async () => {
+      const failure = new TypeError('Failed to fetch');
+      const sw = loadWorker(jest.fn(async () => Promise.reject(failure)));
+      jest.spyOn(sw.caches, 'open').mockRejectedValue(new Error('SecurityError'));
+
+      await expect(
+        sw.dispatchFetch(new FakeRequest('/library', { mode: 'navigate' }))
+      ).rejects.toBe(failure);
+    });
   });
 });
