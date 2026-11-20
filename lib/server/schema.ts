@@ -154,6 +154,9 @@ export const userSettings = pgTable(
     // archetype and reveal-line write transaction (wave 6) to discard runs that straddle a toggle.
     screenEnabled: boolean('screen_enabled').default(false).notNull(),
     screenToggledAt: timestamp('screen_toggled_at', { mode: 'string' }),
+    // "Don't ask again" on the home page's to-read prompt (nextReadSettings.ts). Stored as
+    // the opt-out so a missing row and every existing row read as "ask".
+    nextReadPromptOff: boolean('next_read_prompt_off').default(false).notNull(),
   },
   (table) => [
     uniqueIndex('ix_user_settings_user_id').using(

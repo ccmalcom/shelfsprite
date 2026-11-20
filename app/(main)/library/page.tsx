@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, Suspense } from 'react';
 import { useStickySort } from '@/lib/useStickySort';
 import Image from 'next/image';
+import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import useSWR, { mutate } from 'swr';
 import { BookOpen, Heart } from 'lucide-react';
@@ -444,6 +445,14 @@ function ToReadTab({ books }: { books: Book[] }) {
           <div className="flex flex-wrap items-center gap-2">
             <SearchInput value={search} onChange={setSearch} />
             <SortSelect value={sort} onChange={setSort} options={TO_READ_SORT_OPTIONS} />
+            {books.length >= 2 && (
+              <Link
+                href="/next-read"
+                className="inline-flex min-h-10 items-center rounded-lg border border-border bg-surface px-3 text-sm text-text transition hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Pick my next read
+              </Link>
+            )}
           </div>
 
           {filtered.length === 0 ? (

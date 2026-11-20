@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "next_read_prompt_off" boolean DEFAULT false NOT NULL;

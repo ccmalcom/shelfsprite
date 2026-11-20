@@ -40,6 +40,11 @@ export const RATE_LIMITS = {
    * normal {"detail": …} shape.
    */
   bookMatch: { limit: 40, windowSeconds: 60 },
+  /**
+   * No Python ancestor: POST /api/next-read, one Claude call per request over the reader's own
+   * to-read shelf. Answers ApiError(429) with the normal {"detail": …} shape.
+   */
+  nextRead: { limit: 10, windowSeconds: 60 },
 } as const;
 
 export interface RateLimitResult {

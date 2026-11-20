@@ -117,6 +117,35 @@ export interface SimilarBook {
   rationale: string | null;
 }
 
+/** One pick from POST /next-read: a book already on the reader's to-read shelf. */
+export interface NextReadPick {
+  rank: number;
+  score: number;
+  rationale: string;
+  book: Book;
+}
+
+export interface NextReadResult {
+  count: number;
+  /** Books on the to-read shelf. */
+  to_read_count: number;
+  /** Books the ranking looked at (the newest-saved 150 at most). */
+  considered: number;
+  model: string;
+  picks: NextReadPick[];
+}
+
+/** Whether the home page offers a to-read pick before a new batch. */
+export interface NextReadSettings {
+  prompt: boolean;
+}
+
+/** SWR key for GET /settings/next-read. */
+export const NEXT_READ_SETTINGS_KEY = 'settings-next-read';
+
+/** The to-read count at which "Find my next books" offers the shelf first. */
+export const NEXT_READ_PROMPT_MIN = 10;
+
 export interface SimilarBooksResult {
   anchor_book_id: number;
   anchor_title: string;
@@ -554,6 +583,18 @@ export const api = {
   /** Ephemeral "more books like this" for one library book (Wave 3a). */
   similarBooks: (bookId: number, n = 8) =>
     post<SimilarBooksResult>(`/books/${bookId}/similar`, { n }),
+
+  /**
+   * Rank the reader's own to-read shelf and explain the top picks. Ephemeral. These three go
+   * through screenRequest (not `post`) so a refusal reads as the server's sentence, not JSON.
+   */
+  nextRead: (n = 3) => screenRequest<NextReadResult>('POST', '/next-read', { n }),
+
+  /** Whether "Find my next books" first offers a pick from a long to-read shelf. */
+  nextReadSettings: () => screenRequest<NextReadSettings>('GET', '/settings/next-read'),
+
+  setNextReadPrompt: (prompt: boolean) =>
+    screenRequest<NextReadSettings>('PUT', '/settings/next-read', { prompt }),
 
   /** Natural-language discovery: "find me a book like X" (Wave 3b). Ephemeral — not persisted. */
   discover: (query: string, n = 10) => post<DiscoverResult>('/discover', { query, n }),
