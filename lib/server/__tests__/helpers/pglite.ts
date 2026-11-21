@@ -169,7 +169,8 @@ const SCHEMA_SQL = `
       updated_at timestamp,
       display_name text,
       screen_enabled boolean not null default false,
-      screen_toggled_at timestamp
+      screen_toggled_at timestamp,
+      next_read_prompt_off boolean not null default false
     );
     create table reader_archetypes (
       id serial primary key,

@@ -289,6 +289,20 @@ concurrent enrichment or user correction wins.
   catalog queries and supported constraints, retrieves from both catalog sources, then returns an
   ephemeral reranked result for `POST /api/discover`.
 
+- `nextReadPrompts.ts` / `nextReadRun.ts` — "Pick my next read" for `POST /api/next-read`:
+  one Claude call ranks the reader's own to-read shelf (newest-saved
+  `NEXT_READ_MAX_CANDIDATES`, 150, at most) against `tasteAndLoved` plus the reader's
+  more/less-like books and custom instructions, and explains the top `n` (default 3, at most
+  10). There is no Stage 1: every candidate is a shelf book, indices are validated, nothing is
+  persisted and no catalog call is made. It skips the profile-staleness gate but refuses an
+  empty shelf and a reader with no loved book or trait. Its own `RATE_LIMITS.nextRead` bucket
+  answers `ApiError(429)`.
+- `nextReadSettings.ts` — the home page's to-read prompt: when "Find my next books" is pressed
+  with `NEXT_READ_PROMPT_MIN` (10, in `lib/api.ts`) or more books on the to-read shelf, the
+  client offers the shelf first. "Don't ask again" stores `user_settings.next_read_prompt_off`;
+  `GET|PUT /api/settings/next-read` reads and sets it as `{prompt}`, and Settings turns it back
+  on.
+
 Claude may propose search queries and rank the bounded candidate pool, but it cannot introduce a
 book that Stage 1 did not retrieve. Candidate IDs cited by tool output are validated before results
 are returned or stored.

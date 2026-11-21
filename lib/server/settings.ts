@@ -28,7 +28,11 @@ export async function keyConfigured(db: Db, userId: string): Promise<boolean> {
 export async function upsertUserSettings(
   db: Db,
   userId: string,
-  patch: Partial<{ anthropicApiKeyEncrypted: string | null; displayName: string }>
+  patch: Partial<{
+    anthropicApiKeyEncrypted: string | null;
+    displayName: string;
+    nextReadPromptOff: boolean;
+  }>
 ): Promise<void> {
   const rows = await db
     .select()

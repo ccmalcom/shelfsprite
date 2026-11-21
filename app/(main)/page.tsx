@@ -12,19 +12,24 @@ import {
   type ProfileStatus,
   type ArchetypeOut,
   type UserProfile,
+  type NextReadSettings,
   PROFILE_STATUS_KEY,
   ARCHETYPE_KEY,
+  NEXT_READ_SETTINGS_KEY,
+  NEXT_READ_PROMPT_MIN,
 } from '@/lib/api';
 import { Button, useToast } from '@/components/ui';
 import ReaderSprite from '@/components/ReaderSprite';
 import BookCover from '@/components/BookCover';
 import CurrentReads from '@/components/CurrentReads';
 import YearCard from '@/components/YearCard';
+import NextReadPromptModal, { type NextReadChoice } from '@/components/NextReadPromptModal';
 
 export default function HomePage() {
   const router = useRouter();
   const toast = useToast();
   const [running, setRunning] = useState(false);
+  const [askShelf, setAskShelf] = useState(false);
 
   const {
     data: stats,
@@ -70,6 +75,36 @@ export default function HomePage() {
     mutate: retrySaved,
   } = useSWR<Book[]>('books-to-read', () => api.books({ shelf: 'to-read', limit: 500 }));
   const saved = savedBooks?.[0];
+  const toReadCount = savedBooks?.length ?? 0;
+  const { data: nextReadSettings } = useSWR<NextReadSettings>(NEXT_READ_SETTINGS_KEY, () =>
+    api.nextReadSettings()
+  );
+
+  // A long to-read shelf gets an offer to pick from it before another batch of new books.
+  // The prompt is on unless the reader turned it off, so a settings read that failed or has
+  // not landed yet still asks.
+  function handleFind() {
+    if (toReadCount >= NEXT_READ_PROMPT_MIN && nextReadSettings?.prompt !== false) {
+      setAskShelf(true);
+      return;
+    }
+    void handleRun();
+  }
+
+  function handleChoose(choice: NextReadChoice, dontAsk: boolean) {
+    setAskShelf(false);
+    if (dontAsk) {
+      // Not awaited: a failed save only means the reader is asked once more next time.
+      api
+        .setNextReadPrompt(false)
+        .then((next) => mutate(NEXT_READ_SETTINGS_KEY, next, { revalidate: false }))
+        .catch(() =>
+          toast.error("Couldn't save \u201cDon't ask again\u201d. Try it from Settings.")
+        );
+    }
+    if (choice === 'shelf') router.push('/next-read');
+    else void handleRun();
+  }
 
   async function handleRun() {
     setRunning(true);
@@ -124,13 +159,18 @@ export default function HomePage() {
               size="lg"
               loading={running}
               disabled={running || recBlocked}
-              onClick={handleRun}
+              onClick={handleFind}
             >
               {running ? 'Choosing carefully\u2026' : 'Find my next books'}
             </Button>
             <Link href="/discover" className="text-sm text-muted hover:text-text">
               Explore a mood →
             </Link>
+            {toReadCount >= 2 && (
+              <Link href="/next-read" className="text-sm text-muted hover:text-text">
+                Pick from my to-read shelf →
+              </Link>
+            )}
           </div>
           {recBlockMsg && (
             <p className="mt-4 text-sm text-muted">
@@ -221,6 +261,13 @@ export default function HomePage() {
         </Link>
         <YearCard compact />
       </section>
+      {askShelf && (
+        <NextReadPromptModal
+          toReadCount={toReadCount}
+          onChoose={handleChoose}
+          onCancel={() => setAskShelf(false)}
+        />
+      )}
       <div className="mt-8 border-t border-border pt-5 text-sm text-muted">
         {statsError && !stats ? (
           <p>

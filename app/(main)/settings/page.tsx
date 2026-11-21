@@ -20,6 +20,7 @@ import {
   screenApi,
 } from '@/lib/api';
 import ScreenSettingsCard from '@/components/screen/ScreenSettingsCard';
+import NextReadSettingsCard from '@/components/NextReadSettingsCard';
 import { useScreenSettings } from '@/lib/useScreenSettings';
 import { invalidateScreenState } from '@/lib/screenCache';
 import { Button, Card, Badge, useToast, Field, Input } from '@/components/ui';
@@ -501,6 +502,11 @@ export default function SettingsPage() {
             </p>
             <Button onClick={() => setShowImport(true)}>Import from a file</Button>
           </Card>
+        </section>
+
+        {/* The home page's to-read prompt ("Don't ask again" is undone here). */}
+        <section id="to-read" className="mb-6 scroll-mt-24">
+          <NextReadSettingsCard />
         </section>
 
         {/* ScreenSprite (spec §7.4). ScreenGate sends /screen/* here while it is off. */}
