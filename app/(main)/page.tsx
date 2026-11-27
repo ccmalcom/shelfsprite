@@ -207,7 +207,7 @@ export default function HomePage() {
             </p>
           ) : savedLoading ? (
             <div
-              className="h-48 w-32 rounded bg-elevated motion-safe:animate-pulse"
+              className="h-48 w-32 rounded-sm bg-elevated motion-safe:animate-pulse"
               role="status"
               aria-label="Loading saved books"
             />

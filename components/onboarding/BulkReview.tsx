@@ -206,8 +206,10 @@ export default function BulkReview({
                 onClick={() => setShelf(o.value)}
                 className={[
                   'flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
-                  shelf === o.value ? 'bg-surface text-text shadow' : 'text-muted hover:text-text',
+                  'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
+                  shelf === o.value
+                    ? 'bg-surface text-text shadow-sm'
+                    : 'text-muted hover:text-text',
                 ].join(' ')}
               >
                 {o.label}
@@ -258,7 +260,7 @@ export default function BulkReview({
                           <button
                             type="button"
                             onClick={() => update(row.key, (r) => ({ ...r, rating: 0 }))}
-                            className="rounded text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                            className="rounded-sm text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
                           >
                             Clear
                           </button>
@@ -271,7 +273,7 @@ export default function BulkReview({
                       type="button"
                       onClick={() => setRows((prev) => prev.filter((r) => r.key !== row.key))}
                       aria-label={`Remove ${b.title}`}
-                      className="rounded p-1 text-faint transition hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                      className="rounded-sm p-1 text-faint transition hover:text-danger focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                     >
                       <X className="h-4 w-4" aria-hidden="true" />
                     </button>
@@ -279,7 +281,7 @@ export default function BulkReview({
                       type="button"
                       aria-expanded={swapping === row.key}
                       onClick={() => setSwapping((k) => (k === row.key ? null : row.key))}
-                      className="rounded px-1 text-xs text-muted underline-offset-2 hover:text-text hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                      className="rounded-sm px-1 text-xs text-muted underline-offset-2 hover:text-text hover:underline focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
                     >
                       Not this book
                     </button>
@@ -297,7 +299,7 @@ export default function BulkReview({
                               <button
                                 type="button"
                                 onClick={() => swapTo(row.key, alt)}
-                                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                               >
                                 <BookCover book={alt} className="h-12 w-8" />
                                 <span className="min-w-0 flex-1">

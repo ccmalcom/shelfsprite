@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation';
 import { navRoutesFor, sectionFor } from '@/lib/nav';
 
 const focusRing =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
 
 export default function BottomNav() {
   const pathname = usePathname();

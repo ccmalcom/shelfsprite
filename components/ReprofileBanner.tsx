@@ -123,7 +123,7 @@ export default function ReprofileBanner() {
           <button
             type="button"
             onClick={() => setSummary(null)}
-            className="rounded-md px-2 py-1 font-mono text-xs text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className="rounded-md px-2 py-1 font-mono text-xs text-muted transition-colors hover:text-text focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
           >
             Dismiss
           </button>
@@ -147,7 +147,7 @@ export default function ReprofileBanner() {
           disabled={running}
           className={[
             'inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-semibold text-base transition-all',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
             running
               ? 'cursor-not-allowed bg-warning opacity-70'
               : 'bg-warning hover:opacity-90 active:scale-95',

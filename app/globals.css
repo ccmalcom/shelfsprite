@@ -1,6 +1,69 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  `inline` is load-bearing. Every token below reads a runtime variable (`--bg-rgb`, the per-user
+  `--user-accent`, next/font's `--font-display`), so the utility must resolve it where it is used.
+  A non-inline theme variable would resolve once on :root and hand every descendant that frozen
+  value, ignoring any override set lower in the tree, and `--font-display` / `--font-mono` would
+  refer to themselves.
+*/
+@theme inline {
+  --color-base: rgb(var(--bg-rgb));
+  --color-surface: rgb(var(--surface-rgb));
+  --color-elevated: rgb(var(--elevated-rgb));
+  --color-border: rgb(var(--border-rgb));
+  --color-border-strong: rgb(var(--border-strong-rgb));
+  --color-hairline: rgb(var(--hairline-rgb));
+  --color-text: rgb(var(--text-rgb));
+  --color-muted: rgb(var(--muted-rgb));
+  --color-faint: rgb(var(--faint-rgb));
+
+  --color-accent: rgb(var(--accent-rgb));
+  --color-accent-hover: rgb(var(--accent-hover-rgb));
+  --color-accent-quiet: var(--accent-quiet);
+
+  --color-success: rgb(var(--success-rgb));
+  --color-success-quiet: var(--success-quiet);
+
+  --color-danger: rgb(var(--danger-rgb));
+  --color-danger-quiet: var(--danger-quiet);
+
+  --color-warning: rgb(var(--warning-rgb));
+  --color-warning-quiet: var(--warning-quiet);
+
+  --color-user: var(--user-accent);
+  --color-user-surface: var(--user-surface);
+  --color-user-ink: rgb(var(--user-ink-rgb));
+
+  --font-display: var(--font-display), system-ui, sans-serif;
+  --font-sans: var(--font-body), system-ui, sans-serif;
+  --font-mono: var(--font-mono), monospace;
+}
+
+/*
+  Tailwind 4 changed two defaults this app was built against. Borders default to `currentcolor`
+  instead of gray-200, and buttons default to `cursor: default`. These rules keep the v3 look.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+@utility fade-in {
+  animation: fadeIn 0.25s ease-in-out;
+}
 
 :root {
   /* Ink & Paper structure with Ember & Ivory colors, shared by every route. */
@@ -82,12 +145,7 @@ body {
   cursor: grabbing;
 }
 
-/* Smooth fade for page transitions — disabled when reduced motion is preferred */
-@layer utilities {
-  .fade-in {
-    animation: fadeIn 0.25s ease-in-out;
-  }
-}
+/* Smooth fade for page transitions (the fade-in utility above) — disabled when reduced motion is preferred */
 
 @media (prefers-reduced-motion: no-preference) {
   @keyframes fadeIn {

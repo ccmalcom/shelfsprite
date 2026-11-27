@@ -15,10 +15,10 @@ const variantClasses: Record<Variant, string> = {
   // Dark ink on saturated fills: white on --accent is 3.07:1 (2.68 on hover),
   // --bg on --accent is 5.99:1 (6.86 on hover). Matches the star-filter pattern
   // already shipping in app/(main)/library/page.tsx.
-  primary: 'bg-accent text-[color:var(--bg)] hover:bg-accent-hover',
+  primary: 'bg-accent text-(--bg) hover:bg-accent-hover',
   secondary: 'bg-surface border border-border text-text hover:bg-elevated',
   ghost: 'bg-transparent text-muted hover:text-text hover:bg-surface',
-  danger: 'bg-danger text-[color:var(--bg)] hover:opacity-90',
+  danger: 'bg-danger text-(--bg) hover:opacity-90',
 };
 
 const sizeClasses: Record<Size, string> = {
@@ -28,7 +28,7 @@ const sizeClasses: Record<Size, string> = {
 };
 
 const focusRing =
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
+  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base';
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   (

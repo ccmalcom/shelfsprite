@@ -23,7 +23,7 @@ type SearchOutcome = { query: string; hits: CatalogResult[] } | { query: string;
 
 const inputClass = [
   'w-full rounded-lg border border-border-strong bg-base px-3 py-2 text-sm text-text',
-  'placeholder-faint focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+  'placeholder-faint focus:border-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
   'focus-visible:ring-1 focus-visible:ring-accent',
 ].join(' ');
 
@@ -161,10 +161,10 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                     className={[
                       'flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition',
                       'hover:bg-elevated',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
+                      'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
                     ].join(' ')}
                   >
-                    <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-elevated">
+                    <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-sm bg-elevated">
                       {r.cover_url ? (
                         <Image
                           src={r.cover_url}
@@ -205,7 +205,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
         <>
           {/* Selected book */}
           <div className="flex items-center gap-3 rounded-xl border border-border bg-elevated p-3">
-            <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-surface">
+            <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded-sm bg-surface">
               {selected.cover_url ? (
                 <Image
                   src={selected.cover_url}
@@ -235,7 +235,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                 setReview('');
                 setDateRead('');
               }}
-              className="shrink-0 text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+              className="shrink-0 text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
             >
               Change
             </button>
@@ -254,9 +254,9 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                   onClick={() => setShelf(o.value)}
                   className={[
                     'flex-1 rounded-md px-2 py-1.5 text-sm font-medium transition',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                    'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                     shelf === o.value
-                      ? 'bg-surface text-text shadow'
+                      ? 'bg-surface text-text shadow-sm'
                       : 'text-muted hover:text-text',
                   ].join(' ')}
                 >
@@ -276,7 +276,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                 <button
                   type="button"
                   onClick={() => setRating(0)}
-                  className="text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+                  className="text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
                 >
                   Clear
                 </button>
@@ -323,7 +323,7 @@ export default function AddBookModal({ onAdded, onClose, defaultShelf = 'read' }
                     value={dateRead}
                     max={new Date().toISOString().slice(0, 10)}
                     onChange={(e) => setDateRead(e.target.value)}
-                    className="self-start rounded-lg border border-border bg-base px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent [color-scheme:dark]"
+                    className="self-start rounded-lg border border-border bg-base px-3 py-2 text-sm text-text focus:border-accent focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent scheme-dark"
                   />
                 )}
               </Field>

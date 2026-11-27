@@ -133,7 +133,7 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
         type="button"
         onClick={onClose}
         aria-label="Close"
-        className="absolute right-4 top-4 rounded-full p-1 text-faint hover:bg-elevated hover:text-text focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        className="absolute right-4 top-4 rounded-full p-1 text-faint hover:bg-elevated hover:text-text focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
       >
         <X className="h-4 w-4" />
       </button>
@@ -203,7 +203,7 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
               aria-label="Status"
               value={status}
               onChange={(e) => setStatus(e.target.value as TitleStatus)}
-              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
             >
               {TITLE_STATUSES.map((s) => (
                 <option key={s} value={s}>
@@ -222,7 +222,7 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
                 value={watchedOn}
                 max={todayIso()}
                 onChange={(e) => setWatchedOn(e.target.value)}
-                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent [color-scheme:dark]"
+                className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent scheme-dark"
               />
             </label>
           )}
@@ -253,7 +253,7 @@ export default function TitleDetailModal({ title, duplicateOf, onClose, onCorrec
               value={review}
               onChange={(e) => setReview(e.target.value)}
               rows={3}
-              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
             />
             {title.letterboxd_review !== null && (
               <span className="mt-1 block text-xs text-faint">

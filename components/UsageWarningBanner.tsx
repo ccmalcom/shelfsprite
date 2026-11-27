@@ -27,7 +27,7 @@ export default function UsageWarningBanner() {
           onClick={() => setDismissed(true)}
           className={[
             'rounded-lg px-2 py-1 text-xs font-medium text-warning transition hover:bg-warning/10',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
           ].join(' ')}
         >
           Dismiss

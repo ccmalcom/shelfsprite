@@ -119,7 +119,7 @@ function VerdictControls({
           onChange={(e) => setDraft(e.target.value)}
           rows={2}
           autoFocus
-          className="w-full resize-none rounded-lg border border-user bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+          className="w-full resize-none rounded-lg border border-user bg-elevated px-3 py-2 text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
         />
         <p className="text-xs text-faint">
           Say it your way. It feeds your recommendations directly.

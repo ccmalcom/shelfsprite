@@ -65,7 +65,7 @@ export default function AlreadyReadModal({ title, author, onConfirm, onCancel }:
             <button
               type="button"
               onClick={() => setRating(0)}
-              className="rounded text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="rounded-sm text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
             >
               Clear
             </button>

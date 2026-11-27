@@ -173,7 +173,7 @@ export default function AddTitleModal({
                   value={watchedOn}
                   max={todayIso()}
                   onChange={(e) => setWatchedOn(e.target.value)}
-                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent [color-scheme:dark]"
+                  className="rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent scheme-dark"
                 />
               </label>
             )}
@@ -190,7 +190,7 @@ export default function AddTitleModal({
                 value={review}
                 onChange={(e) => setReview(e.target.value)}
                 rows={3}
-                className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                className="w-full rounded-lg border border-border bg-elevated px-3 py-2 text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
               />
             </label>
 

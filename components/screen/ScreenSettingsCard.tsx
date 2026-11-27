@@ -144,7 +144,7 @@ export default function ScreenSettingsCard() {
           <div className="flex flex-wrap gap-2">
             <Link
               href="/screen"
-              className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-[color:var(--bg)] hover:bg-accent-hover"
+              className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-(--bg) hover:bg-accent-hover"
             >
               Open ScreenSprite
             </Link>

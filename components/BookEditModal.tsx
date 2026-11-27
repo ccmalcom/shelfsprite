@@ -146,7 +146,7 @@ export default function BookEditModal({
             <button
               type="button"
               onClick={() => setDescExpanded((v) => !v)}
-              className="mt-1 text-xs text-accent hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+              className="mt-1 text-xs text-accent hover:underline focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
             >
               {descExpanded ? 'Show less' : 'Show more'}
             </button>
@@ -162,7 +162,7 @@ export default function BookEditModal({
             <button
               type="button"
               onClick={() => setRating(0)}
-              className="text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+              className="text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
             >
               Clear
             </button>
@@ -207,7 +207,7 @@ export default function BookEditModal({
               value={dateRead}
               max={new Date().toISOString().slice(0, 10)}
               onChange={(e) => setDateRead(e.target.value)}
-              className="self-start rounded-lg border border-border bg-base px-3 py-2 text-sm text-text focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent [color-scheme:dark]"
+              className="self-start rounded-lg border border-border bg-base px-3 py-2 text-sm text-text focus:border-accent focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent scheme-dark"
             />
           )}
         </Field>
@@ -221,13 +221,13 @@ export default function BookEditModal({
           aria-checked={exclude}
           onClick={() => setExclude(!exclude)}
           className={[
-            'inline-flex h-5 w-9 flex-shrink-0 items-center rounded-full px-0.5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+            'inline-flex h-5 w-9 shrink-0 items-center rounded-full px-0.5 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
             exclude ? 'bg-accent' : 'bg-border',
           ].join(' ')}
         >
           <span
             className={[
-              'h-4 w-4 rounded-full bg-white shadow transition-transform',
+              'h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
               exclude ? 'translate-x-4' : 'translate-x-0',
             ].join(' ')}
           />
@@ -248,7 +248,7 @@ export default function BookEditModal({
             type="button"
             onClick={onClose}
             disabled={busy}
-            className="text-sm font-medium text-faint transition hover:text-muted disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+            className="text-sm font-medium text-faint transition hover:text-muted disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
           >
             Finish later
           </button>
@@ -258,7 +258,7 @@ export default function BookEditModal({
               type="button"
               onClick={handleRemove}
               disabled={busy}
-              className="text-sm font-semibold text-danger transition hover:opacity-80 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger rounded"
+              className="text-sm font-semibold text-danger transition hover:opacity-80 disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-danger rounded-sm"
             >
               {removing ? 'Removing\u2026' : 'Confirm remove'}
             </button>
@@ -267,7 +267,7 @@ export default function BookEditModal({
               type="button"
               onClick={() => setRemoveArmed(true)}
               disabled={busy}
-              className="text-sm font-medium text-faint transition hover:text-danger disabled:opacity-50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-danger rounded"
+              className="text-sm font-medium text-faint transition hover:text-danger disabled:opacity-50 focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-danger rounded-sm"
             >
               Remove
             </button>

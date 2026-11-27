@@ -96,7 +96,7 @@ export function GenreSection({
   const filterBtnClass = (active: boolean) =>
     [
       'rounded-md px-2.5 py-1 text-xs transition',
-      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+      'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
       active ? 'bg-elevated text-text' : 'text-muted hover:text-text',
     ].join(' ');
 

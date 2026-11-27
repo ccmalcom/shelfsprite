@@ -271,7 +271,7 @@ Re-profiling is **never automatic** in the UI: editing a book marks the profile 
 
 ## Design system
 
-CSS variables in `globals.css`: `--bg #161412`, `--accent #FF5C3A` (persimmon), `--user-accent` per-user at runtime. Mirrored into `tailwind.config.ts` as token classes (`bg-base`, `text-accent`, etc.). Fonts: Bricolage Grotesque (display), Inter (body), JetBrains Mono (data labels) loaded via `next/font/google`.
+CSS variables in `globals.css`: `--bg #161412`, `--accent #FF5C3A` (persimmon), `--user-accent` per-user at runtime. Mirrored into the `@theme inline` block at the top of `globals.css` as token classes (`bg-base`, `text-accent`, etc.). Fonts: Bricolage Grotesque (display), Inter (body), JetBrains Mono (data labels) loaded via `next/font/google`.
 
 ## Mobile / tablet
 

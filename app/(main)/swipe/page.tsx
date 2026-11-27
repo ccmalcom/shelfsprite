@@ -303,9 +303,9 @@ export default function SwipePage() {
               aria-label="Not interested"
               className={[
                 'flex h-14 w-14 items-center justify-center rounded-full',
-                'border-2 border-danger bg-surface text-danger shadow',
+                'border-2 border-danger bg-surface text-danger shadow-sm',
                 'transition hover:bg-danger/10 active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
               <span className="text-xl font-bold" aria-hidden="true">
@@ -320,9 +320,9 @@ export default function SwipePage() {
               aria-label="Already read"
               className={[
                 'flex h-12 w-12 items-center justify-center self-center rounded-full',
-                'border-2 border-warning bg-surface text-warning shadow',
+                'border-2 border-warning bg-surface text-warning shadow-sm',
                 'transition hover:bg-warning/10 active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-warning focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
               <span className="text-base font-mono font-bold" aria-hidden="true">
@@ -337,9 +337,9 @@ export default function SwipePage() {
               aria-label="Add to to-read list"
               className={[
                 'flex h-14 w-14 items-center justify-center rounded-full',
-                'border-2 border-success bg-surface text-success shadow',
+                'border-2 border-success bg-surface text-success shadow-sm',
                 'transition hover:bg-success/10 active:scale-95',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-success focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
               <span className="text-xl font-bold" aria-hidden="true">
@@ -362,7 +362,7 @@ export default function SwipePage() {
                 className={[
                   'rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-muted',
                   'transition hover:border-danger/60 hover:text-danger active:scale-95',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
                 ].join(' ')}
               >
                 Less like this
@@ -376,7 +376,7 @@ export default function SwipePage() {
                 className={[
                   'rounded-full border border-border bg-surface px-4 py-1.5 text-xs font-medium text-muted',
                   'transition hover:border-success/60 hover:text-success active:scale-95',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
                 ].join(' ')}
               >
                 More like this

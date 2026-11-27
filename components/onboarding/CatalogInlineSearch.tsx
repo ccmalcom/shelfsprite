@@ -55,7 +55,7 @@ export default function CatalogInlineSearch({
         onChange={(e) => setQuery(e.target.value)}
         aria-label={label}
         placeholder="Search by title or author"
-        className="w-full rounded-lg border border-border-strong bg-base px-3 py-2 text-sm text-text placeholder-faint focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+        className="w-full rounded-lg border border-border-strong bg-base px-3 py-2 text-sm text-text placeholder-faint focus:border-accent focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
       />
       {searching && <p className="text-xs text-muted">Searching the catalogs.</p>}
       {error && <p className="text-xs text-danger">{error}</p>}
@@ -69,7 +69,7 @@ export default function CatalogInlineSearch({
               <button
                 type="button"
                 onClick={() => onPick(h)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left transition hover:bg-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <BookCover book={h} className="h-12 w-8" />
                 <span className="min-w-0 flex-1">

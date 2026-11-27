@@ -25,7 +25,7 @@ const FORMAT_LABEL: Record<string, string> = {
 
 const selectClass = [
   'w-full rounded-lg border border-border bg-base px-3 py-2 text-sm text-text',
-  'focus:border-accent focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+  'focus:border-accent focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
 ].join(' ');
 
 export default function ImportModal({

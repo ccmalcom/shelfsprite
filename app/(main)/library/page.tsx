@@ -74,7 +74,7 @@ function SearchInput({ value, onChange }: { value: string; onChange: (v: string)
       className={[
         'flex-1 min-w-0 rounded-lg border border-border-strong bg-elevated px-3 py-2',
         'text-sm text-text placeholder-faint',
-        'focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+        'focus:border-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
       ].join(' ')}
     />
   );
@@ -102,7 +102,7 @@ function SortSelect<T extends string>({
       onChange={(e) => onChange(e.target.value as T)}
       className={[
         'rounded-lg border border-border-strong bg-elevated px-3 py-2',
-        'text-sm text-muted focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+        'text-sm text-muted focus:border-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
       ].join(' ')}
     >
       {options.map((o) => (
@@ -204,7 +204,7 @@ function ReadTab({ books }: { books: Book[] }) {
                   aria-label={`Filter by ${star} stars`}
                   aria-pressed={filterStar === star}
                   onClick={() => setFilterStar(filterStar === star ? null : star)}
-                  className={`min-h-10 rounded border border-border-strong px-3 text-sm ${filterStar === star ? 'bg-accent text-[color:var(--bg)]' : 'text-muted'}`}
+                  className={`min-h-10 rounded-sm border border-border-strong px-3 text-sm ${filterStar === star ? 'bg-accent text-(--bg)' : 'text-muted'}`}
                 >
                   {star} ★
                 </button>
@@ -261,7 +261,7 @@ function ReadTab({ books }: { books: Book[] }) {
                 onClick={() => setEditing(book)}
                 className={[
                   'library-read-book flex flex-1 min-w-0 items-center gap-4 text-left',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base rounded',
+                  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base rounded-sm',
                 ].join(' ')}
               >
                 <CoverThumb book={book} size="sm" />
@@ -304,7 +304,7 @@ function ReadTab({ books }: { books: Book[] }) {
                   }}
                   className={[
                     'rounded-full p-3 transition active:scale-95',
-                    'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                    'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                     book.is_favorite ? 'text-warning' : 'text-muted hover:text-warning/70',
                   ].join(' ')}
                 >
@@ -448,7 +448,7 @@ function ToReadTab({ books }: { books: Book[] }) {
             {books.length >= 2 && (
               <Link
                 href="/next-read"
-                className="inline-flex min-h-10 items-center rounded-lg border border-border bg-surface px-3 text-sm text-text transition hover:bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="inline-flex min-h-10 items-center rounded-lg border border-border bg-surface px-3 text-sm text-text transition hover:bg-elevated focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Pick my next read
               </Link>
@@ -469,7 +469,7 @@ function ToReadTab({ books }: { books: Book[] }) {
                       onClick={() => setDetail(book)}
                       className={[
                         'flex w-full gap-4 p-4 text-left',
-                        'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded-xl',
+                        'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-xl',
                         'hover:bg-elevated transition',
                       ].join(' ')}
                     >
@@ -487,7 +487,7 @@ function ToReadTab({ books }: { books: Book[] }) {
                     </button>
                     {/* Outside the row's button: a link can't sit inside a button. Indented
                         to line up with the title (md cover width plus the row gap). */}
-                    <div className="-mt-2 flex flex-wrap gap-1.5 pb-3 pl-[5.5rem] pr-4">
+                    <div className="-mt-2 flex flex-wrap gap-1.5 pb-3 pl-22 pr-4">
                       <BookLinkPills links={shelfLinks(book)} size="sm" />
                     </div>
                   </li>
@@ -666,7 +666,7 @@ function CurrentlyReadingTab({ books }: { books: Book[] }) {
                           className={[
                             'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-faint',
                             'transition hover:border-muted hover:text-text disabled:opacity-50',
-                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                            'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                           ].join(' ')}
                         >
                           Did not finish
@@ -811,7 +811,7 @@ function DnfTab({ books }: { books: Book[] }) {
                       <div className="flex items-center gap-2">
                         <p className="text-sm text-muted">{book.author ?? 'Unknown author'}</p>
                         {book.exclude_from_profile && (
-                          <span className="rounded px-1.5 py-0.5 text-xs font-medium bg-border text-faint">
+                          <span className="rounded-sm px-1.5 py-0.5 text-xs font-medium bg-border text-faint">
                             excluded
                           </span>
                         )}
@@ -829,7 +829,7 @@ function DnfTab({ books }: { books: Book[] }) {
                           className={[
                             'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
                             'transition hover:border-muted hover:text-text disabled:opacity-50',
-                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                            'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                           ].join(' ')}
                         >
                           Try again
@@ -841,7 +841,7 @@ function DnfTab({ books }: { books: Book[] }) {
                           className={[
                             'rounded-md border border-success/40 bg-success/10 px-2.5 py-1 text-xs font-medium text-success',
                             'transition hover:bg-success/20 disabled:opacity-50',
-                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success',
+                            'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-success',
                           ].join(' ')}
                         >
                           Finished it
@@ -853,7 +853,7 @@ function DnfTab({ books }: { books: Book[] }) {
                           className={[
                             'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
                             'transition hover:border-muted hover:text-text disabled:opacity-50',
-                            'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                            'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                           ].join(' ')}
                         >
                           {book.app_review ? 'Edit note' : 'Add note'}
@@ -1035,7 +1035,7 @@ function RejectedTab({ recs }: { recs: Recommendation[] }) {
                     className={[
                       'rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted',
                       'transition hover:border-muted hover:text-text',
-                      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                      'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                     ].join(' ')}
                   >
                     {rec.user_note ? 'Edit note' : 'Add note'}
@@ -1068,7 +1068,7 @@ function RejectedTab({ recs }: { recs: Recommendation[] }) {
               className={[
                 'w-full rounded-lg border border-border bg-elevated px-3 py-2',
                 'text-sm text-text placeholder:text-faint',
-                'focus:outline-none focus:ring-1 focus:ring-accent',
+                'focus:outline-hidden focus:ring-1 focus:ring-accent',
                 'resize-none',
               ].join(' ')}
               rows={3}
@@ -1328,7 +1328,7 @@ function LibraryInner() {
             className={[
               'flex shrink-0 items-center justify-center gap-2 whitespace-nowrap',
               'border-b-2 px-3 py-3 text-sm font-medium transition',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-elevated',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-elevated',
               activeTab === t.id
                 ? 'border-accent text-text'
                 : 'border-transparent text-muted hover:text-text',

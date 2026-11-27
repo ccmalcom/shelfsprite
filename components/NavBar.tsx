@@ -73,7 +73,7 @@ export default function NavBar() {
     <>
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[70] focus:rounded focus:bg-surface focus:p-3"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-70 focus:rounded-sm focus:bg-surface focus:p-3"
       >
         Skip to content
       </a>
@@ -85,7 +85,7 @@ export default function NavBar() {
           // the book logo is ~41.6 px tall and the ScreenSprite mark 28 px; on a phone the switch
           // sits beside a 112 px logo or a 140 px mark.
           className={[
-            'shrink-0 rounded lg:flex lg:h-[42px] lg:items-center',
+            'shrink-0 rounded-sm lg:flex lg:h-[42px] lg:items-center',
             showSwitch ? 'min-w-[141px] lg:min-w-0' : '',
           ].join(' ')}
         >

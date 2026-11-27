@@ -156,7 +156,7 @@ export function TraitsSection({
   const filterBtnClass = (active: boolean) =>
     [
       'rounded-md px-2.5 py-1 text-xs capitalize transition',
-      'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+      'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
       active ? 'bg-elevated text-text' : 'text-muted hover:text-text',
     ].join(' ');
 
@@ -220,7 +220,7 @@ export function TraitsSection({
             type="button"
             aria-expanded={showDismissed}
             onClick={() => setShowDismissed((v) => !v)}
-            className="rounded font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className="rounded-sm font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
           >
             {showDismissed ? 'Hide' : 'Show'} dismissed ({dismissed.length})
           </button>

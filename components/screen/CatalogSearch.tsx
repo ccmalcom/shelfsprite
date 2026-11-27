@@ -74,7 +74,7 @@ export default function CatalogSearch({
               }}
               className={[
                 'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-                type === t ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text',
+                type === t ? 'bg-surface text-text shadow-xs' : 'text-muted hover:text-text',
               ].join(' ')}
             >
               {t === 'tv' ? 'TV show' : 'Film'}

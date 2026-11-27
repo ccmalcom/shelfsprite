@@ -95,7 +95,7 @@ export default function BookDetailModal({
         className={[
           'absolute right-4 top-4 rounded-full p-1 text-faint',
           'hover:bg-elevated hover:text-text',
-          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+          'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
         ].join(' ')}
       >
         <X className="h-4 w-4" />
@@ -142,7 +142,7 @@ export default function BookDetailModal({
                 'inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-accent/10',
                 'px-3 py-1 text-xs font-medium text-accent',
                 'transition hover:bg-accent/20',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
               ].join(' ')}
             >
               Find similar reads
@@ -162,7 +162,7 @@ export default function BookDetailModal({
               className={[
                 'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-muted',
                 'transition hover:border-muted hover:text-text disabled:opacity-50',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
               ].join(' ')}
             >
               Start reading
@@ -174,7 +174,7 @@ export default function BookDetailModal({
               className={[
                 'rounded-md border border-success/40 bg-success/10 px-3 py-1.5 text-xs font-medium text-success',
                 'transition hover:bg-success/20 disabled:opacity-50',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-success',
+                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-success',
               ].join(' ')}
             >
               Mark finished
@@ -186,7 +186,7 @@ export default function BookDetailModal({
               className={[
                 'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-faint',
                 'transition hover:border-muted hover:text-text disabled:opacity-50',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
               ].join(' ')}
             >
               Did not finish
@@ -211,7 +211,7 @@ export default function BookDetailModal({
                 className={[
                   'rounded-md border border-border px-3 py-1.5 text-xs font-medium text-faint',
                   'transition hover:border-danger/60 hover:text-danger disabled:opacity-50',
-                  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                  'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                 ].join(' ')}
               >
                 Remove

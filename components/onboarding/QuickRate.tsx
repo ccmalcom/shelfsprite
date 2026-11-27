@@ -164,7 +164,7 @@ export default function QuickRate({
                 onClick={() => toggleGenre(g.id)}
                 className={[
                   'rounded-full border px-3 py-1.5 text-sm transition',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
+                  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface',
                   on
                     ? 'border-accent bg-accent-quiet text-accent'
                     : 'border-border text-muted hover:border-muted hover:text-text',
@@ -218,7 +218,7 @@ export default function QuickRate({
                 t.rating > 0 ? 'border-accent/60' : 'border-border',
               ].join(' ')}
             >
-              <BookCover book={t.book} className="mb-2 aspect-[2/3] w-full" />
+              <BookCover book={t.book} className="mb-2 aspect-2/3 w-full" />
               <p className="line-clamp-2 text-sm font-medium leading-snug text-text">
                 {t.book.title}
               </p>
@@ -238,7 +238,7 @@ export default function QuickRate({
                     type="button"
                     onClick={() => rate(t.key, 0)}
                     aria-label={`Clear rating for ${t.book.title}`}
-                    className="rounded text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+                    className="rounded-sm text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
                   >
                     Clear
                   </button>

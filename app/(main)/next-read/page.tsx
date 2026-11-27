@@ -117,7 +117,7 @@ export default function NextReadPage() {
                   key={pick.book.id}
                   className="flex gap-4 rounded-xl border border-border bg-surface p-4 sm:p-5"
                 >
-                  <BookCover book={pick.book} className="h-28 w-[4.5rem] shrink-0" />
+                  <BookCover book={pick.book} className="h-28 w-18 shrink-0" />
                   <div className="min-w-0 flex-1">
                     <p className="font-mono text-xs uppercase tracking-widest text-faint">
                       {pick.rank === 1 ? 'Read this next' : `Then #${pick.rank}`}

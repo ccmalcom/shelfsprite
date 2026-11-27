@@ -90,7 +90,7 @@ function ArchetypeExplainerModal({ onClose }: { onClose: () => void }) {
             <ul className="mt-4 grid grid-cols-4 gap-3">
               {READER_SPRITE_CODES.map((code) => (
                 <li key={code} className="flex flex-col items-center gap-1">
-                  <ReaderSprite code={code} size={72} className="h-auto w-full max-w-[4.5rem]" />
+                  <ReaderSprite code={code} size={72} className="h-auto w-full max-w-18" />
                   <span className="font-mono text-[0.625rem] text-faint">{code}</span>
                 </li>
               ))}
@@ -231,9 +231,9 @@ export function TasteHero({ compact = false, bookSubjects = true }: TasteHeroPro
     return (
       <div className={['rounded-2xl border border-border bg-surface', padClass].join(' ')}>
         <div className="space-y-4">
-          <div className="h-3 w-24 rounded bg-elevated motion-safe:animate-pulse" />
-          <div className="h-9 w-3/4 rounded bg-elevated motion-safe:animate-pulse" />
-          <div className="h-9 w-1/2 rounded bg-elevated motion-safe:animate-pulse" />
+          <div className="h-3 w-24 rounded-sm bg-elevated motion-safe:animate-pulse" />
+          <div className="h-9 w-3/4 rounded-sm bg-elevated motion-safe:animate-pulse" />
+          <div className="h-9 w-1/2 rounded-sm bg-elevated motion-safe:animate-pulse" />
           <div className="mt-4 flex gap-2">
             {[1, 2, 3].map((i) => (
               <div
@@ -279,8 +279,8 @@ export function TasteHero({ compact = false, bookSubjects = true }: TasteHeroPro
           href="/profile"
           className={[
             'mt-6 inline-flex items-center gap-2 rounded-lg bg-accent text-sm font-semibold',
-            'text-[color:var(--bg)] hover:bg-accent-hover active:scale-95 transition-all',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+            'text-(--bg) hover:bg-accent-hover active:scale-95 transition-all',
+            'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
             'focus-visible:ring-offset-2 focus-visible:ring-offset-base px-6 py-3',
           ].join(' ')}
         >

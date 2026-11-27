@@ -123,13 +123,13 @@ export function StarRating({
                 onMouseEnter={() => setHovered(v)}
                 onKeyDown={handleKeyDown}
                 className={[
-                  'absolute inset-y-0 cursor-pointer rounded',
+                  'absolute inset-y-0 cursor-pointer rounded-sm',
                   starOptions.length === 1
                     ? 'inset-x-0'
                     : v < star
                       ? 'left-0 w-1/2'
                       : 'right-0 w-1/2',
-                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
+                  'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
                   'focus-visible:ring-offset-1 focus-visible:ring-offset-base',
                 ].join(' ')}
               />
