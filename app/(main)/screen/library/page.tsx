@@ -148,7 +148,7 @@ function ScreenLibraryInner() {
           <div className="mt-5 flex flex-wrap justify-center gap-3">
             <Link
               href="/settings#screen"
-              className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-[color:var(--bg)] hover:bg-accent-hover"
+              className="inline-flex items-center justify-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-(--bg) hover:bg-accent-hover"
             >
               Import from Letterboxd
             </Link>
@@ -176,7 +176,7 @@ function ScreenLibraryInner() {
                   className={[
                     'flex shrink-0 items-center justify-center gap-2 whitespace-nowrap',
                     'border-b-2 px-3 py-3 text-sm font-medium transition',
-                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-elevated',
+                    'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-elevated',
                     active
                       ? 'border-accent text-text'
                       : 'border-transparent text-muted hover:text-text',
@@ -222,9 +222,9 @@ function ScreenLibraryInner() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className={[
-                'min-w-[12rem] flex-1 rounded-lg border border-border-strong bg-elevated px-3 py-2',
+                'min-w-48 flex-1 rounded-lg border border-border-strong bg-elevated px-3 py-2',
                 'text-sm text-text placeholder-faint',
-                'focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'focus:border-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             />
             <div
@@ -241,7 +241,7 @@ function ScreenLibraryInner() {
                   className={[
                     'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
                     type === f.value
-                      ? 'bg-surface text-text shadow-sm'
+                      ? 'bg-surface text-text shadow-xs'
                       : 'text-muted hover:text-text',
                   ].join(' ')}
                 >
@@ -255,7 +255,7 @@ function ScreenLibraryInner() {
               onChange={(e) => setSort(e.target.value as TitleSort)}
               className={[
                 'rounded-lg border border-border-strong bg-elevated px-3 py-2',
-                'text-sm text-muted focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+                'text-sm text-muted focus:border-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               ].join(' ')}
             >
               {TITLE_SORTS.map((s) => (
@@ -281,7 +281,7 @@ function ScreenLibraryInner() {
                     type="button"
                     aria-label={tileLabel(t)}
                     onClick={() => setOpenId(t.id)}
-                    className="block w-full rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    className="block w-full rounded-lg text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
                   >
                     <TitleTile
                       title={t.title}

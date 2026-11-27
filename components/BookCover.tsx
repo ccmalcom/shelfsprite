@@ -13,7 +13,9 @@ export default function BookCover({
   const [failed, setFailed] = useState<string | null>(null);
   const src = book.cover_url;
   return (
-    <div className={`relative shrink-0 overflow-hidden rounded bg-elevated shadow-sm ${className}`}>
+    <div
+      className={`relative shrink-0 overflow-hidden rounded-sm bg-elevated shadow-xs ${className}`}
+    >
       {src && failed !== src ? (
         <Image
           src={src}

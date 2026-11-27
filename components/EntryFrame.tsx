@@ -4,7 +4,7 @@ import ShelfSprite from '@/components/ShelfSprite';
 export default function EntryFrame({ children }: { children: React.ReactNode }) {
   return (
     <main className="entry-frame min-h-screen bg-base px-5 py-8 sm:px-8">
-      <a href="/welcome" aria-label="ShelfSprite home" className="inline-block rounded">
+      <a href="/welcome" aria-label="ShelfSprite home" className="inline-block rounded-sm">
         <BrandLogo priority sizes="180px" className="h-auto w-40 sm:w-44" />
       </a>
       <div className="mx-auto grid w-full max-w-5xl gap-10 py-12 sm:py-20 lg:grid-cols-2 lg:items-center lg:gap-24">

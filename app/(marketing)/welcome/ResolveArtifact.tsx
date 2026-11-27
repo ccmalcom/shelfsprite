@@ -66,7 +66,7 @@ export default function ResolveArtifact() {
             width={200}
             height={300}
             sizes="72px"
-            className="h-[108px] w-[72px] shrink-0 rounded border border-border object-cover"
+            className="h-[108px] w-[72px] shrink-0 rounded-sm border border-border object-cover"
           />
           <div className="flex min-w-0 flex-col gap-1.5">
             <div>
@@ -89,7 +89,7 @@ export default function ResolveArtifact() {
           <Field label="length">245 pages</Field>
           <Field label="subjects">fantasy · labyrinths · amnesia</Field>
           <Field label="match">
-            <span className="rounded bg-success-quiet px-1.5 py-0.5 text-success">HIGH</span>
+            <span className="rounded-sm bg-success-quiet px-1.5 py-0.5 text-success">HIGH</span>
           </Field>
         </div>
       </div>

@@ -81,7 +81,7 @@ export function RevealFrame({
     <div
       ref={frameRef}
       style={{ ['--user-accent' as string]: accent }}
-      className="fixed inset-0 z-[60] flex flex-col items-center justify-center overflow-y-auto bg-base px-6 py-10 text-center"
+      className="fixed inset-0 z-60 flex flex-col items-center justify-center overflow-y-auto bg-base px-6 py-10 text-center"
       role="dialog"
       aria-modal="true"
       aria-label="Your reading profile reveal"
@@ -90,7 +90,7 @@ export function RevealFrame({
       <div
         ref={contentRef}
         tabIndex={-1}
-        className="flex w-full max-w-xl flex-1 flex-col items-center justify-center focus:outline-none"
+        className="flex w-full max-w-xl flex-1 flex-col items-center justify-center focus:outline-hidden"
       >
         {children}
       </div>
@@ -118,7 +118,7 @@ export function RevealFrame({
         <button
           type="button"
           onClick={onSkip}
-          className="mt-4 rounded font-mono text-[13px] text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base"
+          className="mt-4 rounded-sm font-mono text-[13px] text-faint transition-colors hover:text-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base"
         >
           Skip to my profile
         </button>
@@ -141,7 +141,7 @@ export function RevealButton({
   disabled?: boolean;
 }) {
   const base =
-    'mt-8 inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base disabled:cursor-wait disabled:opacity-70';
+    'mt-8 inline-flex items-center justify-center rounded-lg px-6 py-3 text-sm font-semibold transition-all active:scale-95 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base disabled:cursor-wait disabled:opacity-70';
   const styles =
     variant === 'primary' ? 'bg-user text-base hover:opacity-90' : 'text-muted hover:text-text';
   return (

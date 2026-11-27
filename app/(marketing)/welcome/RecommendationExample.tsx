@@ -18,7 +18,7 @@ export default function RecommendationExample() {
             className="flex h-36 w-24 shrink-0 flex-col justify-between rounded-r-md border-l-4 border-white/10 bg-[#3d4a3a] p-2 shadow-lg sm:h-40 sm:w-28"
             aria-hidden="true"
           >
-            <p className="break-words font-display text-xs font-bold leading-snug text-white sm:text-[13px]">
+            <p className="wrap-break-word font-display text-xs font-bold leading-snug text-white sm:text-[13px]">
               Annihilation
             </p>
             <p className="text-[10px] leading-relaxed text-white/80">Jeff VanderMeer</p>

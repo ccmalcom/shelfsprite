@@ -39,7 +39,7 @@ const CHIP = 'inline-flex max-w-full items-center gap-1 rounded-full border px-2
 const LIVE_CHIP = [
   CHIP,
   'border-border text-muted hover:border-accent hover:text-accent',
-  'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+  'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
 ].join(' ');
 const GONE_CHIP = `${CHIP} border-dashed border-border text-faint`;
 

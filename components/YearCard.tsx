@@ -58,7 +58,7 @@ export default function YearCard({ compact = false }: { compact?: boolean }) {
     return (
       <Card>
         <div
-          className="h-24 rounded bg-elevated motion-safe:animate-pulse"
+          className="h-24 rounded-sm bg-elevated motion-safe:animate-pulse"
           role="status"
           aria-label="Loading your goals"
         />
@@ -189,7 +189,7 @@ export default function YearCard({ compact = false }: { compact?: boolean }) {
                   {g.done && <Badge variant="success">Done</Badge>}
                 </div>
                 {g.unknown > 0 && (
-                  <p className="ml-[7.75rem] mt-1 text-xs text-faint">
+                  <p className="ml-31 mt-1 text-xs text-faint">
                     {g.unknown} books have no page count.
                   </p>
                 )}

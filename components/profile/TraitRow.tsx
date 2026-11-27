@@ -172,7 +172,7 @@ export function TraitRow({ trait, bookMap, open, onToggle, titleEvidence }: Trai
         onClick={handleHeaderClick}
         className={[
           'flex w-full items-start gap-3 rounded-xl p-4 text-left',
-          'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+          'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
         ].join(' ')}
       >
         <Badge variant={polarityVariant} className="mt-0.5 shrink-0">
@@ -225,7 +225,7 @@ export function TraitRow({ trait, bookMap, open, onToggle, titleEvidence }: Trai
               rows={1}
               className={[
                 'w-full resize-none rounded-lg border border-accent bg-elevated px-3 py-2',
-                'text-sm text-text focus:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'text-sm text-text focus:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
               ].join(' ')}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void save();

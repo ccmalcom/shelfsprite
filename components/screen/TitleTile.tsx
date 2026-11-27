@@ -37,7 +37,7 @@ export default function TitleTile({
 
   return (
     <div
-      className={['relative aspect-[2/3] overflow-hidden rounded-lg bg-elevated', className].join(
+      className={['relative aspect-2/3 overflow-hidden rounded-lg bg-elevated', className].join(
         ' '
       )}
     >

@@ -33,8 +33,8 @@ export default function SectionSwitch({
             aria-current={current ? 'true' : undefined}
             className={[
               'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent',
-              current ? 'bg-surface text-text shadow-sm' : 'text-muted hover:text-text',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent',
+              current ? 'bg-surface text-text shadow-xs' : 'text-muted hover:text-text',
             ].join(' ')}
           >
             {o.label}

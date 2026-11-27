@@ -151,7 +151,7 @@ function Group({
                 aria-label={`Add ${s.value}`}
                 disabled={disabled}
                 onClick={() => add(s.value)}
-                className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
+                className="rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50"
               >
                 <Badge>
                   {s.value} &middot; {s.count}

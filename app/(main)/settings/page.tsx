@@ -91,7 +91,7 @@ function DangerAction({
             className={[
               'rounded-lg border border-danger/60 px-3 py-2 text-sm font-medium text-danger',
               'transition hover:bg-danger/10',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-base',
             ].join(' ')}
           >
             {buttonLabel}

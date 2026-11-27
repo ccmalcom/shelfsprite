@@ -11,8 +11,8 @@
   `Search title or author\u2026` in production, because the escape sat in a bare
   `placeholder="\u2026"`. Put such a value in an expression container instead, so the escape is
   processed and the source stays ASCII: `placeholder={'\u2026'}`.
-- **`text-base` is a COLOR, not a font size.** `tailwind.config.ts` registers a color named `base`
-  (`var(--bg)`), and Tailwind's `text-*` namespace serves both `fontSize` and `textColor` with
+- **`text-base` is a COLOR, not a font size.** The `@theme` block in `app/globals.css` registers a color named
+  `base` (`--bg-rgb`), and Tailwind's `text-*` namespace serves both `fontSize` and `textColor` with
   `textColor` registered later, so `text-base` compiles to `color: var(--bg)` and emits no font
   size at all. Written for emphasis on a colored surface (`bg-accent text-base`) that is correct
   and intentional. Written meaning "1rem body text" it paints the copy in the page background and

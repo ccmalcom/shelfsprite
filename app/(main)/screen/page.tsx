@@ -169,7 +169,7 @@ export default function ScreenForYouPage() {
                 className={[
                   'rounded-md px-3 py-1.5 text-xs font-semibold transition-colors',
                   filter === f.value
-                    ? 'bg-surface text-text shadow-sm'
+                    ? 'bg-surface text-text shadow-xs'
                     : 'text-muted hover:text-text',
                 ].join(' ')}
               >

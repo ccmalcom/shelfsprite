@@ -443,7 +443,7 @@ export function UploadStep({
             className={[
               'w-full rounded-lg border border-border px-4 py-3 text-left transition',
               'hover:border-muted',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+              'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
             ].join(' ')}
           >
             <span className="block text-sm font-medium text-text">{o.title}</span>
@@ -620,7 +620,7 @@ export function ManualStep({
               key={b.id}
               className="flex items-center gap-3 rounded-lg border border-border bg-base p-2.5"
             >
-              <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded bg-elevated">
+              <div className="relative h-12 w-9 shrink-0 overflow-hidden rounded-sm bg-elevated">
                 {b.cover_url ? (
                   <Image src={b.cover_url} alt="" fill className="object-cover" unoptimized />
                 ) : (
@@ -646,7 +646,7 @@ export function ManualStep({
                 type="button"
                 onClick={() => void handleRemove(b)}
                 aria-label={`Remove ${b.title}`}
-                className="shrink-0 rounded p-1 text-faint transition hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                className="shrink-0 rounded-sm p-1 text-faint transition hover:text-danger focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>

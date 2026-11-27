@@ -81,7 +81,7 @@ export default function FeedbackModal({ trigger, runId, heading, onClose, onReso
               disabled={submitting}
               className={[
                 'rounded-lg border px-4 py-2 text-sm font-medium transition-colors',
-                'focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent',
+                'focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent',
                 'disabled:opacity-50 disabled:cursor-not-allowed',
                 category === value
                   ? 'border-accent bg-accent/10 text-accent'

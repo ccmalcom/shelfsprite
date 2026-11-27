@@ -111,8 +111,8 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
         title="Your taste profile"
         description={
           screenEnabled
-            ? 'What your books, films and shows have in common, and what makes a story work for you. Keep the parts that ring true. Correct the rest.'
-            : 'What your books have in common, and what makes a story work for you. Keep the parts that ring true. Correct the rest.'
+            ? 'What your books, films and shows have in common, and what makes a story work for you. Keep the parts that ring-3 true. Correct the rest.'
+            : 'What your books have in common, and what makes a story work for you. Keep the parts that ring-3 true. Correct the rest.'
         }
       />
       <div className="space-y-3">
@@ -124,7 +124,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
           {me?.is_admin && (
             <Link
               href="/admin"
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+              className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
             >
               <Shield size={14} aria-hidden="true" />
               Admin
@@ -132,7 +132,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
           )}
           <Link
             href="/settings"
-            className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent"
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-xs text-faint transition-colors hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent"
           >
             <Settings size={14} aria-hidden="true" />
             Settings
@@ -144,7 +144,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
             <button
               type="button"
               onClick={() => setRevealOpen(true)}
-              className="font-mono text-xs text-faint hover:text-muted transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+              className="font-mono text-xs text-faint hover:text-muted transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
             >
               Replay my reveal
             </button>
@@ -181,7 +181,7 @@ export function ProfileView({ section = 'books' }: { section?: 'books' | 'screen
                   <button
                     type="button"
                     onClick={() => void retryTitles()}
-                    className="underline underline-offset-4 hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+                    className="underline underline-offset-4 hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
                   >
                     Try again
                   </button>

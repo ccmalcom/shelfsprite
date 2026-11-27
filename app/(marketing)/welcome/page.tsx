@@ -19,7 +19,7 @@ import ProfileExample from './ProfileExample';
  * overridden here so the tab reads the same everywhere. No Open Graph image: that is a separate
  * design task with its own asset pipeline.
  *
- * Never write `text-base` on this page. `base` is a registered COLOR token (tailwind.config.ts),
+ * Never write `text-base` on this page. `base` is a registered COLOR token (@theme in globals.css),
  * and Tailwind resolves the shared `text-*` namespace to textColor over fontSize — so
  * `sm:text-base` silently paints body copy in the page background color. Use an explicit size.
  */

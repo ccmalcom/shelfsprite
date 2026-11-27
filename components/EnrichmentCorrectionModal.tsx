@@ -105,7 +105,7 @@ export default function EnrichmentCorrectionModal({
 
       {/* Current (possibly wrong) match, for context */}
       <div className="mb-4 flex items-center gap-3 rounded-xl border border-border bg-elevated p-3">
-        <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-surface">
+        <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded-sm bg-surface">
           {book.cover_url ? (
             <Image
               src={book.cover_url}
@@ -138,7 +138,7 @@ export default function EnrichmentCorrectionModal({
             aria-label="Search for the correct book by title or author"
             className={[
               'w-full rounded-lg border border-border-strong bg-base px-3 py-2 text-sm text-text',
-              'placeholder-faint focus:border-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
+              'placeholder-faint focus:border-accent focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-base',
               'focus-visible:ring-1 focus-visible:ring-accent',
             ].join(' ')}
           />
@@ -162,10 +162,10 @@ export default function EnrichmentCorrectionModal({
                     className={[
                       'flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition',
                       'hover:bg-elevated',
-                      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
+                      'focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1 focus-visible:ring-offset-surface',
                     ].join(' ')}
                   >
-                    <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded bg-elevated">
+                    <div className="relative h-14 w-10 shrink-0 overflow-hidden rounded-sm bg-elevated">
                       {r.cover_url ? (
                         <Image
                           src={r.cover_url}
@@ -202,7 +202,7 @@ export default function EnrichmentCorrectionModal({
       ) : (
         <>
           <div className="flex items-center gap-3 rounded-xl border border-border bg-elevated p-3">
-            <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded bg-surface">
+            <div className="relative h-16 w-11 shrink-0 overflow-hidden rounded-sm bg-surface">
               {selected.cover_url ? (
                 <Image
                   src={selected.cover_url}
@@ -227,7 +227,7 @@ export default function EnrichmentCorrectionModal({
             <button
               type="button"
               onClick={() => setSelected(null)}
-              className="shrink-0 text-xs text-faint hover:text-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-accent rounded"
+              className="shrink-0 text-xs text-faint hover:text-muted focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-accent rounded-sm"
             >
               Change
             </button>
